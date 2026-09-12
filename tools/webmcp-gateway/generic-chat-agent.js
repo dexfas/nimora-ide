@@ -7,6 +7,8 @@ function shunCodeWebMcpAgent(config) {
   const HIGH_IMPACT = new Set(['apply_patch', 'run_command', 'send_command_input']);
   const IGNORE_NAMES = new Set(['TOOL_NAME', '__example__']);
   const seen = new Set();
+  const isDeepSeek = /(^|\.)deepseek\.com$/i.test(location.hostname);
+  const isDeepSeekAuthPage = isDeepSeek && /^\/(?:sign_in|sign_up|forgot_password)(?:\/|$)/i.test(location.pathname);
   let enabled = true;
   let busy = false;
   let primed = false;
@@ -49,6 +51,7 @@ function shunCodeWebMcpAgent(config) {
   }
 
   function findComposer() {
+    if (isDeepSeekAuthPage) return null;
     const selectors = [
       'textarea',
       '[contenteditable="true"][role="textbox"]',
@@ -144,6 +147,7 @@ function shunCodeWebMcpAgent(config) {
 
   async function prime() {
     if (primed) return { ok: true, primed: true, alreadyPrimed: true };
+    if (isDeepSeekAuthPage) return { ok: false, primed: false, reason: 'deepseek-auth-page' };
     const composer = findComposer();
     if (!composer) return { ok: false, primed: false, reason: 'composer-not-found' };
     const prompt = await buildPrompt();
@@ -240,6 +244,8 @@ function shunCodeWebMcpAgent(config) {
       url: location.href,
       enabled,
       primed,
+      isDeepSeek,
+      isDeepSeekAuthPage,
       composerFound: !!composer,
       composerTag: composer?.tagName || null,
       seenCalls: seen.size,

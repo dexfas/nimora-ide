@@ -1,11 +1,13 @@
 (function shunCodeWebMcpAgent(config) {
   if (!config || !config.bridge || !config.token) throw new Error('Missing ShunCode Web MCP config');
-  if (window.__shuncodeWebMcp?.version === 20) return window.__shuncodeWebMcp.status();
-  try { window.__shuncodeWebMcp?.stop?.(); } catch {}
-
   const BRIDGE = String(config.bridge).replace(/\/$/, '');
   const TOKEN = String(config.token);
-  const PRIME_CONTEXT_MARKER = 'SHUNCODE_WEBMCP_CONTEXT_V20';
+  if (window.__shuncodeWebMcp?.version === 24 && window.__shuncodeWebMcp?.matchesConfig?.(BRIDGE, TOKEN)) {
+    return window.__shuncodeWebMcp.status();
+  }
+  try { window.__shuncodeWebMcp?.stop?.(); } catch {}
+
+  const PRIME_CONTEXT_MARKER = 'SHUNCODE_WEBMCP_CONTEXT_V24';
   const pageSessionStorageKey = 'shuncode-webmcp-page-session-id';
   let pageSessionId = '';
   try {
@@ -21,6 +23,7 @@
   const pendingDeliveries = new Map();
   const seenStorageKey = `shuncode-webmcp-seen:${location.origin}${location.pathname}`;
   const isDeepSeek = /(^|\.)deepseek\.com$/i.test(location.hostname);
+  const isDeepSeekAuthPage = isDeepSeek && /^\/(?:sign_in|sign_up|forgot_password)(?:\/|$)/i.test(location.pathname);
   const sendStateKey = `shuncode-webmcp-send-state:${location.origin}`;
   let enabled = true;
   let busy = false;
@@ -197,6 +200,7 @@
   }
 
   function findComposer() {
+    if (isDeepSeekAuthPage) return null;
     const selectors = ['textarea', '[contenteditable="true"][role="textbox"]', '[contenteditable="true"][data-lexical-editor="true"]', '[contenteditable="true"]', 'input[type="text"]'];
     const candidates = [...new Set(selectors.flatMap(selector => [...document.querySelectorAll(selector)]))];
     return candidates.map(element => ({ element, score: composerScore(element) })).filter(item => Number.isFinite(item.score)).sort((a, b) => b.score - a.score)[0]?.element || null;
@@ -438,6 +442,78 @@
     }
   }
 
+  function parseLineScalar(value) {
+    const text = String(value ?? '').trim();
+    if (text === 'true') return true;
+    if (text === 'false') return false;
+    if (text === 'null') return null;
+    if (/^-?(?:\d+\.?\d*|\.\d+)$/.test(text)) return Number(text);
+    if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
+      try { return JSON.parse(text); } catch {}
+    }
+    return text;
+  }
+
+  function setLineArgument(target, dottedPath, value) {
+    const parts = String(dottedPath || '').split('.').filter(Boolean);
+    if (!parts.length) return;
+    let current = target;
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index];
+      const key = /^\d+$/.test(part) ? Number(part) : part;
+      if (index === parts.length - 1) {
+        current[key] = value;
+        return;
+      }
+      const nextIsArray = /^\d+$/.test(parts[index + 1]);
+      if (!current[key] || typeof current[key] !== 'object') current[key] = nextIsArray ? [] : {};
+      current = current[key];
+    }
+  }
+
+  function parseToolLineObject(text, markerIndex, markerLength) {
+    const closeMarker = '[/SHUNCODE_TOOL]';
+    const closeMarkerIndex = text.indexOf(closeMarker, markerIndex + markerLength);
+    if (closeMarkerIndex < 0) return null;
+    const raw = text.slice(markerIndex + markerLength, closeMarkerIndex).trim();
+    if (!raw || raw.startsWith('{')) return null;
+
+    const lines = raw.split(/\r?\n/);
+    const call = { arguments: {} };
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index].trim();
+      if (!line) continue;
+      const heredoc = line.match(/^arg\.([A-Za-z0-9_.-]+)<<([A-Za-z0-9_-]+)$/);
+      if (heredoc) {
+        const [, dottedPath, terminator] = heredoc;
+        const chunks = [];
+        let closed = false;
+        for (index += 1; index < lines.length; index += 1) {
+          if (lines[index].trim() === terminator) {
+            closed = true;
+            break;
+          }
+          chunks.push(lines[index]);
+        }
+        if (!closed) return null;
+        setLineArgument(call.arguments, dottedPath, chunks.join('\n'));
+        continue;
+      }
+      const pair = line.match(/^(id|name|arg\.([A-Za-z0-9_.-]+))=(.*)$/);
+      if (!pair) continue;
+      if (pair[1] === 'id') call.id = pair[3].trim();
+      else if (pair[1] === 'name') call.name = pair[3].trim();
+      else setLineArgument(call.arguments, pair[2], parseLineScalar(pair[3]));
+    }
+    if (typeof call.name !== 'string' || !call.name) return null;
+    return { value: call, endIndex: closeMarkerIndex + closeMarker.length, lineProtocol: true };
+  }
+
+  function parseToolObject(text, markerIndex, markerLength) {
+    return parseToolJsonObject(text, markerIndex, markerLength)
+      || parseToolLineObject(text, markerIndex, markerLength);
+  }
+
   function extractCalls(text) {
     const calls = [];
     const markers = ['[SHUNCODE_TOOL]', '```SHUNCODE_TOOL'];
@@ -446,7 +522,7 @@
       while (fromIndex < text.length) {
         const markerIndex = text.indexOf(marker, fromIndex);
         if (markerIndex < 0) break;
-        const parsed = parseToolJsonObject(text, markerIndex, marker.length);
+        const parsed = parseToolObject(text, markerIndex, marker.length);
         fromIndex = parsed?.endIndex || markerIndex + marker.length;
         const call = parsed?.value;
         if (!call || typeof call.name !== 'string') continue;
@@ -501,7 +577,7 @@
     const occurrences = [];
     for (const element of assistantTextCandidates()) {
       const laneKey = laneKeyFor(element);
-      for (const call of extractCalls(element.textContent || '')) {
+      for (const call of extractCalls(element.innerText || element.textContent || '')) {
         const baseKey = callBaseKey(call);
         const ordinal = (counts.get(baseKey) || 0) + 1;
         counts.set(baseKey, ordinal);
@@ -661,12 +737,16 @@
   }
 
   async function prime() {
+    if (isDeepSeekAuthPage) throw new Error('DeepSeek authentication page is not a chat page');
     if (primed || hasPrimingPrompt()) {
       primed = true;
       return { ok: true, alreadyPrimed: true };
     }
     const tools = await fetchTools();
-    const prompt = `${PRIME_CONTEXT_MARKER}\nYou have LIVE access to the user's ShunCode environment through Web MCP.\n\n${environmentModelPrompt(tools)}\n\nAvailable tools (* = required argument):\n${tools.map(summarizeTool).join('\n')}\n\nIMPORTANT TRANSPORT RULE: Chat renderers can corrupt JSON, quotes, backslashes, HTML and patch text unless the entire tool request is inside a code fence. Whenever a tool is needed, reply with exactly ONE FOUR-BACKTICK text fence and no prose. Inside that outer fence put exactly this request format:\n\n\`\`\`\`text\n[SHUNCODE_TOOL]\n{"id":"unique-call-id","name":"TOOL_NAME","arguments":{}}\n[/SHUNCODE_TOOL]\n\`\`\`\`\n\nDo not omit the outer four-backtick fence. Do not omit [/SHUNCODE_TOOL]. Keep JSON valid and preserve all backslashes exactly. Wait for [SHUNCODE_TOOL_RESULT] before continuing. Never invent tool results. If the user asks you to create or modify a workspace file, you MUST actually use apply_patch or an appropriate ShunCode tool; do not merely print code in chat and claim the file was created. Prefer read/search/diagnostic tools before edits or commands. Minimize tool round-trips: batch compatible file reads in one read_files call, prefer one multi-file apply_patch instead of many tiny patches, and do not perform redundant verification calls. Do not open local files in the browser or start a local preview server merely to visually verify work unless the user explicitly asks for a preview; this self-verification restriction does NOT mean you should avoid browser tools when the user's actual task involves the web. Keep using the appropriate workspace, Windows, and browser tools until the user's task is complete.`;
+    const transportRule = isDeepSeek
+      ? `DEEPSEEK TRANSPORT RULE: Do NOT use JSON and do NOT use a Markdown code fence for tool requests. When a tool is needed, reply with exactly one block and no prose:\n[SHUNCODE_TOOL]\nid=unique-call-id\nname=TOOL_NAME\narg.path=.\narg.depth=1\n[/SHUNCODE_TOOL]\nUse one arg.<name>=<value> line per argument. Use dotted paths for nested values and numeric indexes for arrays, for example arg.files.0.path=README.md. Numbers and booleans should be unquoted. For a multiline string use arg.patch<<SHUNCODE_EOF on one line, then the exact multiline value, then SHUNCODE_EOF on its own line. Always include [/SHUNCODE_TOOL]. Wait for [SHUNCODE_TOOL_RESULT] before continuing.`
+      : `IMPORTANT TRANSPORT RULE: Chat renderers can corrupt JSON, quotes, backslashes, HTML and patch text unless the entire tool request is inside a code fence. Whenever a tool is needed, reply with exactly ONE FOUR-BACKTICK text fence and no prose. Inside that outer fence put exactly this request format:\n\n\`\`\`\`text\n[SHUNCODE_TOOL]\n{"id":"unique-call-id","name":"TOOL_NAME","arguments":{}}\n[/SHUNCODE_TOOL]\n\`\`\`\`\n\nDo not omit the outer four-backtick fence. Do not omit [/SHUNCODE_TOOL]. Keep JSON valid and preserve all backslashes exactly. Wait for [SHUNCODE_TOOL_RESULT] before continuing.`;
+    const prompt = `${PRIME_CONTEXT_MARKER}\nYou have LIVE access to the user's ShunCode environment through Web MCP.\n\n${environmentModelPrompt(tools)}\n\nAvailable tools (* = required argument):\n${tools.map(summarizeTool).join('\n')}\n\n${transportRule}\n\nNever invent tool results. If the user asks you to create or modify a workspace file, you MUST actually use apply_patch or an appropriate ShunCode tool; do not merely print code in chat and claim the file was created. Prefer read/search/diagnostic tools before edits or commands. Minimize tool round-trips: batch compatible file reads in one read_files call, prefer one multi-file apply_patch instead of many tiny patches, and do not perform redundant verification calls. Do not open local files in the browser or start a local preview server merely to visually verify work unless the user explicitly asks for a preview; this self-verification restriction does NOT mean you should avoid browser tools when the user's actual task involves the web. Keep using the appropriate workspace, Windows, and browser tools until the user's task is complete.`;
     await sendMessage(prompt);
     primed = true;
     return { ok: true, toolCount: tools.length };
@@ -678,12 +758,13 @@
   scheduleScan(0);
 
   window.__shuncodeWebMcp = {
-    version: 20,
+    version: 24,
+    matchesConfig: (bridge, token) => String(bridge || '').replace(/\/$/, '') === BRIDGE && String(token || '') === TOKEN,
     prime,
     scan,
     invokeTool,
     fetchTools,
-    status: () => ({ version: 20, enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: seen.size, pendingDeliveries: pendingDeliveries.size, lockedLane, isDeepSeek, deepSeekPacing: 'disabled-user-preference', dedupeMode: 'call-occurrence-v2', lastScanAt, lastHandledCallKey, lastDeliveryError }),
+    status: () => ({ version: 24, enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: seen.size, pendingDeliveries: pendingDeliveries.size, lockedLane, isDeepSeek, isDeepSeekAuthPage, deepSeekPacing: 'disabled-user-preference', dedupeMode: 'call-occurrence-v2', lastScanAt, lastHandledCallKey, lastDeliveryError }),
     stop: () => {
       enabled = false;
       observer.disconnect();

@@ -4,7 +4,7 @@
 
 ## 结论
 
-Nimora IDE 已经恢复并实测通过当前发行版的主要 AI IDE / Agent 能力，包括源码版启动、Chat participant、模型 Provider、Ask / Plan / Code 模式、IDE 工具 broker、Agent Host、MCP 文件工具、WebMCP 受管浏览器、Personal Edge Bridge，以及通过本地和 Cloudflare Quick Tunnel 暴露的外部 Bridge MCP 调用链。
+Nimora IDE 已经恢复并实测通过当前发行版的主要 AI IDE / Agent 能力，包括源码版启动、Chat participant、模型 Provider、Ask / Plan / Code 模式、IDE 工具 broker、Agent Host、MCP 文件工具、WebMCP 受管浏览器、Personal Edge Bridge，以及通过本地和 Cloudflare Quick Tunnel 暴露的外部 Bridge MCP 调用链。ChatGPT 原生 MCP 与 DeepSeek 网页 WebMCP 两条目标接入链也均已完成真实模型端到端验证。
 
 目前不能把结论表述为“所有功能 100% 完全等价”。仍有一批依赖外部账号、特定云端配置或完整人工 UI 回归的场景没有逐项验收，例如 Codex / Copilot 的真实账号登录和推理请求、Cloudflare Named Tunnel / ngrok、远端服务、更新流程及所有 UI 边缘状态。
 
@@ -111,6 +111,42 @@ Nimora 源码版启动时 Main、Renderer、Extension Host 和 Agent Host 均正
 因此 **外部 AI / MCP Client → 公网 HTTPS Tunnel → Nimora Bridge → IDE/MCP tools** 已完成真实端到端闭环。测试使用的 Quick Tunnel、源码 Nimora 进程和临时测试文件在验收结束后均已关闭/清理。
 
 首次公网尝试时，隔离开发设置中残留的 provider 为 `ngrok`，而本机 ngrok 会话认证失败，因此该次启动没有建立公网 tunnel；这不影响随后 Cloudflare Quick Tunnel 的成功验收，也意味着 ngrok 路径仍应单独列为未验证项。
+
+## ChatGPT / DeepSeek 外部 AI 实测
+
+本轮进一步选择两类代表性接入方式做真实模型验收：ChatGPT 走原生 MCP；DeepSeek 网页端走 WebMCP 页面协议。
+
+### ChatGPT 原生 MCP
+
+当前 ChatGPT 会话直接通过连接到 Nimora 的 MCP 工具调用 `run_command`，Nimora 实际执行无副作用测试命令并返回 `CHATGPT_NATIVE_MCP_OK`。因此 **ChatGPT → 原生 MCP → Nimora tool layer** 已完成真实闭环，而不是仅由独立测试 Client 模拟。
+
+### DeepSeek 网页 WebMCP
+
+DeepSeek 使用已登录的真实网页会话完成测试。页面 Agent 获取到 37 个可用工具，其中包含 Nimora 的 `list_directory`、`read_files`、`run_command`、LSP / diagnostics 等工具以及浏览器工具。
+
+验收中发现并修复了三个 DeepSeek / WebMCP 兼容问题：
+
+1. WebMCP Extension Host 重启后会生成新的页面 token，而旧页面 Agent 曾只按版本号判断“已经注入”，因此可能继续持有旧 token并触发 `Invalid Web MCP page token`。现在页面 Agent 会同时校验 Bridge 地址与 token；配置发生变化时会停止旧 Agent 并重新注入。
+2. DeepSeek 登录页的账号输入框曾可能被通用 composer 检测误判为聊天框。现在 `/sign_in`、`/sign_up`、`/forgot_password` 不会 prime WebMCP。
+3. DeepSeek 对 JSON 工具请求连续出现生成中途截断。DeepSeek 现在使用专用行式协议（`id=` / `name=` / `arg.*=`），仍保留旧 JSON 协议给其他网页 AI；数组 / 嵌套参数使用 dotted path，长多行参数支持 heredoc。扫描器使用 `innerText` 保留 DeepSeek Markdown 渲染产生的换行。
+
+真实 DeepSeek 回合验证结果：
+
+| 链路 | 结果 |
+| --- | --- |
+| DeepSeek 接收 WebMCP 上下文与 37 个工具 | 通过 |
+| DeepSeek 自主生成 `list_directory` 工具请求 | 通过 |
+| WebMCP 自动解析并调用 Nimora `list_directory` | 通过 |
+| 工具结果自动回灌 DeepSeek | 通过 |
+| DeepSeek 根据真实结果确认 `README.md` 与 `docs` | 通过 |
+| DeepSeek 生成带数组参数的 `read_files` 请求 | 通过 |
+| `arg.files.0.*` 正确还原为嵌套 MCP 参数 | 通过 |
+| Nimora 实际读取 README 第 1–4 行 | 通过 |
+| DeepSeek 根据返回内容回答首个 Markdown 标题 `# Nimora IDE` | 通过 |
+
+因此 **DeepSeek 网页模型 → WebMCP → Nimora MCP tools → WebMCP result → DeepSeek 继续推理/回答** 已完成真实端到端闭环。
+
+本次为了在不修改安装版文件的前提下复用现有已登录 DeepSeek 内置浏览器会话，页面宿主使用了安装版 Integrated Browser 的只读 HTTP tool bridge，并通过 `.build` 下的临时页面适配器连接到源码 Nimora 的 Gateway / MCP。实际工作区工具执行发生在源码 Nimora。安装版与源码版默认都使用 `48321/48322`，因此两者同时运行时存在开发端口冲突；这属于并行开发环境限制，不影响单独运行 Nimora 时的 WebMCP 架构。
 
 ## 尚未逐项验证的能力
 
