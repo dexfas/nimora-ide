@@ -4,6 +4,8 @@ Nimora IDE 是一个基于 **Code - OSS / Visual Studio Code** 的开源 AI 编�
 
 > **项目公开名称是 Nimora IDE。** 为保持与已恢复发行源码、扩展 ID、协议和运行时路径兼容，仓库中仍保留部分历史 `shuncode` / `ShunCode` 内部标识；这些兼容标识不代表公开项目名称。当前仓库是从现有发行安装包、随包 TypeScript 源码和 source map 重建的开源工作副本，不会修改本机已安装程序。
 
+当前功能对照与实机验收结果见 [docs/PARITY.md](docs/PARITY.md)。
+
 ## 上游基线
 
 - 上游：`https://github.com/microsoft/vscode`
