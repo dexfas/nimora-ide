@@ -1,0 +1,36 @@
+{
+  "name": "shuncode-integrated-browser-bridge",
+  "displayName": "ShunCode Web MCP Bridge",
+  "description": "Web MCP bridge for ShunCode's built-in Integrated Browser and generic AI chat pages.",
+  "version": "0.4.10",
+  "publisher": "shuncode",
+  "private": false,
+  "engines": { "vscode": "^1.132.0" },
+  "extensionKind": ["ui"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "shuncode.webMcp.connect",
+        "title": "Web MCP: 连接当前内置浏览器聊天页"
+      },
+      {
+        "command": "shuncode.webMcp.clipboard",
+        "title": "Web MCP: 剪贴板安全模式（备用）"
+      },
+      {
+        "command": "shuncode.webMcp.stop",
+        "title": "Web MCP: 停用当前内置浏览器聊天页"
+      },
+      {
+        "command": "shuncode.webMcp.status",
+        "title": "Web MCP: 查看状态"
+      },
+      {
+        "command": "shuncode.webMcp.approvalMode",
+        "title": "Web MCP: 设置审批模式"
+      }
+    ]
+  }
+}

@@ -1,0 +1,859 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+import './media/shunCodeBridgeSessionView.css';
+import { $, addDisposableListener, append, clearNode, setVisibility } from '../../../../../../base/browser/dom.js';
+import { Button } from '../../../../../../base/browser/ui/button/button.js';
+import { Codicon } from '../../../../../../base/common/codicons.js';
+import { Disposable, toDisposable } from '../../../../../../base/common/lifecycle.js';
+import { ThemeIcon } from '../../../../../../base/common/themables.js';
+import { localize } from '../../../../../../nls.js';
+import { ICommandService } from '../../../../../../platform/commands/common/commands.js';
+import { defaultButtonStyles } from '../../../../../../platform/theme/browser/defaultStyles.js';
+
+interface BridgeActivityPresentation {
+	readonly kind: 'files' | 'search' | 'edit' | 'terminal' | 'diagnostics' | 'lsp' | 'generic';
+	readonly title: string;
+	readonly subtitle?: string;
+	readonly input?: string;
+	readonly output?: string;
+	readonly files?: string[];
+	readonly items?: BridgeActivityItem[];
+	readonly diff?: string;
+	readonly diffPreview?: BridgeDiffFilePreview[];
+	readonly terminalId?: string;
+	readonly commandId?: string;
+	readonly exitCode?: number | null;
+}
+
+interface BridgeDiffFilePreview {
+	readonly path: string;
+	readonly oldPath?: string;
+	readonly newPath?: string;
+	readonly hunks: BridgeDiffHunkPreview[];
+	readonly truncated?: boolean;
+}
+
+interface BridgeDiffHunkPreview {
+	readonly oldStart: number;
+	readonly newStart: number;
+	readonly lines: BridgeDiffLinePreview[];
+	readonly truncated?: boolean;
+}
+
+interface BridgeDiffLinePreview {
+	readonly kind: 'context' | 'add' | 'delete';
+	readonly oldLine?: number;
+	readonly newLine?: number;
+	readonly text: string;
+}
+
+interface BridgeActivityItem {
+	readonly kind: 'file' | 'folder' | 'match' | 'diagnostic' | 'symbol';
+	readonly path: string;
+	readonly line?: number;
+	readonly column?: number;
+	readonly label?: string;
+	readonly description?: string;
+	readonly severity?: 'error' | 'warning' | 'information' | 'hint';
+	readonly additions?: number;
+	readonly deletions?: number;
+}
+
+interface BridgeActivity {
+	readonly id: number;
+	readonly at: string;
+	readonly tool: string;
+	readonly status: 'running' | 'completed' | 'error' | 'progress';
+	readonly durationMs?: number;
+	readonly message?: string;
+	readonly phase?: string;
+	readonly percent?: number;
+	readonly todoId?: string;
+	readonly todoTitle?: string;
+	readonly presentation?: BridgeActivityPresentation;
+}
+
+interface BridgeTodo {
+	readonly id: string;
+	readonly title: string;
+	readonly status: 'pending' | 'in_progress' | 'completed';
+}
+
+interface BridgeStatus {
+	readonly state: 'stopped' | 'starting' | 'running' | 'error';
+	readonly transport: 'streamable-http';
+	readonly publicUrl?: string;
+	readonly lastError?: string;
+	readonly activeRequests: number;
+	readonly connected: boolean;
+	readonly revision: number;
+	readonly todos: BridgeTodo[];
+	readonly stats: {
+		readonly toolCalls: number;
+		readonly completedToolCalls: number;
+		readonly failedToolCalls: number;
+		readonly averageDurationMs: number;
+		readonly successRate: number;
+		readonly lastTool?: string;
+		readonly lastToolAt?: string;
+	};
+	readonly activities: BridgeActivity[];
+	readonly health?: BridgeHealthReport;
+}
+
+interface BridgeHealthProbe {
+	readonly ok: boolean;
+	readonly url?: string;
+	readonly latencyMs?: number;
+	readonly error?: string;
+}
+
+interface BridgeHealthReport {
+	readonly at: string;
+	readonly ok: boolean;
+	readonly state: BridgeStatus['state'];
+	readonly durationMs: number;
+	readonly local: BridgeHealthProbe;
+	readonly public?: BridgeHealthProbe;
+	readonly tunnelProcessAlive: boolean;
+	readonly sessions: number;
+	readonly activeRequests: number;
+	readonly lastSessionActivityAt?: string;
+	readonly summary: string;
+}
+
+const BRIDGE_GET_STATUS = 'shuncode.bridge.getStatus';
+const BRIDGE_START = 'shuncode.bridge.start';
+const BRIDGE_STOP = 'shuncode.bridge.stop';
+const BRIDGE_CHECK_HEALTH = 'shuncode.bridge.checkHealth';
+const BRIDGE_CLEAR_ACTIVITY_LOG = 'shuncode.bridge.clearActivityLog';
+const BRIDGE_OPEN_RESOURCE = 'shuncode.bridge.openResource';
+const BRIDGE_OPEN_DIFF = 'shuncode.bridge.openDiff';
+const BRIDGE_OPEN_TERMINAL = 'shuncode.bridge.openTerminal';
+
+function formatDuration(durationMs: number | undefined): string {
+	if (durationMs === undefined) {
+		return '';
+	}
+	if (durationMs < 1000) {
+		return `${durationMs} ms`;
+	}
+	return `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)} s`;
+}
+
+function formatTime(value: string | undefined): string {
+	if (!value) {
+		return '';
+	}
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return '';
+	}
+	return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function activityIcon(activity: BridgeActivity): ThemeIcon {
+	if (activity.status === 'error') {
+		return Codicon.error;
+	}
+	if (activity.status === 'running') {
+		return ThemeIcon.modify(Codicon.loading, 'spin');
+	}
+	switch (activity.presentation?.kind) {
+		case 'files': return Codicon.files;
+		case 'search': return Codicon.search;
+		case 'edit': return Codicon.edit;
+		case 'terminal': return Codicon.terminal;
+		case 'diagnostics': return Codicon.warning;
+		case 'lsp': return Codicon.symbolMethod;
+		default: return Codicon.tools;
+	}
+}
+
+export class ShunCodeBridgeSessionView extends Disposable {
+	private static readonly NEAR_BOTTOM_SCROLL_THRESHOLD_PX = 72;
+	private static readonly USER_SCROLL_RENDER_COOLDOWN_MS = 500;
+
+	private readonly root: HTMLElement;
+	private readonly todosRegion: HTMLElement;
+	private readonly timelineScroll: HTMLElement;
+	private readonly timeline: HTMLElement;
+	private readonly connectionDot: HTMLElement;
+	private readonly connectionTitle: HTMLElement;
+	private readonly connectionDescription: HTMLElement;
+	private readonly footerDetails: HTMLElement;
+	private readonly statsContainer: HTMLElement;
+	private readonly footerMeta: HTMLElement;
+	private readonly footerHint: HTMLElement;
+	private readonly healthRow: HTMLElement;
+	private readonly healthDot: HTMLElement;
+	private readonly healthText: HTMLElement;
+	private readonly startStopButton: Button;
+	private readonly healthButton: Button;
+	private readonly clearLogButton: Button;
+	private readonly collapseButton: Button;
+	private visible = false;
+	private refreshing = false;
+	private busy = false;
+	private checkingHealth = false;
+	private healthError: string | undefined;
+	private footerCollapsed = false;
+	private todoExpanded = false;
+	private readonly expandedToolActivities = new Set<number>();
+	private lastRevision = -1;
+	private lastStatus: BridgeStatus | undefined;
+	private followTimeline = true;
+	private suppressScrollTracking = false;
+	private userScrollActiveUntil = 0;
+
+	constructor(
+		parent: HTMLElement,
+		@ICommandService private readonly commandService: ICommandService,
+	) {
+		super();
+
+		this.root = append(parent, $('.shuncode-bridge-session-view'));
+		this.root.style.display = 'none';
+
+		this.todosRegion = append(this.root, $('.shuncode-bridge-session-todos-region'));
+		this.timelineScroll = append(this.root, $('.shuncode-bridge-session-scroll'));
+		this.timeline = append(this.timelineScroll, $('.shuncode-bridge-session-timeline'));
+		this._register(addDisposableListener(this.timelineScroll, 'scroll', () => this.onTimelineScroll()));
+
+		// The ChatWidget registers a wheel listener on its parent (the shared
+		// controls wrapper) that forwards wheel events originating outside its
+		// own container to the chat list, which prevents default and swallows
+		// them. The Bridge session view lives in that same wrapper, so wheel
+		// events over this view would reach that listener and be consumed by
+		// the hidden chat list, leaving the native scrollbar draggable but the
+		// wheel dead. Stop the propagation at the session view boundary so the
+		// browser's native scrolling of `.shuncode-bridge-session-scroll`
+		// keeps working.
+		this._register(addDisposableListener(this.root, 'wheel', (event) => {
+			event.stopPropagation();
+		}));
+
+		const footer = append(this.root, $('.shuncode-bridge-session-footer'));
+		const connectionRow = append(footer, $('.shuncode-bridge-session-connection-row'));
+		const connectionInfo = append(connectionRow, $('.shuncode-bridge-session-connection-info'));
+		const connectionHeading = append(connectionInfo, $('.shuncode-bridge-session-connection-heading'));
+		this.connectionDot = append(connectionHeading, $('span.shuncode-bridge-session-dot'));
+		this.connectionTitle = append(connectionHeading, $('strong'));
+		this.connectionDescription = append(connectionInfo, $('span.shuncode-bridge-session-connection-description'));
+		const connectionActions = append(connectionRow, $('.shuncode-bridge-session-connection-actions'));
+		this.collapseButton = this._register(new Button(connectionActions, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
+		this.collapseButton.element.classList.add('shuncode-bridge-session-collapse-button');
+		this._register(this.collapseButton.onDidClick(() => this.toggleFooterCollapsed()));
+
+		// Action buttons live on their own row below the status text so the
+		// narrow sidebar never has to squeeze three buttons next to the heading.
+		const actionRow = append(footer, $('.shuncode-bridge-session-action-row'));
+		this.startStopButton = this._register(new Button(actionRow, { ...defaultButtonStyles, supportIcons: true }));
+		this.startStopButton.element.classList.add('shuncode-bridge-session-start-stop-button');
+		this._register(this.startStopButton.onDidClick(() => void this.toggleBridge()));
+		this.healthButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
+		this.healthButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-health-button');
+		this._register(this.healthButton.onDidClick(() => void this.checkHealth()));
+		this.clearLogButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
+		this.clearLogButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-clear-button');
+		this._register(this.clearLogButton.onDidClick(() => void this.clearActivityLog()));
+
+		this.footerDetails = append(footer, $('.shuncode-bridge-session-footer-details'));
+		this.statsContainer = append(this.footerDetails, $('.shuncode-bridge-session-stats'));
+		this.healthRow = append(this.footerDetails, $('.shuncode-bridge-session-health'));
+		this.healthDot = append(this.healthRow, $('span.shuncode-bridge-session-dot'));
+		this.healthText = append(this.healthRow, $('span.shuncode-bridge-session-health-text'));
+		setVisibility(false, this.healthRow);
+		this.footerMeta = append(this.footerDetails, $('.shuncode-bridge-session-meta'));
+		this.footerHint = append(this.footerDetails, $('.shuncode-bridge-session-hint'));
+		this.renderFooterCollapsedState();
+
+		const timer = setInterval(() => void this.refresh(), 350);
+		this._register(toDisposable(() => clearInterval(timer)));
+	}
+
+	setVisible(visible: boolean): void {
+		this.visible = visible;
+		setVisibility(visible, this.root);
+		if (visible) {
+			// Re-showing starts pinned to the latest activity again.
+			this.followTimeline = true;
+			void this.refresh(true);
+		}
+	}
+
+	private async toggleBridge(): Promise<void> {
+		if (this.busy) {
+			return;
+		}
+		this.busy = true;
+		this.renderControls();
+		try {
+			const status = await this.commandService.executeCommand<BridgeStatus>(this.lastStatus?.state === 'running' ? BRIDGE_STOP : BRIDGE_START);
+			if (status) {
+				this.lastStatus = status;
+				this.render(status, true);
+			}
+		} catch (error) {
+			this.connectionDescription.textContent = error instanceof Error ? error.message : String(error);
+		} finally {
+			this.busy = false;
+			this.renderControls();
+			void this.refresh(true);
+		}
+	}
+
+	private toggleFooterCollapsed(): void {
+		this.footerCollapsed = !this.footerCollapsed;
+		this.renderFooterCollapsedState();
+		if (this.lastStatus) {
+			this.renderStatus(this.lastStatus);
+		}
+	}
+
+	private async checkHealth(): Promise<void> {
+		if (this.checkingHealth) {
+			return;
+		}
+		this.checkingHealth = true;
+		this.healthError = undefined;
+		this.renderControls();
+		this.renderHealth(this.lastStatus?.health);
+		try {
+			const status = await this.commandService.executeCommand<BridgeStatus>(BRIDGE_CHECK_HEALTH);
+			if (status) {
+				this.lastStatus = status;
+				this.render(status, false);
+			}
+		} catch (error) {
+			this.healthError = error instanceof Error ? error.message : String(error);
+		} finally {
+			this.checkingHealth = false;
+			this.renderControls();
+			this.renderHealth(this.lastStatus?.health);
+		}
+	}
+
+	private async clearActivityLog(): Promise<void> {
+		if (this.busy) {
+			return;
+		}
+		this.busy = true;
+		this.renderControls();
+		try {
+			const status = await this.commandService.executeCommand<BridgeStatus>(BRIDGE_CLEAR_ACTIVITY_LOG);
+			this.expandedToolActivities.clear();
+			this.followTimeline = true;
+			if (status) {
+				this.lastStatus = status;
+				this.render(status, true);
+			}
+		} catch (error) {
+			this.connectionDescription.textContent = error instanceof Error ? error.message : String(error);
+		} finally {
+			this.busy = false;
+			this.renderControls();
+		}
+	}
+
+	private renderFooterCollapsedState(): void {
+		this.root.classList.toggle('footer-collapsed', this.footerCollapsed);
+		setVisibility(!this.footerCollapsed, this.footerDetails);
+		this.collapseButton.label = `$(${this.footerCollapsed ? Codicon.chevronUp.id : Codicon.chevronDown.id})`;
+		const title = this.footerCollapsed
+			? localize('shuncodeBridgeSession.expandStatus', "Expand Bridge status")
+			: localize('shuncodeBridgeSession.collapseStatus', "Collapse Bridge status");
+		this.collapseButton.setTitle(title);
+		this.collapseButton.element.setAttribute('aria-label', title);
+		this.collapseButton.element.setAttribute('aria-expanded', String(!this.footerCollapsed));
+	}
+
+	private async refresh(force = false): Promise<void> {
+		if (!this.visible || this.refreshing || this.busy) {
+			return;
+		}
+		this.refreshing = true;
+		try {
+			const status = await this.commandService.executeCommand<BridgeStatus>(BRIDGE_GET_STATUS);
+			if (status) {
+				this.lastStatus = status;
+				this.render(status, force);
+			}
+		} catch (error) {
+			this.connectionTitle.textContent = localize('shuncodeBridgeSession.unavailable', "Bridge unavailable");
+			this.connectionDescription.textContent = error instanceof Error ? error.message : String(error);
+			this.connectionDot.className = 'shuncode-bridge-session-dot state-error';
+		} finally {
+			this.refreshing = false;
+		}
+	}
+
+	private render(status: BridgeStatus, force: boolean): void {
+		// Rebuilding the timeline replaces every DOM node and would interrupt a
+		// native scrollbar drag in progress; defer it while the user is actively
+		// scrolling and let the next refresh cycle render once idle.
+		if (force || (status.revision !== this.lastRevision && Date.now() >= this.userScrollActiveUntil)) {
+			this.renderTimeline(status.activities, status.todos);
+			this.lastRevision = status.revision;
+		}
+		this.renderStatus(status);
+		this.renderControls();
+	}
+
+	private renderTimeline(activities: readonly BridgeActivity[], todos: readonly BridgeTodo[]): void {
+		clearNode(this.todosRegion);
+		clearNode(this.timeline);
+		this.renderTodos(todos, activities);
+
+		if (!activities.length) {
+			const empty = append(this.timeline, $('.shuncode-bridge-session-empty'));
+			const icon = append(empty, $('span'));
+			icon.classList.add(...ThemeIcon.asClassNameArray(Codicon.radioTower));
+			append(empty, $('strong', undefined, localize('shuncodeBridgeSession.waiting', "Waiting for the remote Agent")));
+			append(empty, $('span', undefined, localize('shuncodeBridgeSession.waitingDetail', "Tool calls made by the connected MCP client will appear here. Input stays in the external client.")));
+			return;
+		}
+
+		for (const activity of activities) {
+			if (activity.status === 'progress') {
+				this.renderProgress(activity);
+			} else {
+				this.renderToolCard(activity);
+			}
+		}
+
+		// Pin to the latest activity only while the user has not scrolled away.
+		// The previous `status === 'running'` clause yanked the scroll position
+		// to the bottom on every poll and made the scrollbar unusable.
+		if (this.followTimeline) {
+			this.scrollTimelineToBottom();
+		}
+	}
+
+	private onTimelineScroll(): void {
+		if (this.suppressScrollTracking) {
+			return;
+		}
+		this.userScrollActiveUntil = Date.now() + ShunCodeBridgeSessionView.USER_SCROLL_RENDER_COOLDOWN_MS;
+		const distanceFromBottom = this.timelineScroll.scrollHeight - this.timelineScroll.scrollTop - this.timelineScroll.clientHeight;
+		this.followTimeline = distanceFromBottom < ShunCodeBridgeSessionView.NEAR_BOTTOM_SCROLL_THRESHOLD_PX;
+	}
+
+	private scrollTimelineToBottom(): void {
+		queueMicrotask(() => {
+			this.suppressScrollTracking = true;
+			this.timelineScroll.scrollTop = this.timelineScroll.scrollHeight;
+			// Programmatic scrolls dispatch scroll events asynchronously; release the
+			// suppression afterwards so user-initiated scrolling is tracked again.
+			setTimeout(() => {
+				this.suppressScrollTracking = false;
+				this.followTimeline = true;
+			}, 0);
+		});
+	}
+
+	private renderTodos(todos: readonly BridgeTodo[], activities: readonly BridgeActivity[]): void {
+		if (!todos.length) {
+			return;
+		}
+		const latestProgressByTodo = new Map<string, BridgeActivity>();
+		for (const activity of activities) {
+			if (activity.status === 'progress' && activity.todoId) {
+				latestProgressByTodo.set(activity.todoId, activity);
+			}
+		}
+		const completed = todos.filter(todo => todo.status === 'completed').length;
+		const card = append(this.todosRegion, $<HTMLDetailsElement>('details.shuncode-bridge-todos'));
+		card.open = this.todoExpanded;
+		const summary = append(card, $('summary.shuncode-bridge-todos-summary'));
+		this.bindDetailsToggle(card, summary, expanded => this.todoExpanded = expanded);
+		const icon = append(summary, $('span.shuncode-bridge-todos-icon'));
+		icon.classList.add(...ThemeIcon.asClassNameArray(Codicon.checklist));
+		append(summary, $('strong', undefined, localize('shuncodeBridgeSession.tasks', "Tasks")));
+		append(summary, $('span.shuncode-bridge-todos-count', undefined, `${completed}/${todos.length}`));
+		const body = append(card, $('.shuncode-bridge-todos-body'));
+		for (const todo of todos) {
+			const row = append(body, $(`div.shuncode-bridge-todo.${todo.status.replace('_', '-')}`));
+			const statusIcon = append(row, $('span.shuncode-bridge-todo-icon'));
+			const todoIcon = todo.status === 'completed'
+				? Codicon.check
+				: todo.status === 'in_progress'
+					? ThemeIcon.modify(Codicon.loading, 'spin')
+					: Codicon.circleLargeOutline;
+			statusIcon.classList.add(...ThemeIcon.asClassNameArray(todoIcon));
+			const labels = append(row, $('.shuncode-bridge-todo-labels'));
+			append(labels, $('span.shuncode-bridge-todo-title', undefined, todo.title));
+			const progress = latestProgressByTodo.get(todo.id);
+			if (todo.status === 'in_progress' && progress) {
+				const detail = [progress.phase, progress.message].filter(Boolean).join(' · ');
+				if (detail) {
+					append(labels, $('span.shuncode-bridge-todo-progress', undefined, detail));
+				}
+				if (progress.percent !== undefined) {
+					append(row, $('span.shuncode-bridge-todo-percent', undefined, `${progress.percent}%`));
+				}
+			}
+		}
+	}
+
+	private renderProgress(activity: BridgeActivity): void {
+		const row = append(this.timeline, $('.shuncode-bridge-progress-row'));
+		const icon = append(row, $('span.shuncode-bridge-progress-icon'));
+		icon.classList.add(...ThemeIcon.asClassNameArray(Codicon.info));
+		const body = append(row, $('.shuncode-bridge-progress-body'));
+		if (activity.todoTitle) {
+			append(body, $('span.shuncode-bridge-progress-task', undefined, localize('shuncodeBridgeSession.progressTask', "Task · {0}", activity.todoTitle)));
+		}
+		if (activity.phase) {
+			append(body, $('strong', undefined, activity.phase));
+		}
+		append(body, $('span', undefined, activity.message ?? localize('shuncodeBridgeSession.progress', "Working…")));
+		if (activity.percent !== undefined) {
+			append(row, $('span.shuncode-bridge-progress-percent', undefined, `${activity.percent}%`));
+		}
+	}
+
+	private renderToolCard(activity: BridgeActivity): void {
+		const presentation = activity.presentation ?? { kind: 'generic' as const, title: activity.tool };
+		const card = append(this.timeline, $<HTMLDetailsElement>('details.shuncode-bridge-tool-card'));
+		card.open = this.expandedToolActivities.has(activity.id);
+		card.classList.add(`state-${activity.status}`, `kind-${presentation.kind}`);
+
+		const summary = append(card, $('summary.shuncode-bridge-tool-summary'));
+		this.bindDetailsToggle(card, summary, expanded => {
+			if (expanded) {
+				this.expandedToolActivities.add(activity.id);
+			} else {
+				this.expandedToolActivities.delete(activity.id);
+			}
+		});
+		const icon = append(summary, $('span.shuncode-bridge-tool-icon'));
+		icon.classList.add(...ThemeIcon.asClassNameArray(activityIcon(activity)));
+		const labels = append(summary, $('.shuncode-bridge-tool-labels'));
+		append(labels, $('span.shuncode-bridge-tool-title', undefined, presentation.title));
+		if (presentation.subtitle) append(labels, $('span.shuncode-bridge-tool-subtitle', undefined, presentation.subtitle));
+		const meta = append(summary, $('span.shuncode-bridge-tool-meta'));
+		meta.textContent = activity.status === 'running'
+			? localize('shuncodeBridgeSession.running', "Running…")
+			: activity.status === 'error'
+				? localize('shuncodeBridgeSession.failed', "Failed")
+				: formatDuration(activity.durationMs) || localize('shuncodeBridgeSession.completed', "Completed");
+		if (presentation.kind === 'edit') {
+			this.renderEditSummaryItems(summary, presentation);
+		}
+
+		const body = append(card, $('.shuncode-bridge-tool-body'));
+		if (presentation.kind !== 'edit') {
+			this.renderToolItems(body, presentation);
+		}
+		if (presentation.kind === 'edit') {
+			this.renderMiniDiff(body, presentation);
+		}
+		if (presentation.terminalId) {
+			const actions = append(body, $('.shuncode-bridge-tool-actions'));
+			const openTerminal = append(actions, $('button.shuncode-bridge-tool-action'));
+			const terminalIcon = append(openTerminal, $('span'));
+			terminalIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.terminal));
+			append(openTerminal, $('span', undefined, localize('shuncodeBridgeSession.openTerminal', "Open Terminal")));
+			openTerminal.addEventListener('click', () => void this.commandService.executeCommand(BRIDGE_OPEN_TERMINAL, presentation.terminalId));
+		}
+
+		const showRawInput = presentation.kind === 'generic' || activity.tool === 'send_command_input';
+		this.renderCodeSection(body, localize('shuncodeBridgeSession.input', "Input"), showRawInput ? presentation.input : undefined);
+		this.renderCodeSection(body, localize('shuncodeBridgeSession.output', "Output"), presentation.output);
+		if (activity.message && activity.status === 'error' && activity.message !== presentation.output) {
+			const error = append(body, $('.shuncode-bridge-tool-error'));
+			error.textContent = activity.message;
+		}
+	}
+
+	private bindDetailsToggle(card: HTMLDetailsElement, summary: HTMLElement, onDidToggle: (expanded: boolean) => void): void {
+		const syncExpandedState = () => {
+			summary.setAttribute('aria-expanded', String(card.open));
+			onDidToggle(card.open);
+		};
+
+		summary.addEventListener('click', event => {
+			event.preventDefault();
+			card.open = !card.open;
+			syncExpandedState();
+		});
+		card.addEventListener('toggle', syncExpandedState);
+		syncExpandedState();
+	}
+
+	private renderEditSummaryItems(parent: HTMLElement, presentation: BridgeActivityPresentation): void {
+		const items = (presentation.items ?? []).filter(item => item.kind === 'file');
+		if (!items.length) {
+			return;
+		}
+		const list = append(parent, $('.shuncode-bridge-edit-summary-files'));
+		for (const item of items.slice(0, 8)) {
+			const row = append(list, $<HTMLButtonElement>('button.shuncode-bridge-edit-summary-file'));
+			row.type = 'button';
+			const icon = append(row, $('span.shuncode-bridge-edit-summary-file-icon'));
+			icon.classList.add(...ThemeIcon.asClassNameArray(Codicon.file));
+			append(row, $('span.shuncode-bridge-edit-summary-file-path', undefined, item.path));
+			if (item.additions !== undefined || item.deletions !== undefined) {
+				const stats = append(row, $('span.shuncode-bridge-edit-summary-file-stats'));
+				append(stats, $('span.additions', undefined, `+${item.additions ?? 0}`));
+				append(stats, $('span.deletions', undefined, `−${item.deletions ?? 0}`));
+			}
+			row.addEventListener('click', event => {
+				event.preventDefault();
+				event.stopPropagation();
+				void this.commandService.executeCommand(BRIDGE_OPEN_RESOURCE, { path: item.path });
+			});
+		}
+		if (items.length > 8) {
+			append(list, $('span.shuncode-bridge-edit-summary-more', undefined, localize('shuncodeBridgeSession.moreEditedFiles', "{0} more files", items.length - 8)));
+		}
+	}
+
+	private renderMiniDiff(parent: HTMLElement, presentation: BridgeActivityPresentation): void {
+		if (!presentation.diffPreview?.length || !presentation.diff) {
+			return;
+		}
+		const preview = append(parent, $('.shuncode-bridge-mini-diff'));
+		for (const file of presentation.diffPreview) {
+			const fileBlock = append(preview, $('.shuncode-bridge-mini-diff-file'));
+			const header = append(fileBlock, $('.shuncode-bridge-mini-diff-header'));
+			const fileButton = append(header, $<HTMLButtonElement>('button.shuncode-bridge-mini-diff-file-button'));
+			fileButton.type = 'button';
+			const fileIcon = append(fileButton, $('span'));
+			fileIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.file));
+			append(fileButton, $('span.shuncode-bridge-mini-diff-path', undefined, file.path));
+			fileButton.addEventListener('click', () => void this.commandService.executeCommand(BRIDGE_OPEN_RESOURCE, { path: file.path }));
+
+			const openDiff = append(header, $<HTMLButtonElement>('button.shuncode-bridge-mini-diff-open'));
+			openDiff.type = 'button';
+			openDiff.setAttribute('title', localize('shuncodeBridgeSession.openFullDiff', "Open full diff"));
+			const diffIcon = append(openDiff, $('span'));
+			diffIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.diff));
+			openDiff.addEventListener('click', () => void this.commandService.executeCommand(BRIDGE_OPEN_DIFF, { diff: presentation.diff, path: file.path }));
+
+			for (let hunkIndex = 0; hunkIndex < file.hunks.length; hunkIndex += 1) {
+				if (hunkIndex > 0) {
+					append(fileBlock, $('div.shuncode-bridge-mini-diff-gap', undefined, '···'));
+				}
+				const hunk = file.hunks[hunkIndex];
+				const code = append(fileBlock, $('.shuncode-bridge-mini-diff-code'));
+				for (const line of hunk.lines) {
+					const row = append(code, $(`div.shuncode-bridge-mini-diff-line.${line.kind}`));
+					const lineNumber = line.kind === 'delete' ? line.oldLine : line.newLine;
+					append(row, $('span.shuncode-bridge-mini-diff-line-number', undefined, lineNumber === undefined ? '' : String(lineNumber)));
+					append(row, $('span.shuncode-bridge-mini-diff-marker', undefined, line.kind === 'add' ? '+' : line.kind === 'delete' ? '−' : ''));
+					const text = append(row, $('span.shuncode-bridge-mini-diff-text', undefined, line.text || ' '));
+					text.setAttribute('title', line.text);
+				}
+				if (hunk.truncated) {
+					append(code, $('div.shuncode-bridge-mini-diff-truncated', undefined, localize('shuncodeBridgeSession.diffMoreLines', "More changed lines…")));
+				}
+			}
+			if (file.truncated) {
+				append(fileBlock, $('div.shuncode-bridge-mini-diff-truncated', undefined, localize('shuncodeBridgeSession.diffMoreHunks', "More changes in this file…")));
+			}
+		}
+	}
+
+	private renderToolItems(parent: HTMLElement, presentation: BridgeActivityPresentation): void {
+		const items: BridgeActivityItem[] = presentation.items ?? (presentation.files ?? []).map(path => ({ kind: 'file' as const, path }));
+		if (!items.length) return;
+		const container = append(parent, $('.shuncode-bridge-tool-items'));
+		for (const item of items.slice(0, 40)) {
+			const row = append(container, $('div.shuncode-bridge-tool-item'));
+			if (item.severity) row.classList.add(`severity-${item.severity}`);
+			row.tabIndex = 0;
+			row.setAttribute('role', 'button');
+			row.setAttribute('title', item.line ? `${item.path}:${item.line}:${item.column ?? 1}` : item.path);
+			const icon = append(row, $('span.shuncode-bridge-tool-item-icon'));
+			const itemIcon = item.kind === 'folder' ? Codicon.folder
+				: item.kind === 'match' ? Codicon.search
+					: item.kind === 'diagnostic' ? (item.severity === 'error' ? Codicon.error : item.severity === 'warning' ? Codicon.warning : Codicon.info)
+						: item.kind === 'symbol' ? Codicon.symbolMethod : Codicon.file;
+			icon.classList.add(...ThemeIcon.asClassNameArray(itemIcon));
+			const labels = append(row, $('.shuncode-bridge-tool-item-labels'));
+			append(labels, $('span.shuncode-bridge-tool-item-primary', undefined, item.label || item.path));
+			const location = item.line ? `${item.path}:${item.line}${item.column ? `:${item.column}` : ''}` : (item.label ? item.path : undefined);
+			const change = item.additions !== undefined || item.deletions !== undefined ? `+${item.additions ?? 0} -${item.deletions ?? 0}` : undefined;
+			const secondary = [location, item.description, change].filter(Boolean).join(' · ');
+			if (secondary) append(labels, $('span.shuncode-bridge-tool-item-secondary', undefined, secondary));
+
+			const openResource = () => void this.commandService.executeCommand(BRIDGE_OPEN_RESOURCE, { path: item.path, line: item.line, column: item.column, folder: item.kind === 'folder' });
+			row.addEventListener('click', openResource);
+			row.addEventListener('keydown', event => {
+				if (event.key === 'Enter' || event.key === ' ') {
+					event.preventDefault();
+					openResource();
+				}
+			});
+
+			if (presentation.kind === 'edit' && presentation.diff && item.kind === 'file') {
+				const diffButton = append(row, $<HTMLButtonElement>('button.shuncode-bridge-tool-item-action'));
+				diffButton.type = 'button';
+				diffButton.setAttribute('title', localize('shuncodeBridgeSession.openFileDiff', "Open file diff"));
+				const diffIcon = append(diffButton, $('span'));
+				diffIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.diff));
+				diffButton.addEventListener('click', event => {
+					event.stopPropagation();
+					void this.commandService.executeCommand(BRIDGE_OPEN_DIFF, { diff: presentation.diff, path: item.path });
+				});
+			}
+		}
+		if (items.length > 40) append(container, $('span.shuncode-bridge-tool-more', undefined, localize('shuncodeBridgeSession.moreItems', "{0} more items", items.length - 40)));
+	}
+
+	private renderCodeSection(parent: HTMLElement, label: string, value: string | undefined): void {
+		if (!value) {
+			return;
+		}
+		const section = append(parent, $('.shuncode-bridge-tool-section'));
+		append(section, $('span.shuncode-bridge-tool-section-label', undefined, label));
+		const pre = append(section, $('pre'));
+		pre.textContent = value;
+	}
+
+	private renderStatus(status: BridgeStatus): void {
+		this.connectionDot.className = `shuncode-bridge-session-dot state-${status.connected ? 'connected' : status.state}`;
+		this.connectionTitle.textContent = localize('shuncodeBridgeSession.mcpSession', "MCP session");
+		if (this.footerCollapsed) {
+			const compact: string[] = [status.connected
+				? localize('shuncodeBridgeSession.connectedCompact', "Connected")
+				: status.state === 'running'
+					? localize('shuncodeBridgeSession.waitingCompact', "Waiting for MCP")
+					: localize('shuncodeBridgeSession.disconnectedCompact', "Not connected")];
+			compact.push(localize('shuncodeBridgeSession.toolCallsCompact', "{0} tool calls", status.stats.toolCalls));
+			if (status.stats.completedToolCalls > 0) {
+				compact.push(formatDuration(status.stats.averageDurationMs));
+			}
+			compact.push(`${status.stats.successRate.toFixed(status.stats.successRate === 100 ? 0 : 1)}%`);
+			this.connectionDescription.textContent = compact.join(' · ');
+		} else {
+			this.connectionDescription.textContent = status.connected
+				? localize('shuncodeBridgeSession.connected', "Connected · the external Agent can call ShunCode tools")
+				: status.state === 'running'
+					? localize('shuncodeBridgeSession.waitingConnection', "Bridge is running and waiting for the external MCP client")
+					: status.lastError ?? localize('shuncodeBridgeSession.notRunning', "Bridge is not running");
+		}
+
+		clearNode(this.statsContainer);
+		this.appendStat(localize('shuncodeBridgeSession.toolCalls', "Tool calls"), String(status.stats.toolCalls));
+		this.appendStat(localize('shuncodeBridgeSession.averageResponse', "Average response"), formatDuration(status.stats.averageDurationMs));
+		this.appendStat(localize('shuncodeBridgeSession.failures', "Failures"), String(status.stats.failedToolCalls));
+		this.appendStat(localize('shuncodeBridgeSession.successRate', "Success rate"), `${status.stats.successRate.toFixed(status.stats.successRate === 100 ? 0 : 1)}%`);
+		this.renderHealth(status.health);
+
+		const pieces = [localize('shuncodeBridgeSession.transport', "Streamable HTTP")];
+		if (status.activeRequests > 0) {
+			pieces.push(localize('shuncodeBridgeSession.activeRequests', "{0} active", status.activeRequests));
+		}
+		if (status.stats.lastTool) {
+			pieces.push(localize('shuncodeBridgeSession.lastTool', "Last tool: {0}", status.stats.lastTool));
+		}
+		const lastTime = formatTime(status.stats.lastToolAt);
+		if (lastTime) {
+			pieces.push(lastTime);
+		}
+		this.footerMeta.textContent = pieces.join(' · ');
+		this.footerHint.textContent = status.connected
+			? localize('shuncodeBridgeSession.outputOnlyHint', "Bridge mode is output-only in ShunCode. Continue the conversation in the external client.")
+			: localize('shuncodeBridgeSession.connectHint', "Start the Bridge here, then connect the configured MCP URL from the external client.");
+	}
+
+	private appendStat(label: string, value: string): void {
+		const stat = append(this.statsContainer, $('.shuncode-bridge-session-stat'));
+		append(stat, $('span', undefined, label));
+		append(stat, $('strong', undefined, value || '—'));
+	}
+
+	private renderHealth(health: BridgeHealthReport | undefined): void {
+		if (this.checkingHealth) {
+			setVisibility(true, this.healthRow);
+			this.healthDot.className = 'shuncode-bridge-session-dot state-starting';
+			this.healthText.textContent = localize('shuncodeBridgeSession.healthChecking', "Checking Bridge health…");
+			this.healthRow.title = '';
+			return;
+		}
+		if (this.healthError) {
+			setVisibility(true, this.healthRow);
+			this.healthDot.className = 'shuncode-bridge-session-dot state-error';
+			this.healthText.textContent = localize('shuncodeBridgeSession.healthFailed', "Health check failed: {0}", this.healthError);
+			this.healthRow.title = this.healthError;
+			return;
+		}
+		if (!health) {
+			setVisibility(false, this.healthRow);
+			return;
+		}
+		setVisibility(true, this.healthRow);
+		this.healthDot.className = `shuncode-bridge-session-dot ${health.ok ? 'state-connected' : 'state-error'}`;
+		const parts: string[] = [];
+		if (health.ok) {
+			parts.push(localize('shuncodeBridgeSession.healthOk', "Healthy"));
+			// Keep the inline summary short: the public round-trip is the number
+			// that matters; local latency and session count live in the tooltip.
+			parts.push(formatDuration((health.public ?? health.local).latencyMs ?? 0));
+		} else {
+			parts.push(localize('shuncodeBridgeSession.healthUnhealthy', "Unhealthy"));
+			if (health.state !== 'running') {
+				parts.push(localize('shuncodeBridgeSession.healthNotRunning', "Bridge is {0}", health.state));
+			}
+			if (!health.local.ok) {
+				parts.push(localize('shuncodeBridgeSession.healthLocalFailed', "local: {0}", health.local.error ?? 'failed'));
+			}
+			if (health.public && !health.public.ok) {
+				parts.push(localize('shuncodeBridgeSession.healthPublicFailed', "public: {0}", health.public.error ?? 'failed'));
+			}
+			if (health.state === 'running' && !health.tunnelProcessAlive) {
+				parts.push(localize('shuncodeBridgeSession.healthTunnelDown', "tunnel process not running"));
+			}
+		}
+		const checkedAt = formatTime(health.at);
+		if (checkedAt) {
+			parts.push(checkedAt);
+		}
+		this.healthText.textContent = parts.join(' · ');
+		const tooltip: string[] = [health.summary];
+		if (health.local.url) {
+			tooltip.push(localize('shuncodeBridgeSession.healthTooltipLocal', "Local: {0} ({1})", health.local.url, formatDuration(health.local.latencyMs ?? 0)));
+		}
+		if (health.public?.url) {
+			tooltip.push(localize('shuncodeBridgeSession.healthTooltipPublic', "Public: {0} ({1})", health.public.url, formatDuration(health.public.latencyMs ?? 0)));
+		}
+		tooltip.push(localize('shuncodeBridgeSession.healthTooltipSessions', "MCP sessions: {0} · active requests: {1}", health.sessions, health.activeRequests));
+		if (health.lastSessionActivityAt) {
+			tooltip.push(localize('shuncodeBridgeSession.healthLastActivity', "Last MCP activity: {0}", formatTime(health.lastSessionActivityAt)));
+		}
+		this.healthRow.title = tooltip.join('\n');
+	}
+
+	private renderControls(): void {
+		const running = this.lastStatus?.state === 'running';
+		const starting = this.lastStatus?.state === 'starting';
+		this.startStopButton.enabled = !this.busy && !starting;
+		this.startStopButton.label = this.busy || starting
+			? `$(${Codicon.loading.id}) ${localize('shuncodeBridgeSession.starting', "Starting…")}`
+			: running
+				? `$(${Codicon.debugStop.id}) ${localize('shuncodeBridgeSession.stopBridge', "Stop Bridge")}`
+				: `$(${Codicon.plug.id}) ${localize('shuncodeBridgeSession.startBridge', "Start Bridge")}`;
+
+		this.healthButton.enabled = !this.checkingHealth && !starting;
+		this.healthButton.label = this.checkingHealth
+			? `$(${Codicon.loading.id}) ${localize('shuncodeBridgeSession.checkingHealthShort', "Checking…")}`
+			: `$(${Codicon.pulse.id}) ${localize('shuncodeBridgeSession.checkHealthShort', "Health")}`;
+		const healthTitle = localize('shuncodeBridgeSession.checkHealth', "Check MCP health");
+		this.healthButton.setTitle(healthTitle);
+		this.healthButton.element.setAttribute('aria-label', healthTitle);
+
+		const hasLog = (this.lastStatus?.activities.length ?? 0) > 0 || (this.lastStatus?.stats.toolCalls ?? 0) > 0;
+		this.clearLogButton.enabled = !this.busy && hasLog;
+		this.clearLogButton.label = `$(${Codicon.clearAll.id}) ${localize('shuncodeBridgeSession.clearLogShort', "Clear log")}`;
+		const clearTitle = localize('shuncodeBridgeSession.clearLog', "Clear tool call log");
+		this.clearLogButton.setTitle(clearTitle);
+		this.clearLogButton.element.setAttribute('aria-label', clearTitle);
+		this.renderFooterCollapsedState();
+	}
+}

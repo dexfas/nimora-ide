@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "ShunCode Personal Edge Bridge",
+  "version": "0.3.0",
+  "description": "Share one normal Microsoft Edge tab with ShunCode WebMCP while keeping the user's real browser login/session.",
+  "permissions": ["tabs", "storage", "alarms", "activeTab", "scripting"],
+  "host_permissions": ["http://127.0.0.1:48321/*", "http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Share this tab with ShunCode"
+  }
+}

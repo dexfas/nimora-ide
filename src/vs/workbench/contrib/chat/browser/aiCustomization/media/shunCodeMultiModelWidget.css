@@ -1,0 +1,242 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+/* Root: full-height scrollable page, matching .shuncode-bridge. */
+.shuncode-multimodel {
+	box-sizing: border-box;
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+	min-height: 0;
+	max-width: none;
+	padding: 0 0 24px;
+	overflow: auto;
+	color: var(--vscode-foreground);
+}
+
+/* Cards: same skeleton as .shuncode-bridge-card. */
+.shuncode-multimodel-card {
+	box-sizing: border-box;
+	padding: 13px 15px;
+	margin-bottom: 10px;
+	border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	border-radius: 6px;
+	background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+}
+
+.shuncode-multimodel-hero {
+	padding: 16px;
+}
+
+.shuncode-multimodel-card-header {
+	padding: 0 0 6px;
+}
+
+.shuncode-multimodel-card-header h2,
+.shuncode-multimodel-card-header h3 {
+	margin: 0;
+	font-weight: 600;
+}
+
+.shuncode-multimodel-body {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.shuncode-multimodel-description {
+	max-width: 720px;
+	margin: 0;
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.shuncode-multimodel-rules {
+	box-sizing: border-box;
+	width: min(100%, 680px);
+	margin: 0;
+	padding-left: 20px;
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+/* Simple checkbox row. */
+.shuncode-multimodel-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	width: min(100%, 680px);
+}
+
+.shuncode-multimodel-check-label {
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+/* Switch row, matching .shuncode-bridge-persistent-row. */
+.shuncode-multimodel-persistent-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 18px;
+	width: min(100%, 680px);
+}
+
+.shuncode-multimodel-persistent-text {
+	display: flex;
+	min-width: 0;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.shuncode-multimodel-persistent-label {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* Field: label above control, matching .shuncode-bridge-field. */
+.shuncode-multimodel-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: min(100%, 680px);
+}
+
+.shuncode-multimodel-field-label {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.shuncode-multimodel-merge-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: stretch;
+	gap: 8px;
+	width: 100%;
+}
+
+.shuncode-multimodel-value {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	width: 100%;
+	padding: 6px 8px;
+	border-radius: 3px;
+	background: var(--vscode-textCodeBlock-background);
+	color: var(--vscode-textPreformat-foreground);
+	font-family: var(--monaco-monospace-font);
+	font-size: 12px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.shuncode-multimodel-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+/* Buttons must not stretch to full width; .monaco-text-button defaults to 100%. */
+.shuncode-multimodel-actions > .monaco-text-button,
+.shuncode-multimodel-merge-row > .monaco-text-button {
+	width: auto;
+}
+
+.shuncode-multimodel-select {
+	box-sizing: border-box;
+	width: min(100%, 680px);
+	height: 28px;
+	padding: 3px 8px;
+	border: 1px solid var(--vscode-input-border, transparent);
+	border-radius: 2px;
+	outline: none;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	font: inherit;
+}
+
+.shuncode-multimodel-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+
+.shuncode-multimodel-hint,
+.shuncode-multimodel-help {
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.shuncode-multimodel-help {
+	margin: 0;
+}
+
+/* Switch control, mirroring .shuncode-bridge-switch. */
+.shuncode-multimodel-switch {
+	position: relative;
+	display: inline-flex;
+	width: 36px;
+	height: 20px;
+	flex: 0 0 auto;
+	padding: 0;
+	border: 0;
+	outline: none;
+	appearance: none;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.shuncode-multimodel-switch-track {
+	box-sizing: border-box;
+	width: 36px;
+	height: 20px;
+	border: 1px solid var(--vscode-checkbox-border, var(--vscode-widget-border));
+	border-radius: 10px;
+	background: var(--vscode-checkbox-background);
+	transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.shuncode-multimodel-switch-track::after {
+	content: '';
+	display: block;
+	width: 14px;
+	height: 14px;
+	margin: 2px;
+	border-radius: 50%;
+	background: var(--vscode-checkbox-foreground);
+	transition: transform 120ms ease;
+}
+
+.shuncode-multimodel-switch[aria-checked='true'] .shuncode-multimodel-switch-track {
+	border-color: var(--vscode-button-background);
+	background: var(--vscode-button-background);
+}
+
+.shuncode-multimodel-switch[aria-checked='true'] .shuncode-multimodel-switch-track::after {
+	transform: translateX(16px);
+	background: var(--vscode-button-foreground);
+}
+
+.shuncode-multimodel-switch:focus-visible .shuncode-multimodel-switch-track {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+	.shuncode-multimodel-merge-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.shuncode-multimodel-persistent-row {
+		align-items: flex-start;
+	}
+}

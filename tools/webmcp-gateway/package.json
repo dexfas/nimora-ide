@@ -1,0 +1,18 @@
+{
+  "name": "shuncode-browser-mcp-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test-client.mjs",
+    "test:web-mcp": "node web-mcp-smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "express": "^5.2.1",
+    "playwright-core": "^1.63.0",
+    "zod": "^4.6.1"
+  }
+}

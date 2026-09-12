@@ -1,0 +1,410 @@
+.interactive-item-container .value > .chat-tool-invocation-part.shuncode-chat-card-tool {
+	margin: 0;
+	padding: 0;
+}
+
+.chat-tool-invocation-part.shuncode-chat-native-tool:not(.has-confirmation) {
+	display: none;
+}
+
+.chat-tool-invocation-part.shuncode-chat-native-tool.has-confirmation {
+	margin-bottom: 8px;
+}
+
+.shuncode-chat-activity {
+	box-sizing: border-box;
+	margin: 0 0 8px;
+	border: 1px solid transparent;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--vscode-foreground);
+}
+
+.shuncode-chat-activity[open] {
+	border-color: var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+}
+
+.shuncode-chat-activity.state-error {
+	border-color: color-mix(in srgb, var(--vscode-errorForeground) 45%, transparent);
+}
+
+.shuncode-chat-activity-header {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 7px;
+	min-height: 28px;
+	padding: 4px 6px;
+	border-radius: 4px;
+	cursor: pointer;
+	list-style: none;
+	font-size: 12px;
+}
+
+.shuncode-chat-activity-header::-webkit-details-marker {
+	display: none;
+}
+
+.shuncode-chat-activity-header:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.shuncode-chat-activity:not([open]) > .shuncode-chat-activity-body {
+	display: none;
+}
+
+.shuncode-chat-activity-icon {
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-chat-activity.state-running .shuncode-chat-activity-icon {
+	color: var(--vscode-progressBar-background);
+}
+
+.shuncode-chat-activity.state-error .shuncode-chat-activity-icon,
+.shuncode-chat-activity.state-error .shuncode-chat-activity-meta {
+	color: var(--vscode-errorForeground);
+}
+
+.shuncode-chat-activity-labels {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.shuncode-chat-activity-title,
+.shuncode-chat-activity-subtitle {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.shuncode-chat-activity-title {
+	color: var(--vscode-foreground);
+}
+
+.shuncode-chat-activity-subtitle,
+.shuncode-chat-activity-meta {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-chat-activity-meta {
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.shuncode-chat-activity-body {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 8px;
+	padding: 3px 8px 10px 31px;
+}
+
+.shuncode-chat-activity-items,
+.shuncode-chat-edit-files {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.shuncode-chat-activity.kind-edit .shuncode-chat-activity-header {
+	grid-template-rows: auto auto;
+}
+
+.shuncode-chat-edit-files {
+	grid-column: 2 / 4;
+	gap: 1px;
+	margin-top: 3px;
+}
+
+.shuncode-chat-edit-file {
+	display: grid;
+	grid-template-columns: 16px minmax(0, 1fr) auto;
+	height: 24px;
+	min-height: 24px;
+	padding: 0 5px;
+	border-radius: 3px;
+	font-size: 11px;
+}
+
+.shuncode-chat-activity-item {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 6px;
+	min-height: 25px;
+	padding: 2px 5px;
+	border-radius: 4px;
+	color: inherit;
+	font-size: 12px;
+	text-decoration: none;
+}
+
+a.shuncode-chat-activity-item:hover,
+a.shuncode-chat-activity-item:focus-visible {
+	outline: none;
+	background: var(--vscode-list-hoverBackground);
+}
+
+.shuncode-chat-activity-item-icon {
+	flex: none;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-chat-activity-item-labels {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.shuncode-chat-activity-item-primary,
+.shuncode-chat-activity-item-secondary {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.shuncode-chat-activity-item-secondary {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-chat-activity-item-diff {
+	display: inline-flex;
+	flex: none;
+	gap: 5px;
+	font-family: var(--monaco-monospace-font);
+	font-size: 10px;
+}
+
+.shuncode-chat-activity-item-diff .additions {
+	color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+}
+
+.shuncode-chat-activity-item-diff .deletions {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground));
+}
+
+.shuncode-chat-activity-more,
+.shuncode-chat-activity-metrics {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-chat-activity-metrics {
+	padding: 1px 5px;
+	font-variant-numeric: tabular-nums;
+}
+
+.shuncode-chat-activity-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.shuncode-chat-activity-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	height: 24px;
+	padding: 0 7px;
+	border: 1px solid var(--vscode-button-secondaryBorder, transparent);
+	border-radius: 3px;
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	cursor: pointer;
+	font: inherit;
+	font-size: 11px;
+}
+
+.shuncode-chat-activity-action:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.shuncode-chat-activity-section {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.shuncode-chat-activity-section-label {
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+	text-transform: uppercase;
+}
+
+.shuncode-chat-activity-section pre {
+	box-sizing: border-box;
+	max-height: 260px;
+	margin: 0;
+	padding: 7px 8px;
+	overflow: auto;
+	border-radius: 4px;
+	background: var(--vscode-textCodeBlock-background);
+	color: var(--vscode-textPreformat-foreground);
+	font-family: var(--monaco-monospace-font);
+	font-size: 11px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+/* Match the Bridge session view (shunCodeBridgeSessionView.css) so tool output scrollbars look identical in chat and bridge modes */
+.shuncode-chat-activity-section pre::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+.shuncode-chat-activity-section pre::-webkit-scrollbar-corner,
+.shuncode-chat-activity-section pre::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.shuncode-chat-activity-section pre::-webkit-scrollbar-thumb {
+	background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
+	border-radius: 0;
+}
+
+.shuncode-chat-activity-section pre::-webkit-scrollbar-thumb:hover {
+	background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
+}
+
+.shuncode-chat-activity-section pre::-webkit-scrollbar-thumb:active {
+	background: var(--vscode-scrollbarSlider-activeBackground, rgba(191, 191, 191, 0.4));
+}
+
+.shuncode-chat-mini-diff {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.shuncode-chat-mini-diff-file {
+	min-width: 0;
+	overflow: hidden;
+	border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	border-radius: 5px;
+	background: var(--vscode-textCodeBlock-background);
+}
+
+.shuncode-chat-mini-diff-header {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 4px;
+	min-height: 28px;
+	padding: 0 4px 0 6px;
+	border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	background: color-mix(in srgb, var(--vscode-editorWidget-background) 72%, transparent);
+}
+
+.shuncode-chat-mini-diff-file-button,
+.shuncode-chat-mini-diff-open {
+	display: inline-flex;
+	min-width: 0;
+	align-items: center;
+	gap: 6px;
+	height: 24px;
+	padding: 0 4px;
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font: inherit;
+}
+
+.shuncode-chat-mini-diff-file-button {
+	flex: 1;
+	justify-content: flex-start;
+}
+
+.shuncode-chat-mini-diff-open {
+	flex: none;
+	width: 24px;
+	justify-content: center;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-chat-mini-diff-file-button:hover,
+.shuncode-chat-mini-diff-open:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.shuncode-chat-mini-diff-path {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+}
+
+.shuncode-chat-mini-diff-code {
+	min-width: 0;
+	font-family: var(--monaco-monospace-font);
+	font-size: 11px;
+	line-height: 18px;
+}
+
+.shuncode-chat-mini-diff-line {
+	display: grid;
+	min-width: 0;
+	grid-template-columns: 36px 14px minmax(0, 1fr);
+	min-height: 18px;
+}
+
+.shuncode-chat-mini-diff-line.add {
+	background: var(--vscode-diffEditor-insertedLineBackground, color-mix(in srgb, var(--vscode-testing-iconPassed) 12%, transparent));
+}
+
+.shuncode-chat-mini-diff-line.delete {
+	background: var(--vscode-diffEditor-removedLineBackground, color-mix(in srgb, var(--vscode-errorForeground) 10%, transparent));
+}
+
+.shuncode-chat-mini-diff-line-number {
+	padding-right: 7px;
+	border-right: 1px solid color-mix(in srgb, var(--vscode-widget-border) 65%, transparent);
+	color: var(--vscode-editorLineNumber-foreground);
+	text-align: right;
+	user-select: none;
+}
+
+.shuncode-chat-mini-diff-marker {
+	color: var(--vscode-descriptionForeground);
+	text-align: center;
+	user-select: none;
+}
+
+.shuncode-chat-mini-diff-line.add .shuncode-chat-mini-diff-marker {
+	color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+}
+
+.shuncode-chat-mini-diff-line.delete .shuncode-chat-mini-diff-marker {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground));
+}
+
+.shuncode-chat-mini-diff-text {
+	min-width: 0;
+	overflow: hidden;
+	padding: 0 7px 0 2px;
+	color: var(--vscode-editor-foreground);
+	text-overflow: ellipsis;
+	white-space: pre;
+}
+
+.shuncode-chat-mini-diff-gap,
+.shuncode-chat-mini-diff-truncated {
+	padding: 2px 8px 2px 50px;
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}

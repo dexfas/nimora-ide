@@ -1,0 +1,4188 @@
+{
+  "generatedAt": "2026-09-12T11:22:45.597Z",
+  "installedSource": "C:/Program Files/ShunCode/resources/app/out/**/*.map",
+  "upstreamReference": "microsoft/vscode 1.132.0 tag (df53daabb18cd157bdb08c7f01c34df936cf12f4)",
+  "note": "Files listed here differed from the public 1.132.0 tag or were absent there. They were restored from the installed ShunCode source maps. This set includes both ShunCode-specific changes and upstream snapshot drift; do not attribute every listed file to ShunCode authorship.",
+  "count": 469,
+  "changes": [
+    {
+      "path": "src/main.ts",
+      "status": "modified",
+      "sha256": "d31616cc0d995f7b3ca588deb606d992a42f57746b7b7731c61434914e843295",
+      "sourceMaps": [
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/browser/dom.ts",
+      "status": "modified",
+      "sha256": "45c3b53f92c808db9ab12140fef85d2d915d2ab3e1ebd677a09458e684d4bf8d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/browser/keyboardEvent.ts",
+      "status": "modified",
+      "sha256": "75a179cde32b2054bcfa924d92ac01b9dd30d768430371afa7cbf12d3b697964",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/browser/ui/inputbox/inputBox.ts",
+      "status": "modified",
+      "sha256": "fbe4f8cbd6e2a1bbdab903cf62a8d7ba9b2a440df26dc4f90da1fbb49bd7bb4e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/browser/ui/menu/menubar.ts",
+      "status": "modified",
+      "sha256": "541e941aed5182360eff183ec891aed9abfac5c0da6d337911436a75b7a0eda5",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/common/codiconsLibrary.ts",
+      "status": "modified",
+      "sha256": "9fb76907327cc80a17ca9577ecc71293dc2f30b4e519f9bb2d9656e59c67ce0c",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/editor/common/services/editorWebWorkerMain.js.map",
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/common/managedSettings.ts",
+      "status": "modified",
+      "sha256": "7698e9204c253282b581bf056a0c32d3670c4907b11d34e3251da8709d996dd6",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/common/map.ts",
+      "status": "modified",
+      "sha256": "9ee201e138ff873b8c18c6538bdcfbe514c945b4b70add24e47334c7dbed06b5",
+      "sourceMaps": [
+        "cli.js.map",
+        "main.js.map",
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/editor/common/services/editorWebWorkerMain.js.map",
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/platform/agentHost/node/diffWorkerMain.js.map",
+        "vs/platform/files/node/watcher/watcherMain.js.map",
+        "vs/platform/localTranscription/node/localTranscriptionMain.js.map",
+        "vs/platform/profiling/electron-browser/profileAnalysisWorkerMain.js.map",
+        "vs/platform/terminal/node/ptyHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/contrib/debug/node/telemetryApp.js.map",
+        "vs/workbench/contrib/notebook/common/services/notebookWebWorkerMain.js.map",
+        "vs/workbench/contrib/output/common/outputLinkComputerMain.js.map",
+        "vs/workbench/services/languageDetection/browser/languageDetectionWebWorkerMain.js.map",
+        "vs/workbench/services/search/worker/localFileSearchMain.js.map",
+        "vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/node/nls.ts",
+      "status": "modified",
+      "sha256": "785bdb2cd50300f7e822be4cf5495b99a3bc4fb1f86774b1b31dd4843b47f8ac",
+      "sourceMaps": [
+        "cli.js.map",
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/node/shunCodeLanguagePackBootstrap.ts",
+      "status": "added",
+      "sha256": "9b9929901f2a9880f373abce650273da10d7a1f5ed09904dbf4a53b06154aac8",
+      "sourceMaps": [
+        "cli.js.map",
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/node/zip.ts",
+      "status": "modified",
+      "sha256": "e94db1fd5ada1a89b4c686f966935e3c464a715ecec1cd7c2ad5c4f89d32e2e2",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/base/parts/ipc/common/ipc.ts",
+      "status": "modified",
+      "sha256": "2accb5220fa23d08c0a9dc2cfa255df7c47309c38ce234df4bc3529d34d424d8",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/platform/files/node/watcher/watcherMain.js.map",
+        "vs/platform/localTranscription/node/localTranscriptionMain.js.map",
+        "vs/platform/terminal/node/ptyHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/contrib/debug/node/telemetryApp.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/code/electron-main/app.ts",
+      "status": "modified",
+      "sha256": "3bb22c6f7e97d94d3c4d3b7822f9a38f303ada19d5f8e5a967b907a4522dd2d9",
+      "sourceMaps": [
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/code/electron-main/main.ts",
+      "status": "modified",
+      "sha256": "1019763f987198d211188a617302b986bbbe9e6e5d2dc62ff08070b8d8ad3c06",
+      "sourceMaps": [
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/editor/browser/widget/diffEditor/features/movedBlocksLinesFeature.ts",
+      "status": "modified",
+      "sha256": "6ccf0a2402a1a4e0d0ab7f776b62e700aac6ac7abc28a9e43d71d3f23bbaab1c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/editor/common/config/editorOptions.ts",
+      "status": "modified",
+      "sha256": "23aa18ad5f2a9b21d0149ffbe75ba9d1b7a7729a188adc54b4126dcdb171f378",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/editor/contrib/find/browser/findController.ts",
+      "status": "modified",
+      "sha256": "532cd24814c24a805ee8f2efaf1574a559308cd6fbf0ddad0020e217276d5d40",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/editor/contrib/inlineCompletions/browser/controller/inlineCompletionsController.ts",
+      "status": "modified",
+      "sha256": "de4891720bdbbd6026e495fee2ecbe4ed3492508cc84c2c0d2f9a601c4c73acd",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/editor/contrib/inlineCompletions/browser/model/inlineCompletionsModel.ts",
+      "status": "modified",
+      "sha256": "47ddf16049487b9476756789851b680c199a89ffd2a8ed3eb2116f6a2b78c954",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/editor/contrib/rename/browser/rename.ts",
+      "status": "modified",
+      "sha256": "b6f677b43c9e6c14fdceacfebe897de8ed40d479870c8d119c6e862571564d73",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/editor/contrib/suggest/browser/media/suggest.css",
+      "status": "modified",
+      "sha256": "739832bde1e8d0df6588b2dc6f4e5f631bbb4032a3921140fc6404ce1d5a25f7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/editor/contrib/suggest/browser/suggestWidget.ts",
+      "status": "modified",
+      "sha256": "0c7833a61cc39ad3a511efa4ee3963bd87896cf73f8be54d3d7c7c690bd8809c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/accessibility/browser/accessibleView.ts",
+      "status": "modified",
+      "sha256": "562f51a55326237c20de914363ee65bc71665e2d510ac322d1a28aa28d82290e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/actions/browser/menuEntryActionViewItem.ts",
+      "status": "modified",
+      "sha256": "9d2a0ab79caf6ee6a4be80a7590cf45c6efc96188f4c6897f9f336a6b628885c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/actions/common/actions.ts",
+      "status": "modified",
+      "sha256": "9fdc4a575d608f75f716a7256a459572f66004af798e93598cbc982e096f4a76",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/actionWidget/browser/actionList.ts",
+      "status": "modified",
+      "sha256": "56c530dadce4948e506aa0d4ffd6af37cd10f1e2cb2826ab01aa17e12429b228",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/browser/agentHostEnablementService.ts",
+      "status": "modified",
+      "sha256": "22d855601228d4c9862bb2dd0fa57932666c6075e046c7cd7f912c69b87e4a80",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/browser/remoteAgentHostProtocolClient.ts",
+      "status": "modified",
+      "sha256": "a4d170c470d26018b8f4d088f57e4261b168dd66446e51337b68c65619551ca6",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostByokLm.ts",
+      "status": "modified",
+      "sha256": "c752bce5cc05f052d0ae00ebee77b4b4417e96c201f076dbd853629d5656bc39",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostCheckpointService.ts",
+      "status": "modified",
+      "sha256": "b3c42a98a614175681795cc0f6f1bcf3d9a5dcc13a18745cf8da376221324641",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostEnablementService.ts",
+      "status": "modified",
+      "sha256": "f0bb19b0de10e6b7b85a88159682c30b4f064de9c14236bdae33d3d8bb94800d",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostFileSystemService.ts",
+      "status": "modified",
+      "sha256": "31c44835c8f5864aa2e5740e7c664d342eaeafdf051356225f293f696e585858",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostGitService.ts",
+      "status": "modified",
+      "sha256": "bd623a0f95dc2c6ef3fc930511fe40aa1849f4a6571326cfc002fa94f6786cfa",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostGitStateService.ts",
+      "status": "modified",
+      "sha256": "42f7ceab001986699d1030f149a367a3ae14d75198b59a4e0939ebe28f55485f",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostResourceService.ts",
+      "status": "modified",
+      "sha256": "c473aab64e9d0cb1395f1817c0d2c88fe6ac1d9a056881551a198011207c07e1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostSchema.ts",
+      "status": "modified",
+      "sha256": "93f4ebc4b0de77bfb37f34028d23a129a66f3facacc012fe93c8b460097d5965",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostStarter.config.contribution.ts",
+      "status": "modified",
+      "sha256": "71079c9e22ec8c0e5efd3ff9ea83ae23bace329c5c32ddfe0523c97394513088",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentHostUri.ts",
+      "status": "modified",
+      "sha256": "ee1b7232d0f50f6c13754af622287911b11fcd3150ac4eb3942a99978d74b9da",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/agentService.ts",
+      "status": "modified",
+      "sha256": "ee327466e99a7a11d4917e38792d7a48241a9ed01c2a5822fc901ddd30c5972e",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/copilotCliConfig.ts",
+      "status": "modified",
+      "sha256": "83dceb19d9ffc9a28d5efd41ae81ff898488782bec56887955e88344c71be169",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/diffComputeService.ts",
+      "status": "modified",
+      "sha256": "f048cfe997655f5cdf66fc54fb1a148675e208b969c9a2a4a99a8bd60f9fe00c",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/fileEditDiff.ts",
+      "status": "modified",
+      "sha256": "7c5a78393ca451ddded901e3aee8bbfd7aa6d629d90db07baa3941b7ea89e6a0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/githubEndpoints.ts",
+      "status": "modified",
+      "sha256": "3cb47e5076a7b5cd349b4d64e6d23027905ce803c3882dfb4d9b22e61dbde60e",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/meta/agentToolCallMeta.ts",
+      "status": "modified",
+      "sha256": "6761b946bd8e6a56a20b4b3e3ac9e46ffdd212ef806e70a6583da5dbfaebad83",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/otel/agentHostOTelService.ts",
+      "status": "modified",
+      "sha256": "9fd0e06b8a0e8f2336bc6dc3d50af869750cf3cf6c8f1c03e2db86a3fef9ca3a",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/reasoningEffort.ts",
+      "status": "modified",
+      "sha256": "874e1319219ee29f8d1bb61f7999e0ef80505178c07042e7bcd888b1226890ee",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/remoteAgentHostService.ts",
+      "status": "modified",
+      "sha256": "3c88355794af91b30558ed90b04ea79f846a2e711b9b3abec10eb0d571c1e4ce",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/sessionConfigKeys.ts",
+      "status": "modified",
+      "sha256": "df81a37e1c2be8740e36f30eb7e48d72ba36cbeb0f4d1847e122f2ecbe074001",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/sessionDataService.ts",
+      "status": "modified",
+      "sha256": "f98810149a2a3c410ff0b48e7129634723c1129e368871d16fa871e5eb2c283c",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/state/protocol/channels-chat/reducer.ts",
+      "status": "modified",
+      "sha256": "4f2fa4e70475d0865eab11f1a8cb180f54a37253d8dd40573f9ecc6529963c16",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/state/protocol/channels-chat/state.ts",
+      "status": "modified",
+      "sha256": "241c36dd0344b7f8d3c6b0429743e2309a645b0913d57d64ee5580e5493b7f82",
+      "sourceMaps": [
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/state/sessionProtocol.ts",
+      "status": "modified",
+      "sha256": "6d6bb9a434397087e758735deaa4d859f8a00682b0592e2d321afc9106b40964",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/common/state/sessionState.ts",
+      "status": "modified",
+      "sha256": "1a96f200752ebfeff1387febc19f1cf39b848b17414281d817a097f217028ffa",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/electron-browser/localAgentHostService.ts",
+      "status": "modified",
+      "sha256": "f380a4bda0fc4648d64f976616d5294c4a2d97518aaedd23dda04f3d6370eb4e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostAuthenticationService.ts",
+      "status": "modified",
+      "sha256": "b0287eb42005a479fa8808a5080a4c4a19a1d206aee2b9862eb43d11ef2a8125",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostChangesetService.ts",
+      "status": "modified",
+      "sha256": "d4a29ae36a2a3d744649e4e69abfd2e9adfabc353abbcf6a673a6936a9e6a5fe",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostCheckpointService.ts",
+      "status": "modified",
+      "sha256": "c34fed19f06d63dd6d866f44d1d2b5831bcb06d76ed7f8fd77f5abf1477a794c",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostCommitOperationProvider.ts",
+      "status": "modified",
+      "sha256": "8e32130d8b232059ee9404e7989ec4d3371c0fd4e1b1380d086643e74cbbea6a",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostGitService.ts",
+      "status": "modified",
+      "sha256": "59002d5bd6823fd63a08c2adf9647339bbe4d674e6bc5037290a8ea7099a8307",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostGitStateService.ts",
+      "status": "modified",
+      "sha256": "17ad9d8f15c70dd45ca19fde7b712ad791f98f8674a63e0d2ea6312dcc0d78f7",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostMain.ts",
+      "status": "modified",
+      "sha256": "57c6669092086e86f1b78244679296e2292fcfb104a1cd13c7a1875d62d498fc",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostPullRequestOperationHandler.ts",
+      "status": "modified",
+      "sha256": "d607e4cfeb458451af3c59844167763a00a75fb58b84631019b95b0bfa733725",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostPullRequestOperationProvider.ts",
+      "status": "modified",
+      "sha256": "2d68753baffbdef689d99792cf3db5e81d988cae0905ce2dcb65d27cccb4bc5f",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostRepoInfoTelemetry.ts",
+      "status": "modified",
+      "sha256": "1bac7df8a1e31bdbfd53375e76c3b2e151d45990985659538cb5b1614274e6db",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostReviewService.ts",
+      "status": "modified",
+      "sha256": "e72804a9f3c77c83af2e407cdcafa327d6cace1e588ab2f84134fdd10f8692f4",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostStateManager.ts",
+      "status": "modified",
+      "sha256": "99ee70493f50ab1b9e63807bb6e4f9946094eb6ad3714cef790d83d8d8590652",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostTelemetryReporter.ts",
+      "status": "modified",
+      "sha256": "0fb4063c0cd19e0477d488c8da8e8f207c489b512d5405cdead5da5fa58c8f85",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentHostToolCallTracker.ts",
+      "status": "modified",
+      "sha256": "8088fde399ff54a08f346532d5cdf6878bc23aefccb81b997458c0d4b1a5f578",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentModelRefreshScheduler.ts",
+      "status": "added",
+      "sha256": "c86936fd8b1e728e5d7e7f63f3ce3c755bad8bd5918f85df96ffb21a1929534b",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentService.ts",
+      "status": "modified",
+      "sha256": "3f47872cd6d83f7c5a9250b7a2e6a0746482ef95487f4e1e16b7ae5d28ce3063",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/agentSideEffects.ts",
+      "status": "modified",
+      "sha256": "4ad4bece6523055b1cbc8bcc30ff75d88036bbde6043692724d9b702f09b217d",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/byokLmBridgeRegistry.ts",
+      "status": "modified",
+      "sha256": "3794c7a7880f2d72b956ad99bc9f05ef92f1c53de26e686ad7d86caaa6e28e1d",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeAgent.ts",
+      "status": "modified",
+      "sha256": "28b9941670acbbb49dae43ba375682e7ae4e7c797961499fd7696beff196d0df",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeAgentSession.ts",
+      "status": "modified",
+      "sha256": "60eedd1feac37aca5d8bc3548c291bba8f463b81da3e2822a5e1107289e1a705",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeMapSessionEvents.ts",
+      "status": "modified",
+      "sha256": "075f7792a18280d83fcf1576c22f5ca3e294e415c0cee6e2b43125ab2dd008af",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeReplayMapper.ts",
+      "status": "modified",
+      "sha256": "3b8cc4b89e50847c05be53f921f725ca47d2ed4cce606886660dd6b188ddefa7",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeSdkOptions.ts",
+      "status": "modified",
+      "sha256": "357197fe3132159f9a96ed73784ffa7acd27527169c17fe73120411f002bac20",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeSessionMetadataStore.ts",
+      "status": "modified",
+      "sha256": "154d786fe381a6049ebe4a3bdb5f8a7510ad5971cfdb8577924162e0ae38e1fb",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeSubagentSignals.ts",
+      "status": "modified",
+      "sha256": "c8380156634f4cbcbcbca663e55ca35bd3a79b728033aa360cf95a4eb2a168ed",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeToolCallRegistry.ts",
+      "status": "modified",
+      "sha256": "c7c6f8fefef92ae2811fd5eae6af5d260df7cc51981e8e23a389d13eb32532ff",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/claudeToolDisplay.ts",
+      "status": "modified",
+      "sha256": "3c31f2f2f545a2692ac6f444196e57d2d7e843ad4ca8fec0f9bd929b9c410302",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/customizations/claudeSessionCustomizationDiscovery.ts",
+      "status": "modified",
+      "sha256": "3b3c771a6b5ef8fac0e77c7094686bfddcb477f2ab22d72853dd656d1de39e49",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/customizations/scan/claudeAgentSkillScan.ts",
+      "status": "modified",
+      "sha256": "dab92db5498fac8a51b842a8e11115d2aa8d050f1ad40aa93471b35e55d44866",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/claude/customizations/scan/claudeNativePluginScan.ts",
+      "status": "modified",
+      "sha256": "b219f103cdda5403f5952238283eecfafc95ac8a9313c22cb0c8cbfaf92ecc83",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/codex/codexAgent.ts",
+      "status": "modified",
+      "sha256": "d3d94865f94634158335b6435b64059ca964555264a2438f8d6463e542394c1f",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/codex/codexLaunchConfig.ts",
+      "status": "modified",
+      "sha256": "3dc00d2c62acd67d4d1f4ac762b6a6b4f86f61773b0f8830e5deba155abe23ad",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/codex/codexReplayMapper.ts",
+      "status": "modified",
+      "sha256": "0ea3504eab6f30b2342e49a51308f72bd984e9c0c01c1e52a2786d05ee9d3cc4",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/codex/codexSessionMetadataStore.ts",
+      "status": "modified",
+      "sha256": "0f82ae22cfd397c73e5d6c45cb4bddbeea69596d6e6f1c8d70dcccacf91d6491",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/commandAutoApprover.ts",
+      "status": "modified",
+      "sha256": "72a8e331e29f115f2ea5afc6dae89a67d8944ba52a38a0cc28d5fafb1bffd631",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/buildSessionEvents.ts",
+      "status": "modified",
+      "sha256": "2777da4ac22492413fe767519a0039ec9bc7da27025148695520feced1810db9",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/byokLmProxyService.ts",
+      "status": "modified",
+      "sha256": "bdc16c4bd575238a3f7f387839b661fcb711880c8f4537b9af325c34094a7ab4",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/byokOpenAiTranslation.ts",
+      "status": "added",
+      "sha256": "1820b27468b1ae9a55c4d415477e1a17ab26726c5770a2e3f59c2c63e070c74e",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/copilotAgent.ts",
+      "status": "modified",
+      "sha256": "bfe5bb59f93af5310353f8d823bbbae91a79a40570201a7380c3493a94bbd07c",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/copilotAgentSession.ts",
+      "status": "modified",
+      "sha256": "66360ac87cdf22ade3b13189478cec1e42d039b1e30f7c7b5b2611ed124c6697",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/copilotGitProject.ts",
+      "status": "modified",
+      "sha256": "024018dcc0434de424fe9707815e8e48ab9c9ae9831937076f3b30b9af54e591",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/copilotNonPtyShellTerminals.ts",
+      "status": "modified",
+      "sha256": "8728b372b609385b0293fa7f15b1768c592f0e056b68313b419bbbb30acec4e2",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/copilotSessionLauncher.ts",
+      "status": "modified",
+      "sha256": "538fb7cbbd2306bdb227b5d4d8a77250db8b3f839f683752456acb698db62d1b",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/copilotSessionWrapper.ts",
+      "status": "modified",
+      "sha256": "9d88a93e4dfab67d7e7645be466f9613c6f7a917f9f461d2283c9c10ff4607fb",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/copilotSystemNotification.ts",
+      "status": "modified",
+      "sha256": "b9c7a03fa0b3d9c85c8c02df21539e30feb8c3fc5cffe3ae85817c9b076b826f",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/copilotToolDisplay.ts",
+      "status": "modified",
+      "sha256": "45a32a3ab78c6f92157d65d9234b7ceb40bd631939ed7855afc74aaab5e2c906",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/mapSessionEvents.ts",
+      "status": "modified",
+      "sha256": "a8cdc5be8a3c447ac1e16481b6ef9a890610c2de81069ba44bd0970f914df3a9",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/prompts/toolInstructions.ts",
+      "status": "modified",
+      "sha256": "de986eeb104f83d4919e593c97dbe7ba5b735c9a095f8f8e55e2f7ecad855c2a",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/copilot/toolSearchDeferral.ts",
+      "status": "modified",
+      "sha256": "b7e926991ce4fed18436c320f4e9a4cc69599a2684e9c4a9cc6e80723e8d82e7",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/diffComputeService.ts",
+      "status": "modified",
+      "sha256": "f27ac1b3fd495b366a7704f70e0ba1a14ed7a4ee96ccf43928b6720262787133",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/diffWorkerMain.ts",
+      "status": "modified",
+      "sha256": "17804579733adaf8d629b4e12f301e8e2e4e5dfa42d60937f027f7ede3c4de91",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/diffWorkerMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/protocolServerHandler.ts",
+      "status": "modified",
+      "sha256": "4a3bd3e3b295397075d311c9f3dfd7a60a5731729c8766794f4eb3f6222e4dbe",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/sessionDatabase.ts",
+      "status": "modified",
+      "sha256": "b462fdd795cc1eb160f10335eeb1f0a2248f39fa187386e923837cf7dfef8b8d",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/sessionDataService.ts",
+      "status": "modified",
+      "sha256": "f3cdbffc53f28e8f914e73d880ab44ad0a7499b034260aeca35596bff78632aa",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/sessionDiffAggregator.ts",
+      "status": "modified",
+      "sha256": "0a66f77d50b6052804efed805c0644ed1c2bab1134f0fed767a3fd0298fe433d",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/sessionPermissions.ts",
+      "status": "modified",
+      "sha256": "6ac0932fdade09ac16cbbb9e272b0dd9bd7e72ba376574aa806e88dfec01b41c",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/shared/agentHostOctoKitService.ts",
+      "status": "modified",
+      "sha256": "466f90aa018f88f7f7fafdc79b68cbf85c4d62cb19709295534049811b722e64",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/shared/fileEditTracker.ts",
+      "status": "modified",
+      "sha256": "72d0e0c4c0e189b09f2e3ddd61e4ee7beed94e6500575270351d6cbcca84cc22",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/shared/sessionServerTools.ts",
+      "status": "modified",
+      "sha256": "5eb8ca0da695a8a63d9656561726b191b2d2cb4ca711889471a5f173ae1bd6e7",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/agentHost/node/shared/worktreeIsolation.ts",
+      "status": "modified",
+      "sha256": "88b6d0867a74ac6cbb2f03f7fbfe79e05e6d9076afff6e6ea8e98484f6a4716c",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/browserView/common/browserView.ts",
+      "status": "modified",
+      "sha256": "f3da03aaeb56a7eaa44fc18966b0208ed6dcb3a8599b2b4eab1928a721e644a3",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/browserView/electron-main/browserView.ts",
+      "status": "modified",
+      "sha256": "4c20e9c685674d5b995324f3c97738af5dae3860f73c3aea691a434615faa2d7",
+      "sourceMaps": [
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/browserView/electron-main/browserViewFrameInspector.ts",
+      "status": "modified",
+      "sha256": "efc9b1e688b3d75bce8c13fbb312219b5001c58cc601f5307bcfd964432c1f3f",
+      "sourceMaps": [
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/browserView/electron-main/browserViewInspector.ts",
+      "status": "modified",
+      "sha256": "2a9809291e8bb9f48e0c8731bcb5d61a55a7505f84af8901a31fabd2ef00d7fc",
+      "sourceMaps": [
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/browserView/electron-main/browserViewMainService.ts",
+      "status": "modified",
+      "sha256": "b40bbcebcf346619a8241866cc34868a057df1630d8e4b330ed7012d2f306780",
+      "sourceMaps": [
+        "main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/chat/common/sessionArchiveActions.ts",
+      "status": "modified",
+      "sha256": "f0339a702ff5c414b8c29716d229587e5823386b8574fda56ca9ac91a617ea63",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/dialogs/electron-browser/dialog.ts",
+      "status": "modified",
+      "sha256": "1e6d94f291683150c26a6d1dc27e50c6514f0a19cce529f4715ceb82cb1411be",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts",
+      "status": "modified",
+      "sha256": "05639b245c4c3531c737de488ae8e596615736e53715d9db88619f470279fb67",
+      "sourceMaps": [
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/extensionManagement/common/extensionGalleryService.ts",
+      "status": "modified",
+      "sha256": "85b0ea6688ddbdaa364fc7d8caa8170a5af32f4b5b4be01469fdc0977b38bc6c",
+      "sourceMaps": [
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/history/browser/contextScopedHistoryWidget.ts",
+      "status": "modified",
+      "sha256": "4b9020b5dfa160a22c57bb4c7bfea97f6b7f029f95723e44e6cd26481c667265",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/keybinding/common/abstractKeybindingService.ts",
+      "status": "modified",
+      "sha256": "10f336e5cbb78d038d25bf96225c889e6af64799e3958e704b4824b0c9f7f056",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/localTranscription/common/localTranscription.ts",
+      "status": "modified",
+      "sha256": "8c66c39ac5e02743840fb3a2a503418e0422cd9b1dcb3c61aab8d81f6bf27780",
+      "sourceMaps": [
+        "vs/platform/localTranscription/node/localTranscriptionMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/localTranscription/node/localTranscriptionService.ts",
+      "status": "modified",
+      "sha256": "10b1efe2d74dc2033beb197363efd362d368c24bcc73fadf7a744ca0b26a0ddc",
+      "sourceMaps": [
+        "vs/platform/localTranscription/node/localTranscriptionMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/mcp/common/allowedMcpServersService.ts",
+      "status": "modified",
+      "sha256": "d991c028241496809f80edfe817efc334cff5826a6243267d014430e40db0855",
+      "sourceMaps": [
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/mcp/common/mcpGalleryService.ts",
+      "status": "modified",
+      "sha256": "c9c005d07ee55ce2b38fb34bf473b71658840be78cbc341aba9de13b19be7f46",
+      "sourceMaps": [
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/mcp/common/mcpManagement.ts",
+      "status": "modified",
+      "sha256": "2992083a0f9d3977b4f3b65bb3598b5b59411fc4b3bb08fba16dae90419e18f7",
+      "sourceMaps": [
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/mcp/common/mcpManagementService.ts",
+      "status": "modified",
+      "sha256": "7f518e7e243268d2b24dae519b674e99701390f59c6a83f70e934ada72a748e9",
+      "sourceMaps": [
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/mcp/node/mcpManagementService.ts",
+      "status": "modified",
+      "sha256": "8615862a064cb17321f26cf368e450e8395d5fffd9d7a50cedb0f7aa20fe6181",
+      "sourceMaps": [
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/policy/common/copilotManagedSettings.ts",
+      "status": "modified",
+      "sha256": "fc4ac558ed70b1be6dd1e91dbde5457932d1bb6f3b0570ec161a493a1d11707f",
+      "sourceMaps": [
+        "main.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/product/common/product.ts",
+      "status": "modified",
+      "sha256": "cd34311f84c7c1924a5c3502b85f5284dbdad9b6e9fcecdafaf6125b48c91193",
+      "sourceMaps": [
+        "cli.js.map",
+        "main.js.map",
+        "vs/code/electron-utility/sharedProcess/sharedProcessMain.js.map",
+        "vs/code/node/cliProcessMain.js.map",
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/platform/terminal/node/ptyHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/contrib/debug/node/telemetryApp.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/quickinput/browser/quickInputActions.ts",
+      "status": "modified",
+      "sha256": "f82ac2263a1d867e6ee8d6a85db60e740d5006795010561ef32c02991112e3f0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/sandbox/common/terminalSandboxEngine.ts",
+      "status": "modified",
+      "sha256": "19546855198e265a75909b5d497a4d8b8fae7121cb1b9c97aadc9efeee8cc816",
+      "sourceMaps": [
+        "vs/platform/agentHost/node/agentHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/telemetry/browser/errorTelemetry.ts",
+      "status": "modified",
+      "sha256": "2fce0883a3c707754263a3dc2d55a671e4f5e273918aced760d8a66eae2224a4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/platform/terminal/common/capabilities/commandDetectionCapability.ts",
+      "status": "modified",
+      "sha256": "d2fbafba758dc26b2b32772d66e01f07f4cbc8395d16fb5ef8d19ebc72cbcda1",
+      "sourceMaps": [
+        "vs/platform/terminal/node/ptyHostMain.js.map",
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/dockedAuxiliaryBarController.ts",
+      "status": "modified",
+      "sha256": "fab4840d1cc9487906a08444c229d983be4bb230df4108a8c85c96e2c8116c8d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/layoutActions.ts",
+      "status": "modified",
+      "sha256": "dffe87e1692a7878e539e7c8f8c51d8522030606e9d5c5743c9082fcd5a18c30",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/media/sidebarActionButton.css",
+      "status": "modified",
+      "sha256": "356a26bc5ce17e36e0e8f1192f019831535fd460790492596eade6f254e20e7b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/media/workbench.css",
+      "status": "modified",
+      "sha256": "f3c67dfb963be4fe9a0b42ba369934d5a1f2282c8c93e4537c6312ca3ef691ee",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/menus.ts",
+      "status": "modified",
+      "sha256": "bec549f5ff71d5cb0b89a8581c138c1f51e7ef42e043ff0d99b896943aca0776",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/mobileNavigationStack.ts",
+      "status": "modified",
+      "sha256": "47c132218b0d31cdd9314bd5b307a09db1ba23cb214eb0abdfc618623b2729f3",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/chatView.ts",
+      "status": "modified",
+      "sha256": "024955cb0ab2b04f9c513bb485cf9cfe7b7b0522053ce082f78832703b9b00d0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/media/chatCompositeBar.css",
+      "status": "modified",
+      "sha256": "88624751845b641075f8c5745969dcafdb9463ff58fb0e6f24cb59d1429bc15e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/media/sessionsPart.css",
+      "status": "modified",
+      "sha256": "f7c2b7a63c3e983fccb7e3d793747b3b2c6e934dd699250463482453acc9c3b1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/mobile/mobileChatShell.css",
+      "status": "modified",
+      "sha256": "25286b646393c1588ce31266d4782e46de6c7d4e1082c1ddad1a211f093e982d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/mobile/mobileSessionsPart.ts",
+      "status": "modified",
+      "sha256": "045faeb2c225fcc24222562e04218aa3f03ea53392d24b6ed8908c60ef9e67a3",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/panelPart.ts",
+      "status": "modified",
+      "sha256": "b7b453f6849c0b92dc5d9c68fb9b231fa3e250d30e40cf8ba39c3c197f449204",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/sessionHeaderMetaActionViewItem.ts",
+      "status": "modified",
+      "sha256": "61e241dafc383b342350d0b4cff7fc856c60ddb40a55c6d0744aca14a83ddf11",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/sessionsPart.ts",
+      "status": "modified",
+      "sha256": "1173df4be266f56450550cdf4dc0e2f8c512cc126dd8dce1b51d2f0890ee41c9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/parts/sessionView.ts",
+      "status": "modified",
+      "sha256": "fa8887f0722a425b6915cd2b2c67714d7d95ab8ab34f08a78ca6de49cdeed3e2",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/singlePaneWorkbench.ts",
+      "status": "modified",
+      "sha256": "e9aaa311f299399f44b1c5d57ed2a9ccc4cbd1576d9fc902d0ecc777bc679503",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/browser/workbench.ts",
+      "status": "modified",
+      "sha256": "3d5f8c97ec91cf039fd5a777dcf2aae25d1666fb3529673bb37703fd9a2eb7d0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/common/agentHostSessionsProvider.ts",
+      "status": "modified",
+      "sha256": "9cce9f749ee753a2aa67b66710c3323de790b8bbca451eb17c6e4d1c7bbb455a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/common/contextkeys.ts",
+      "status": "modified",
+      "sha256": "b0b8d957b4d4680aad1161c2beb252f5c0dba85c3efb6daf1bf47587e1394126",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/common/sessionCommands.ts",
+      "status": "modified",
+      "sha256": "ed38fc6e40a53bf4f4af3b8177a6e73a46a9343864e0cd00dcdf4f75ee27521f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/common/sizes.ts",
+      "status": "modified",
+      "sha256": "2e28e95dc689fd6e5277c6844fbfd8c5329125e88eafc7ba1f2d7da313625e3c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/agentFeedback/browser/agentEditorCommentsProvider.ts",
+      "status": "modified",
+      "sha256": "6e6b8542545be1b8494d1b14fa063c57fa55518e7918344e92b3ab5651817b0d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/agentFeedback/browser/agentFeedbackEditorActions.ts",
+      "status": "modified",
+      "sha256": "4d8038bafc58cbd1a2207b083f47f8cca307d51a9f6fdcc18c6e1cef53526d5e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/agentFeedback/browser/agentFeedbackEditorOverlay.ts",
+      "status": "modified",
+      "sha256": "c4f4da937a5dad9a082f6542d6cc7cddb7b93a5d110929bd5fdde9a6531ac5e0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/agentFeedback/browser/agentFeedbackService.ts",
+      "status": "modified",
+      "sha256": "2552d4f0e43f31f375dfbf7dd8cd60dc8478e1e381281a15506e96049e8fbaae",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/agentFeedback/browser/media/agentFeedbackEditorOverlay.css",
+      "status": "added",
+      "sha256": "6a169edb04cc7759a293147998dfcea4d1babffb1693e1542ce9b8f8862c6ff6",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/aiCustomizationTreeView/browser/aiCustomizationTreeViewViews.ts",
+      "status": "modified",
+      "sha256": "ea0ca304da1c68ec7e197da479a56d71fcfba154f61e7bf67a1b39f696fd1f6b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/aquarium/browser/aquarium.contribution.ts",
+      "status": "modified",
+      "sha256": "3d588afc9ab65fd99f444cc20d82da1deb760b6a2a08165a7905ed1bacb5c88a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/aquarium/browser/aquariumOverlay.ts",
+      "status": "modified",
+      "sha256": "5af653a88a2133b2ecbf8cfd74955c9c4d63cf243730233c679279a32f59042f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/automations/browser/automationDialog.ts",
+      "status": "modified",
+      "sha256": "c7a8300ddf2bb0620155687b2e3438c3a9f245c6c57f3831858f25a5b167070f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/automations/browser/automationDialogService.ts",
+      "status": "modified",
+      "sha256": "e9144000768cc6c04a7b5c032597b6204260e9fe8886fef4237169929286432b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/automations/browser/automations.contribution.ts",
+      "status": "modified",
+      "sha256": "d943486fe09417a73b4cb4ebaaeb6fc195567a495ae10e2c621d9f8102549aaa",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/changes/browser/media/changesView.css",
+      "status": "modified",
+      "sha256": "74570ae2c03c1df0a39857f225ef291accce82e668ea3e0154c58358283fcd9e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/changes/browser/media/multiFileDiffEditor.css",
+      "status": "modified",
+      "sha256": "c220eb415ca330a0cecfe503948573720efb66fb167218d14bec7ed8cdfec9bf",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/chatView.ts",
+      "status": "modified",
+      "sha256": "15d69fe862ddb4f2574fba3d627427c2ff3ea60246929f019cfef971d8f52284",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/media/chatInput.css",
+      "status": "modified",
+      "sha256": "6b012564d91422a12843c3bf0ec14247e80e9a58c067d18355520da872ea97ad",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/media/chatWidget.css",
+      "status": "modified",
+      "sha256": "6945b8e563dd5cbcb95bf5e59407cbedc8b720a5ab068698ae01500d6e8d41df",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/media/sessionBackgroundActivitiesControl.css",
+      "status": "added",
+      "sha256": "f2e9ec8596b3f9f87bba95c8f8d7861fdeeca737d33e9c0ca8263342f8eba943",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/media/sessionChatInputToolbar.css",
+      "status": "modified",
+      "sha256": "583d2df4de34341757f472474d973545606d8c8fccc385e457c409df9287dffc",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/media/voiceChatView.css",
+      "status": "modified",
+      "sha256": "53331c2c292d19fe6d68d4906bc2dd9b429ef8f4afe5caebb70cba94734bcb08",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/newChatInput.ts",
+      "status": "modified",
+      "sha256": "004867e50cd2fdb300041df16309f822bd93662f962de9d12fc065d19b174b55",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/newChatVoice.ts",
+      "status": "modified",
+      "sha256": "4d4681991af6c3458c29847d995fcb10fccd8bb89c98519523d59257e40c4241",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/newChatWidget.ts",
+      "status": "modified",
+      "sha256": "81c9a8d74f24ed03129a59512f3b7f4e7d375cc716ebc79b00b4f3a8d60f7d6b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/responseSelectionResolver.ts",
+      "status": "modified",
+      "sha256": "3ae8e6a5da847c5acc8af2f50c55356dfaf212d214951bd2da0b28a6ecf838b3",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/responseSelectionSideChatController.ts",
+      "status": "modified",
+      "sha256": "9096acbcd2525e3a8e4900b9e49f499d851e25dc186125cece0022dad4d30c56",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/sessionBackgroundActivitiesControl.ts",
+      "status": "modified",
+      "sha256": "5f1641ca946098850c3080a0d42ed51eb0b2296545b5559d1f658da8b877c1fe",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/sessionChatInputToolbar.ts",
+      "status": "modified",
+      "sha256": "64ea90b1f0733764c761b2298cba496ace12b6c01370b6ad899aad401576f1e4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/sessionsChatAccessibilityHelp.ts",
+      "status": "modified",
+      "sha256": "40be1fd29f930a565f803801a428f0d3dbcbd8446f05f73e14ea9724c2f90cf0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/sessionTypePicker.ts",
+      "status": "modified",
+      "sha256": "f5733f15207765fb03271c67c0f230275553dd5cb62742e7ded1e611e036cdce",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/voiceBridge.contribution.ts",
+      "status": "modified",
+      "sha256": "2470a4b589b7a59c41fa041aa9694e6ecb49421b4daeb66336bc3d0ec0fefe8d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/chat/browser/voiceInputDecorations.ts",
+      "status": "modified",
+      "sha256": "897c69122f028b5a15bf856706f55747525276a6e1555da68557f5f7821c4bf2",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/editor/browser/editor.contribution.ts",
+      "status": "modified",
+      "sha256": "0d5c7967d738c9d2d5715e2d7a4677e9dddf04095851f318ce7a72459052a09e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/editor/browser/media/editorTabs.css",
+      "status": "modified",
+      "sha256": "d71ebe056cc76a06ec029e68cb09399d2efa33b28082b972260f3b9f1d987fd0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/github/browser/github.contribution.ts",
+      "status": "modified",
+      "sha256": "5269bdcce22199f3b434fd76a40f65e44b87992bc5a9cb25fa3c86274b4b22aa",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/github/browser/githubService.ts",
+      "status": "modified",
+      "sha256": "85be589320d3c75af72d2b229b0360a1a462fdbb667e4bb00f028f225ff7baed",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/github/common/types.ts",
+      "status": "modified",
+      "sha256": "4e7dc59d92964cb17d17a138ce2b94cc054ba017a7569523a5261ac297604948",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/layout/browser/baseSessionLayoutController.ts",
+      "status": "modified",
+      "sha256": "df7d194b1931dfbd04f725861fc76f76b231b76ac6fc6cf75e6d6629451d2d06",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/agentHost/browser/agentHostDiffs.ts",
+      "status": "modified",
+      "sha256": "6aff79389456296af6788eda0cbe6217bfa01ee168f6e1037b5ea5cc3cc91a64",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/agentHost/browser/agentHostSessionConfigPicker.ts",
+      "status": "modified",
+      "sha256": "271c8b082fddf6f8b8761590e86e70da962c1d7b9ca575359fdff0c32a36e9cf",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/agentHost/browser/baseAgentHostSessionsProvider.ts",
+      "status": "modified",
+      "sha256": "5becf3121dc8cb9ac73b61c886ca557b87f83a00e8570c21f12c1ed878ab2426",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/agentHost/browser/localAgentHost.contribution.ts",
+      "status": "modified",
+      "sha256": "2a4cc3350ca4b0c9d5cf28ce51ebcd61c9914a1bcda75657d3653abbaf07cbb0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/agentHost/browser/localAgentHostSessionsProvider.ts",
+      "status": "modified",
+      "sha256": "cfdc3d84a6373139ab1f4d4db306072b9d54c407c66610fa7c60eaf656fa520c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/agentHost/browser/media/openSubagentChat.css",
+      "status": "added",
+      "sha256": "b40da32095417d7a591ec910515967f70c34ca9304300fc9c206d687a867d739",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/agentHost/browser/openSubagentChat.ts",
+      "status": "modified",
+      "sha256": "faf6ac7c5e5b520d83bf6006c34b85b65f18325eecc55fee8624680e1b9478de",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/copilotChatSessions/browser/copilotChatSessionsProvider.ts",
+      "status": "modified",
+      "sha256": "a00c4eb46ce253a4741109211c31cf38864f491b567ad92eeee4e4ad48d21ba9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/copilotChatSessions/browser/permissionPicker.ts",
+      "status": "modified",
+      "sha256": "5ab8827e3074d017d239e1f98dd91a46b2ea458e82f14ff5a9ace03cabf61bbd",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/remoteAgentHost/browser/remoteAgentHost.contribution.ts",
+      "status": "modified",
+      "sha256": "4c9e49cbc9693cec272bd5e3ae77b99116d9aed1775b32d1096d6f00913b6d4a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/providers/remoteAgentHost/browser/remoteAgentHostSessionsProvider.ts",
+      "status": "modified",
+      "sha256": "638d252d222e5f6983a258736494956b27cc543876b1aa366077bd0f158e312c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/sessions/browser/customizationsToolbar.contribution.ts",
+      "status": "modified",
+      "sha256": "f1db11c44303b54a651e268cebf1917d051ee7f70ec27ebb124c82c9beef202c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/sessions/browser/media/sessionsList.css",
+      "status": "modified",
+      "sha256": "5261e9ee4a63c497e7d3d5642670db9b68c27d74aab9193cf431aaf0d764da2a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/sessions/browser/media/sessionsTitleBarWidget.css",
+      "status": "modified",
+      "sha256": "c52e631052ad6f0759a1ea80c69b6ed777c57b79935bcd0d16786d079db5a6d5",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/sessions/browser/sessionsActions.ts",
+      "status": "modified",
+      "sha256": "14a3e2eaa212bec7f8957321ec042ec20f553b2278eeac32eb2eb491de061bf0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/sessions/browser/views/sessionArchiveAnimation.ts",
+      "status": "added",
+      "sha256": "16949aa607cbc40e219196d51229fde9e25201c7685342cdf3ffe56984c5342b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/sessions/browser/views/sessionsList.ts",
+      "status": "modified",
+      "sha256": "ff9e5c9fde78ff1d03b087e2cb8a712870b0b0a6b4aaa137f7393cdabe6301e2",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/sessions/browser/views/sessionsView.ts",
+      "status": "modified",
+      "sha256": "75c813efde054ac60434c208e777546264aa2c07e4ea5a8b6b9800f18f8e7568",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/sessions/browser/views/sessionsViewActions.ts",
+      "status": "modified",
+      "sha256": "74ccb1f259166fafcc7f0dc18b3834885007789c76005a3b4c0b974d574fbbba",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/contrib/terminal/browser/sessionsTerminalContribution.ts",
+      "status": "modified",
+      "sha256": "563411c0d013e4c3d3f0b65db6385263396197488ae60f6380cdc635fbd85e02",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/services/sessions/browser/sessionGroupsService.ts",
+      "status": "modified",
+      "sha256": "845bc8089d847d528a9a004b2ade66389391613b350de23061177343ae4dde3e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/services/sessions/browser/sessionsListModelService.ts",
+      "status": "modified",
+      "sha256": "2573d449444f80e4ed42d7bbbdd48279e55793411efbb752d224346329ba62c4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/services/sessions/browser/sessionsManagementService.ts",
+      "status": "modified",
+      "sha256": "ab4de459662c2d4d777a5ff6c8f89f6f4b054522959c4603a8f13c406e9cde8c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/services/sessions/browser/sessionsService.ts",
+      "status": "modified",
+      "sha256": "0b37bcea004df5da16d9bb577f189a8c4facbc7d1dd3e77576f2e6297a6da696",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/services/sessions/common/session.ts",
+      "status": "modified",
+      "sha256": "888aad9639b4fc914f5a772a6ffb063569b9477634cf584917cab1af856b465c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/services/sessions/common/sessionContextKeys.ts",
+      "status": "modified",
+      "sha256": "ffd19edb770a4ccfd29aa1b0c95cf0fec5e5525f34202c303db8c86292e0ac38",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/services/sessions/common/sessionsManagement.ts",
+      "status": "modified",
+      "sha256": "a99204104d23e9f459c4edbb18ad7e1a45cda0a929d1ec225db493b564f46a9b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/sessions.common.main.ts",
+      "status": "modified",
+      "sha256": "a86f84a3749dc64d086ca51b5ab87a088a3b60c1f1dfcc3bc09a99e74c1b3ac2",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/sessions/sessions.desktop.main.ts",
+      "status": "modified",
+      "sha256": "f21978dd32842cc45a4e9fb636a65fea062e06e92e1b23965f3fa08bc7b092bb",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/api/common/extHost.api.impl.ts",
+      "status": "modified",
+      "sha256": "36d9b902073bcb9dca9e2599931c19cd8adfc2776d2c58fdce805d640747ce90",
+      "sourceMaps": [
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/api/common/extHostChatAgents2.ts",
+      "status": "modified",
+      "sha256": "1cc60550255fffb932bf3840512cadc930857d41f6a5c4f2dfb333748bbde727",
+      "sourceMaps": [
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/api/common/extHostLanguageModels.ts",
+      "status": "modified",
+      "sha256": "7acf86612769dfbcc004231cc6a6a558873f859586eac1120086aa9cd0a7221a",
+      "sourceMaps": [
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/api/common/extHostTypeConverters.ts",
+      "status": "modified",
+      "sha256": "f1b309e1ce2eaf23d44c385870b3978dad9ed36c04a59a26af25f9af1b428a7a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/api/common/extHostTypes.ts",
+      "status": "modified",
+      "sha256": "38c3f9de833629e169353836c28724f5c4a7580659a728b3aed48a83b90aa9c1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/browser/parts/editor/breadcrumbs.ts",
+      "status": "modified",
+      "sha256": "e30e5b93a3934dfce16b61bfd3d1c621b49126503f000137cb441c250c78ccf4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/browser/parts/editor/editorConfiguration.ts",
+      "status": "modified",
+      "sha256": "4f216b507befbaf31eed3692413eabc7145357d9108205096e3552b1a503b2ed",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/browser/parts/editor/editorGroupView.ts",
+      "status": "modified",
+      "sha256": "86aaa2d6c0af4c56d01ca01debc01473aefcf754af8e2bd8054d0113f4505f9e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/browser/parts/editor/editorTabsControl.ts",
+      "status": "modified",
+      "sha256": "b4b43fb26eb0484c4c3b5a96ddea88506d5b497b2594037da99c6fb503e6ad4e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/browser/parts/editor/editorTitleControl.ts",
+      "status": "modified",
+      "sha256": "a24fea2376fa2f155bdc6192703c167b8e8d5466ef62eedee6ab67bc7663b7f8",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/browser/parts/editor/editorTypePicker.ts",
+      "status": "modified",
+      "sha256": "2fce6c0eabd845c5a2e76166a7eaabf6d9dafd94061e541ab490bb48547e12ef",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/browser/parts/notifications/notificationsToasts.ts",
+      "status": "modified",
+      "sha256": "4b8719b2c22fd5dbff277a606bc6368dc6f29eaa6fabbba64507ea57e1653d63",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/browser/parts/titlebar/menubarControl.ts",
+      "status": "modified",
+      "sha256": "5f9c6e0fe835ca23e3b4ac8e2c6af082d5ed890cffb9dff0c1e3e51f240bb8b8",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/common/editor.ts",
+      "status": "modified",
+      "sha256": "0cd04a25e1cd93149f7fe3d82f1735cbfa8ac58ac351fccc3ffadfb8afd6f45d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/common/views.ts",
+      "status": "modified",
+      "sha256": "8723cffac163359d42784cc0996c768cf9f5f3c1f9db0b8db7ec2f1a65609384",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/accessibility/browser/accessibilityConfiguration.ts",
+      "status": "modified",
+      "sha256": "5fbe7c4f3fb5d5f209bfec50e3ed476cc58015804117d7c3256a5932ae7d19a7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/agentsVoice/browser/agentsVoice.contribution.ts",
+      "status": "modified",
+      "sha256": "590bb1a3a612262ab1f628845397305ca3865d63d0f935167c77f6bfdc65681b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/agentsVoice/browser/media/voiceModeOnboarding.css",
+      "status": "modified",
+      "sha256": "0de6975bfca931b9085bf65e844a127aa7c46d32e68d6bb469862e3902e1023c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/agentsVoice/browser/voiceModeOnboarding.ts",
+      "status": "modified",
+      "sha256": "eb9ec8364df2bcdf10459a19141285714cbb6d767d1652a6ee2a6be341607723",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/agentsVoice/common/agentsVoiceColors.ts",
+      "status": "modified",
+      "sha256": "2ae3a1c5561af5c800c9d96d8bf220c08b76c09fc2ef2159261c20bd327461c4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/browserView/common/browserView.ts",
+      "status": "modified",
+      "sha256": "33e9aab25eb425c59647dee9d83174a20497cbbea665b8e9e8f7038a0e1dc41f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/browserView/electron-browser/browserViewWorkbenchService.ts",
+      "status": "modified",
+      "sha256": "8d8a0585722aae30786120a82098729a9a287d5bb2f3ab2eb6704d1c96eebc2c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts",
+      "status": "modified",
+      "sha256": "d557e2bc7ee941cbdc860fe795f81b7a532cfded44d0f0e1e97397b76f50fbf7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/browserView/electron-browser/overlayManager.ts",
+      "status": "modified",
+      "sha256": "624f63ea1067ca0f0d2adccad700577e8649f391bb10fa2f05916dd209d0b726",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/accessibility/chatResponseAccessibleView.ts",
+      "status": "modified",
+      "sha256": "1408ae9e2682d8d3ddf5ffdf44c109892271a4cf13b2a89f1f48b67dc3fe5ec1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/chatAccessibilityHelp.ts",
+      "status": "modified",
+      "sha256": "131457a6ad2ab029e676186447d518d0646d06926b76a19db23a98ead3882018",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/chatActions.ts",
+      "status": "modified",
+      "sha256": "a7af29eed4818190c96412afa9e43677a616c72bd1b81f6b0bbed39d5be7bd0f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/chatBranchActions.ts",
+      "status": "added",
+      "sha256": "711db39727ef9df143615e524a526d4ff8c6a15b62529551d61056c9e61de585",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/chatContext.ts",
+      "status": "modified",
+      "sha256": "b7a6be748c91322f6c9250f8161097edf655b966edfdb10db9731e8ee01f5c0f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/chatContextActions.ts",
+      "status": "modified",
+      "sha256": "b6b763d0c096da3fe82626ea396c6753872fa56df65d55f6492f709c18f15931",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/chatExecuteActions.ts",
+      "status": "modified",
+      "sha256": "80d1b0d7a6272248620071a210109e5142c44c76db98f93f94ea55183b7f2780",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/chatSpeechToTextActions.ts",
+      "status": "modified",
+      "sha256": "1b12761eb2fc81457cae19357e5ae626d04c7b3a58312ef6241b2dfe6d21a031",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/chatToolActions.ts",
+      "status": "modified",
+      "sha256": "da60eeecbc48df9e2a9cbfc2f219c286364f23c69d4d456cd1e9889fba9d2f78",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/actions/exportAgentHostDebugLogsAction.ts",
+      "status": "modified",
+      "sha256": "27d8a7b5738c6629b14927493b35e207871785ec5a645029c6085e24cf41cd2e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostActiveClientService.ts",
+      "status": "modified",
+      "sha256": "f8b1655df4ef639a8857e0886ebc231d9a834f7461650ca3c9ce51b001009ff1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostByokLmHandler.ts",
+      "status": "modified",
+      "sha256": "bbb87145f1cf2dc70ec76a18966bcc21148dc2a989bb596823d4bbf257b6d214",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostChatContribution.ts",
+      "status": "modified",
+      "sha256": "31848035ffeef3529fbe80c8ded1c363ea08ba0a88b053c8ae2dc3a49117c3fe",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostChatInputPicker.contribution.ts",
+      "status": "modified",
+      "sha256": "1adcc404ce8f441c94604fb7fc0fd58f83d490acf21ee6c78fc45bd99e042d40",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostChatInputPicker.ts",
+      "status": "modified",
+      "sha256": "a5eb81a2aab034c0852c07e3c8de8f01a0b408544f0f81ed33a1a7c17e1a5ca9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostCopilotCliSettingsContribution.ts",
+      "status": "modified",
+      "sha256": "1002a9443a992e3697c786baa1e52c24485233ba1a55b526b9a85ade78396202",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostLocalCustomizations.ts",
+      "status": "modified",
+      "sha256": "99192583d8b78b13d921e03b7c3daabca306dbb9b1d1c8b2630bdd066a7e03bc",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostPromptCacheNotification.ts",
+      "status": "modified",
+      "sha256": "d9205546b84b094b6482a0d66aff3ef5b5805ba579e6b63e60f60a7cb2d48c5b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostSessionHandler.ts",
+      "status": "modified",
+      "sha256": "44930f3e50a96ec692a33d4555ecde4f6b09ad757a7997ab578d8c76ca7e43b8",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostSessionListController.ts",
+      "status": "modified",
+      "sha256": "dfdd891f6a799ebb5a380d31d9dc0041730983fd46fd6666437c6b2ecfdfb915",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHostSessionListStore.ts",
+      "status": "modified",
+      "sha256": "5d2a4158f792a80bc4bf2a55cdcbb6ee28fd6078a60e56f4981ef2e4b52b375e",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/stateToProgressAdapter.ts",
+      "status": "modified",
+      "sha256": "998b4f540fd26c8405bbd51530b312ad2495bdebde928a8d495e67aa4d8105e6",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentSessionsControl.ts",
+      "status": "modified",
+      "sha256": "72158e2ed5e258fad7bb07abace7ffa1b4b6469f4a403a1b7718af81e53164ea",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/agentSessions/agentSessionsModel.ts",
+      "status": "modified",
+      "sha256": "86c7dee95f7681c5be8db1f035f373678f0f9866e508b1c017a8ca5d3692a112",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/aiCustomizationManagement.contribution.ts",
+      "status": "modified",
+      "sha256": "c7c1af26393a2637c9ee5ca24aed22e48314fb87ddf6622916d93405c0dd155e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/aiCustomizationManagementEditor.ts",
+      "status": "modified",
+      "sha256": "6ffc0c894a9987b02eed43fe620075a14718980fc82deb7fe191c864b2eacedb",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/aiCustomizationWorkspaceService.ts",
+      "status": "modified",
+      "sha256": "2d0d6ffa585094cd2f0968adaad5d047b7d892a0c58b1b25e2487826cd0aabc5",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/automationsAccessibilityHelp.ts",
+      "status": "added",
+      "sha256": "4a0e072215ce786ad614432e13659a42e9554e8f0225343f094d267c1156bc03",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/automationsListWidget.ts",
+      "status": "added",
+      "sha256": "97280ffeb25bd34823cd7ca863efcf316659c933a864edeca35152b54a6f2117",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/embeddedMcpServerDetail.ts",
+      "status": "modified",
+      "sha256": "d57bfbb95c4beacf3af308ea4c735a940987e3bcdeb96bae4c98a468d0cd9e66",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/mcpListWidget.ts",
+      "status": "modified",
+      "sha256": "32574ea56f632e7d6afe12621c60a2df06a31d6fe500fe934725bbc6a1756f6f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/media/aiCustomizationManagement.css",
+      "status": "modified",
+      "sha256": "66de9601156d287b5251f7340381d771272dbf7830cf993a043e5e24a39216eb",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/media/shunCodeBridgeWidget.css",
+      "status": "added",
+      "sha256": "2daae4aa77d413decdc2db7b3b6da7c31643add10476133efc8f81486e97fa75",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/media/shunCodeMultiModelWidget.css",
+      "status": "added",
+      "sha256": "18437a5442819185939b81a5ea48f30dccb971fcef2f1a7ec8e679739691369b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/shunCodeBridgeLocalization.ts",
+      "status": "added",
+      "sha256": "40dd8c475b009b63b318c56106fc15270152b8ad3feb1dfb10143955ed521398",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/shunCodeBridgeWidget.ts",
+      "status": "added",
+      "sha256": "4bb09198326fd0ee020e283d68fcf76f3ca9214f7e23520b9afeadbad2afc735",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/shunCodeMultiModelLocalization.ts",
+      "status": "added",
+      "sha256": "6da46482e46bde6b08e7289f88c0cddbd69f83e0415864e6c7eeb095deb9c1db",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/shunCodeMultiModelWidget.ts",
+      "status": "added",
+      "sha256": "bbd477e7938ae6e7494e99436d565024bcee91cbcfe93c760cb024f661d2f302",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/aiCustomization/toolsListWidget.ts",
+      "status": "modified",
+      "sha256": "6c48dc6f8139bc9b2c3df12b58375480149d829ec421d1dc81dea939bc6b77d4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/attachments/chatAttachmentModel.ts",
+      "status": "modified",
+      "sha256": "a40c62cfb2bb50cd0d6cfe074f5ed759413beba6af21a2e4a62115526c341b65",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/attachments/chatAttachmentResolveService.ts",
+      "status": "modified",
+      "sha256": "46a2c97cac9dd924e5c593c3c7e56b9dae4f0e6a02c5da88f53768fc32e5f40f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/attachments/chatContextPickService.ts",
+      "status": "modified",
+      "sha256": "5a525b1853db9cdaf5376de76884af48f2bdc6c37caa8c702e085b15a3184d45",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/attachments/chatDynamicVariables.ts",
+      "status": "modified",
+      "sha256": "133329396c5490e0d67984184ae04461f7315a29d1a465fc2884895b1ee7b707",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts",
+      "status": "modified",
+      "sha256": "32f80106ec54517b81bbe72830bcac47b2139d1f9cb703106d3285df4bb7ec8b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chat.ts",
+      "status": "modified",
+      "sha256": "9cb250b95f6d5f35fdd9ddbf96eb7159c213ae1151521de503d44cb9eb392d4c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatBranchService.ts",
+      "status": "added",
+      "sha256": "db0f6dca445ca48c08b33dcf7672acd3581181abe080390681c087c7ff36d263",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatDebug/agentHostChatDebugProvider.ts",
+      "status": "modified",
+      "sha256": "9b131ead5a0540f86cbdf8f918a26c51ff838d3dadedbcd1705ad0ff047b7c82",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatDebug/agentHostLogSources.ts",
+      "status": "modified",
+      "sha256": "8441c2d939e66aba096e6b036e887ec25d2dedc89828d612d393b8f9f39952af",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatDebug/agentHostUsageSidecar.ts",
+      "status": "modified",
+      "sha256": "7cd95f36a1e7503422e5af2dbb6cee14347179cc2702be2d5af2e06493c72139",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatManagement/chatManagementEditor.ts",
+      "status": "modified",
+      "sha256": "39af183a9b5272a6403d7dd470bd21041544756481aee40ba2d968cea6811867",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatManagement/chatModelsWidget.ts",
+      "status": "modified",
+      "sha256": "254493575f371840464f72ad833142c059ce8140d10ca53f9dde391323837b24",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatManagement/media/chatModelsWidget.css",
+      "status": "modified",
+      "sha256": "07b73f2e9456f182cee2cd096c6deefb71b4983ebfb9e1d0021301f16f587928",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatPetService.ts",
+      "status": "modified",
+      "sha256": "601eb2ea599d80da0ac5d89f272251c12cf6f61d9a94edafc4f0720b7ff165d3",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatSessions/chatSessions.contribution.ts",
+      "status": "modified",
+      "sha256": "a28769fb63bc339abb4bb9e27e97be4ef68a55c05a163b047dfe1d24f3875d59",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/chatTipService.ts",
+      "status": "modified",
+      "sha256": "c5597c6b0fefaf857df01bdb472413f46c730c74a07872754d5ff7926d4368e5",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/copilotCliEventsUri.ts",
+      "status": "modified",
+      "sha256": "42ab3174cc56d39399ac43de562747c7345c844947ec761040b323ea9d8488b0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/planReviewFeedback/planReviewFeedbackEditorActions.ts",
+      "status": "added",
+      "sha256": "ccfd8606a6970eb28cf582a13656b638964f6140bcdfb0ab742bbe881b800496",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/planReviewFeedback/planReviewFeedbackEditorContribution.ts",
+      "status": "added",
+      "sha256": "556a098b94cb9128dfb3d711c7b71c48c979dcba83b80aff8e0cfe1b63796830",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/planReviewFeedback/planReviewFeedbackService.ts",
+      "status": "modified",
+      "sha256": "bd381096d88ee2e9a426810eb60eceb4ba6cf5075855b8fe78fc25e173ccbc4c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/pluginAutoUpdate.ts",
+      "status": "modified",
+      "sha256": "ecede2de23f13704d51135db384276c85c8a2cd252dfebc5bcbce87ddc5cda5f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/pluginInstallService.ts",
+      "status": "modified",
+      "sha256": "5dfc23bfa03e25f8fac5da8df2914ed6c378f58cd93ef2cc032121580a5f3214",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/chatSpeechToTextService.ts",
+      "status": "modified",
+      "sha256": "8ea18c1add1b3cf6e288dbe0dbfe69ff124ff794986c2f2196a73fa7c29a7ed8",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/dictationActionViewItem.ts",
+      "status": "modified",
+      "sha256": "d10ed2895d80efc5b7806f28235bc9b38e463713d3493d2a80a6e6fb2e9e4dcd",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/dictationDownloadActionViewItem.ts",
+      "status": "modified",
+      "sha256": "6af52773aed23282e3d7746d179246a96ff87aa4e71cfb2c16029a5ba2029961",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/dictationMicGlow.ts",
+      "status": "modified",
+      "sha256": "449d5978020e5a0bedb766d32532b16e1f7cdf3befef3064ec2e0993a6060e60",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/dictationOnboarding.ts",
+      "status": "modified",
+      "sha256": "956fc796ef16af27acb93c51d85fb80bfe011a0fb84c68f0cae9be6acd4ce102",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/dictationSession.ts",
+      "status": "modified",
+      "sha256": "771b5e3c11b6522b163f29da1dc9bdecdd9c63bd34b0db646503470280778cb4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/media/dictationMicGlow.css",
+      "status": "modified",
+      "sha256": "6c74724619d7b89b005cfb4c8fee8b0b1d372d94c16626ebac5c7ff59f471058",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/media/dictationOnboarding.css",
+      "status": "modified",
+      "sha256": "3646e6185247ad8e526f0c34996f4a4616b87fb5b85fcdf9f21e9e1033d82499",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/media/dictationSession.css",
+      "status": "modified",
+      "sha256": "0821834eaadcec798e78917480cfb8418f1d5cb06da9d584d4066e5f9fc48720",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/speechToText/micButtonMenuActions.ts",
+      "status": "modified",
+      "sha256": "829a4333389113e8949efd072cc48e20ccebfd592eeb331674ec5ee09fb2bc1f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/tools/languageModelToolsConfirmationService.ts",
+      "status": "modified",
+      "sha256": "e3b84ae716d126f41057a373ef7962276bbcba62d4988ab8b8d674cecb40b042",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/tools/languageModelToolsService.ts",
+      "status": "modified",
+      "sha256": "abb238d4096eb3fdb98b16f9d6a7384b153685c4d4c744cf76d35bd1d4168d6d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/voiceClient/micCaptureService.ts",
+      "status": "modified",
+      "sha256": "b268575deb09e8bb3d0218cf63c6311df1534e1957b4619e2b0ffaa21defe978",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/voiceClient/voiceClientService.ts",
+      "status": "modified",
+      "sha256": "e2ddbe83112b09229f75259aaf06e4566b3cfbe0d13f3734dcc2de28113ec345",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/voiceClient/voiceGlow.ts",
+      "status": "modified",
+      "sha256": "282424eabad6a134d2b9efcd38099219acaed29c1702ecfcad0ea38466a03124",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/voiceClient/voiceSessionController.ts",
+      "status": "modified",
+      "sha256": "8403e52fe090f6ffb49e4ffc9df6a97c30095466e1d1ad70b75ee6df84cffc4f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/voiceClient/voiceToolDispatchService.ts",
+      "status": "modified",
+      "sha256": "3165ab2e76f82d5c343a793e2b06e43cdcdb226a4fb0c295264a7ea0d3cc6a0c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/voiceInputMode/media/voiceInputMode.css",
+      "status": "modified",
+      "sha256": "48fed58416c3d9fcc60371f1f35e50455a07b08fe8364e0d88f2d0fcc72f7210",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/voiceInputMode/voiceInputModeActionViewItem.ts",
+      "status": "modified",
+      "sha256": "bdea709ac684ad069a4f94d00d0898ea174b34f4ce9d5b41f7d7f92fc392463d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatArtifactsWidget.ts",
+      "status": "modified",
+      "sha256": "fa75e3cba319f233e71d4a6b79fb630a6e40514a606e3687d505558e024c1d7a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/chatCollapsibleContentPart.ts",
+      "status": "modified",
+      "sha256": "440df447fc6da79b13c893a0b1d1a8613a2c704cbd22c1fd3b8d8a92618ff42a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/chatConfirmationWidget.ts",
+      "status": "modified",
+      "sha256": "ead337011028608f203d9e7f551b3f1f230e6a0edacf696bf6517045b1f7a29c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/chatInlineAnchorWidget.ts",
+      "status": "modified",
+      "sha256": "815aac7844521399792b653a766e3cb67475571dbc595079b76f3c0114fa022c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/chatPlanReviewPart.ts",
+      "status": "modified",
+      "sha256": "9dd079e92ea0ac2e445e8831fbf62b63ce68db767936c9e3853f7e999236b84c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/chatQuestionCarouselPart.ts",
+      "status": "modified",
+      "sha256": "efc98318f483815e1db56567b81c995fbee76ef12875ee56f89a33aab6f93832",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/chatSubagentContentPart.ts",
+      "status": "modified",
+      "sha256": "0c07124f0013494383aa174fb460019ca737057d7e2a21133d6123be70905be5",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/chatToolInputOutputContentPart.ts",
+      "status": "modified",
+      "sha256": "5f70c9a1f3b8eff552f5795804243bc2a570f7f01c15fc2d9a5348540e28a584",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/chatTurnPillsPart.ts",
+      "status": "modified",
+      "sha256": "dc60cb9a80040ae64beb1c1733b507212ea539204cd03c71e242fa16093e4c9a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/media/chatConfirmationWidget.css",
+      "status": "modified",
+      "sha256": "831b47e06c5027a2bafdf574e59afd2a94c0643ba90e849f1a005d55c8ed72c7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/media/chatPlanReview.css",
+      "status": "modified",
+      "sha256": "78e0092d06ee4640e9a795e1f2feddfb207fc4aec9a57d6f05381bc9caeb23d4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/media/chatQuestionCarousel.css",
+      "status": "modified",
+      "sha256": "09810f1fd3513daa5786730ecc63bb1640e53fd49895de6e08680a87c63a605d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/media/chatTerminalToolProgressPart.css",
+      "status": "modified",
+      "sha256": "5053082d22b35120d83da145d0c6c6ba28d23bfef9156da90e488080e9f71eb0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/media/chatThinkingContent.css",
+      "status": "modified",
+      "sha256": "ec5be666852034a07136d771dbbaf0eafddc2e9a71f90c1ce956a8bfb18ebe87",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/media/chatToolConfirmationCarousel.css",
+      "status": "modified",
+      "sha256": "4e0588cf2a0de0a4000ec43f859f8554138aafbc9ca4f971cc74d93e65832be9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/abstractToolConfirmationSubPart.ts",
+      "status": "modified",
+      "sha256": "682e4537dc51b48edfdd67aa86bf0e261a19db9c312578a3361b931cbd304805",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatAutomationConfiguredResultSubPart.ts",
+      "status": "modified",
+      "sha256": "246b46ad133f01e68519e11238f315866bb1efdaefbb3b54baffc8ab6ffed761",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatInputOutputMarkdownProgressPart.ts",
+      "status": "modified",
+      "sha256": "5617e021635110536558b1f8619b3dc86aac63b7a4e2d7f418c30745a06c56cd",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatModifiedFilesConfirmationSubPart.ts",
+      "status": "modified",
+      "sha256": "64efa2a7d2be92a15c47746013e173f324b2502033ac651df1fb647e739bb36d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatSimpleToolProgressPart.ts",
+      "status": "modified",
+      "sha256": "51ab2256e57546633357e0d1c4700f80ab1bd00c75d827a4cfcaff1600505cbb",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatTerminalToolConfirmationSubPart.ts",
+      "status": "modified",
+      "sha256": "794ee79332240d0204fc2e306e364aebc1808f353489044e9b7ffcbfdbf2f1ad",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatTerminalToolProgressPart.ts",
+      "status": "modified",
+      "sha256": "3a29d86bd0b469a1de7bc7f4cf08cc604bfd3dfcc0a5517b3c329ffc8a40878c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatToolConfirmationSubPart.ts",
+      "status": "modified",
+      "sha256": "728e561f101bddb6253a033816f0b63630faf15f97be4efdd0ba44a5f72f2fe9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatToolInvocationPart.ts",
+      "status": "modified",
+      "sha256": "f49755fa40041bbdda2d65dca7249d6866614affa3102eec054cce9cd5a82a58",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatToolPartUtilities.ts",
+      "status": "modified",
+      "sha256": "c889767c10bff706a1defbe5ebf0fd3ac396022d2a2c6a37766ec8256e75ff6f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/media/shunCodeChatToolProgressPart.css",
+      "status": "added",
+      "sha256": "0d98696a141e686f25145307ac2e8b22ae453142628049762646e3b9cdcff3b0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/media/toolRiskBadge.css",
+      "status": "modified",
+      "sha256": "e182f2048aed04b1a24bfbd4f1417c4ecdfeb762c9ab514e785e9d8406951933",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/shunCodeChatToolProgressPart.ts",
+      "status": "added",
+      "sha256": "cf9aac843202b5e2b559bf4f9d20a4eff30800dee3e062e779737b5c76c9fac7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/toolRiskBadgeWidget.ts",
+      "status": "modified",
+      "sha256": "ae224974c8805cde2db1ce703f02a5e2a456fd8fdd10c11d319c0bcecbcf2613",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatDragAndDrop.ts",
+      "status": "modified",
+      "sha256": "fe3e0c7a2e2a5d75c5a55870d20dadfdf6121218117714ee7439d7722bc00d22",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatListRenderer.ts",
+      "status": "modified",
+      "sha256": "9ad536181ea78202cc8e90657d30d8645a33b0f14224da6bb6b4ebe77fd8fbf9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatListWidget.ts",
+      "status": "modified",
+      "sha256": "2b54cc342b82713a6836887ad1a7ce4c15684e869cc0bef3fa04dc3d96ca2de4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatPetWidget.ts",
+      "status": "modified",
+      "sha256": "7f2a86785372c829f9924d0a2dc0a71bdd26b56a6b99e0e80028c0a94f8eef63",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatReadOnlyBanner.ts",
+      "status": "modified",
+      "sha256": "68b5586771ddbad792cbc6e7b1d6e9938e56281c6a8b8a1bdc55034b0371e8f7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatTurnPills.ts",
+      "status": "modified",
+      "sha256": "39d7d93626c707ed5c289583febb68912d99c5eee300743a90ff805720e0785f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/chatWidget.ts",
+      "status": "modified",
+      "sha256": "422290d05a42694df6661058037a27dcffd4bcaa9264a632563d259ab29dfda3",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/chatInputModelSelectionController.ts",
+      "status": "modified",
+      "sha256": "76215ac6d9d386ef36cf03dcaca4105a04aef9a8ed85dd1b4c36dc12ed500893",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/chatInputModelUtils.ts",
+      "status": "modified",
+      "sha256": "a182d5a09aad52b0efa7022c2272124c66fc01549e25973bbc2af0ca8130b30c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/chatInputNotificationService.ts",
+      "status": "modified",
+      "sha256": "74a332f4e652e4142694db4cb69c92420738cab118a9ab5d49dd12aa13677252",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/chatInputNotificationWidget.ts",
+      "status": "modified",
+      "sha256": "c487d077768d2f26b8798bd54a465274cd2555a15e230bd59a61903e96811b96",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/chatInputOnboarding.ts",
+      "status": "modified",
+      "sha256": "0f10d9bdbccab68e2cc4fd12b064483ba05b1be574fba4e657ccb9acedd88ffc",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/chatInputPart.ts",
+      "status": "modified",
+      "sha256": "0af0efce5ca9a6ada96b55bdf7c41bfd447ac084ab6c677e6383ebca1c87831e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/media/chatInputNotificationWidget.css",
+      "status": "modified",
+      "sha256": "86ac363c09d92b1ad20491c01c48317c6f8acdda23f9df201f17ccfad22f751d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/modelPicker/media/modelPicker.css",
+      "status": "modified",
+      "sha256": "ca46bd40872b5a256ec5fc90ec2f4aecc4a37d7166555c676ee24f60a5048445",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/modelPicker/modelPickerConfiguration.ts",
+      "status": "modified",
+      "sha256": "57cd4b3e9749bfaa33f0e50ddc90475d77dd86e33bdd9c8f3799691c7589aef4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/modelPicker/modelPickerItemPrimitives.ts",
+      "status": "modified",
+      "sha256": "328a616524770d5e6f2024ff93ace18d6f10ef4af4ccd2cf53b09dcea97a6b33",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/modelPicker/modelPickerPresentation.ts",
+      "status": "modified",
+      "sha256": "b5f2cc3d11471c80a9748e2ebb1e226f779094c90c8901d298ffd078169c92e9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/modelPicker/modelPickerWidget.ts",
+      "status": "modified",
+      "sha256": "b56585393c912da635ede363a19c2f75febc3d5d3db390c0acc456140c307b05",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/modelPicker/modelProviderIcons.ts",
+      "status": "modified",
+      "sha256": "cd7679deccac3f7645b8377bbf89f85a134e78869c9f31d47f070b14afe3d12c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/input/permissionPickerActionItem.ts",
+      "status": "modified",
+      "sha256": "0a85e3dd28b2e22f44b4b41c8a4ecf7d35fcf44facf8e131aed91b40f048a66e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/media/chat.css",
+      "status": "modified",
+      "sha256": "98b40cdac8efe8b5f3dfa41c29c146328f8ec29edb868c300bde0c5d7cf183ef",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widget/media/chatPet.css",
+      "status": "modified",
+      "sha256": "d2ee96c28cb2a86a2e0d0dd7172bd417ea623c6941457f5eca26087f0c5980ba",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widgetHosts/editor/chatEditor.ts",
+      "status": "modified",
+      "sha256": "1bc39e60c78366b92a4a7ec56a604545d61621835704a7feeb706ec0a2580ae6",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widgetHosts/viewPane/chatViewPane.ts",
+      "status": "modified",
+      "sha256": "71637dc1995ecc4083b8fb70b265b713d720d8a2e3f56ac3fe1ea8548c29e4de",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widgetHosts/viewPane/media/chatViewPane.css",
+      "status": "modified",
+      "sha256": "0f9173905bacfabf8c7f1bf473e98a4ad7e0f3f662cb73bbee79db811f0877c6",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widgetHosts/viewPane/media/shunCodeBridgeSessionView.css",
+      "status": "added",
+      "sha256": "4ca638003befb9bb0894842b53b523417199ffcfdd70519e33757e974b9d1752",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/browser/widgetHosts/viewPane/shunCodeBridgeSessionView.ts",
+      "status": "added",
+      "sha256": "d74d362f739422f355c1bd7f1148acd4016f636fe08bca8b92cb55a8cbfb6a36",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/actions/chatContextKeys.ts",
+      "status": "modified",
+      "sha256": "f250cbe6215bcc6a3aa2c36652f4f5f9858d2bed1d187921948b1e470cb495e2",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/aiCustomizationWorkspaceService.ts",
+      "status": "modified",
+      "sha256": "58eaed402636e7593f58c22bd3194437dbc8a204b26265b0af4b56e36258e216",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/chatService/chatService.ts",
+      "status": "modified",
+      "sha256": "49af2e1c6712c5d43dc10ff227c4fbbecd4040d5151e5322ea72ab9d23ef599c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/chatService/chatServiceImpl.ts",
+      "status": "modified",
+      "sha256": "e46a95c30f3cf85a6917f2fa455bdf8989c3393262e061145b960b33aa680bb8",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/chatSessionsService.ts",
+      "status": "modified",
+      "sha256": "1d3978648683075a2b82cba2bd7e5d6076ada429feb49af35dd6b92eea9701a1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/constants.ts",
+      "status": "modified",
+      "sha256": "b536620d449616a72be0b100e8baafba7481e4c4bb16d4d1b17cc8fd6982b619",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/languageModels.ts",
+      "status": "modified",
+      "sha256": "14fb7b4952b1453a025fb7ad628d4af69e6873c357b0101d7d37993d5fd916d3",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/model/chatModel.ts",
+      "status": "modified",
+      "sha256": "68ef9030981eddc09bb0fbfeb30bbfa879b8140c78277a17baa3e2addb9e9cc1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/model/chatProgressTypes/chatPlanReviewData.ts",
+      "status": "modified",
+      "sha256": "66a49063c7266e8b512a37a2ff8df14b6c35fca8ce6df2d2d89258d1ec9861c0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/model/chatProgressTypes/chatQuestionCarouselData.ts",
+      "status": "modified",
+      "sha256": "42c3cc5adababebbd3f3e23f95144c7c0f00b2dc313b773e68a3842b7cfbc915",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/model/chatSessionOperationLog.ts",
+      "status": "modified",
+      "sha256": "2bceac648c594040ca3ebfd3e11b852c1c3e79e54e60df0fda14f8c7c866e7db",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/modelSelection.ts",
+      "status": "modified",
+      "sha256": "c01009495c21423c40e7d2a28feb0e0c7b59d4505223185ee2a34d3c3eebf6c5",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/participants/chatAgents.ts",
+      "status": "modified",
+      "sha256": "ce37139a5358d8ed8cf2696d2d089c91af5bb825f068b194b8396dd576cf01db",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/plugins/agentPluginEnablement.ts",
+      "status": "modified",
+      "sha256": "842b99f5ee74b0ec3482c7e04decf39200e510d06282d7d19222e185fc9c2912",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/plugins/marketplaceReference.ts",
+      "status": "modified",
+      "sha256": "9d7f2268eb38f6bdcac7bc17872fed88d9ad00a9c84b1b6374a8600d1536a9b8",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/plugins/pluginInstallService.ts",
+      "status": "modified",
+      "sha256": "350193510288e7872161c888ebc0e3388ab4a2b10c0b11d9d89bd0f0bcea177f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/plugins/pluginMarketplaceService.ts",
+      "status": "modified",
+      "sha256": "7a8b8d7c51059f15cf3c1d641a73e3e426bcac59cfc9a874fa8572f9aa957f78",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/promptSyntax/computeAutomaticInstructions.ts",
+      "status": "modified",
+      "sha256": "7f7427905715773e23e3ea45cc988be34a7f8f60e4eaf363b448ee83f8d5ebc1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/promptSyntax/service/promptsServiceImpl.ts",
+      "status": "modified",
+      "sha256": "ea12fdc084891a6cdeb8c6b63dfd04cf88d695c2cdda9af6e1d7a9626ccd2ded",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/tools/builtinTools/reviewPlanTool.ts",
+      "status": "modified",
+      "sha256": "2bac81f526ab80b360d2aa6a8af852caa50fde6d2b9ea12d24cbd109892a0945",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/tools/languageModelToolsContribution.ts",
+      "status": "modified",
+      "sha256": "beafbcb6724c5afaea719b9d39a2633257549a42c3c7a7c9cf4739a649d1c6c4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/voiceClient/voiceClientService.ts",
+      "status": "modified",
+      "sha256": "7d06d5d6d34e571a618d946e7e7acc8d3a1357885bc2d36f519ef890aed9f491",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/widget/annotations.ts",
+      "status": "modified",
+      "sha256": "5c5ec9d0079a3f6b6e6e545d407236603f31f6a7ec4ec503e3cd1930e4d4c8a7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/common/widget/chatColors.ts",
+      "status": "modified",
+      "sha256": "e0a2bef9cc4484e1ac1dc946e6b1baac2dd7a29e99ac59a21ec4690e8d62d4f1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/chat/electron-browser/chat.contribution.ts",
+      "status": "modified",
+      "sha256": "32e4f43a6044416f844f4e65e8dadb8e8b3e0c6e13127adb0b9f2fb28b869526",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/codeEditor/browser/dictation/editorDictation.ts",
+      "status": "modified",
+      "sha256": "cb1bbafe31184fca43ed5f069e171e49dd392d1278518d6040de3f314c2374a5",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/comments/browser/commentReply.ts",
+      "status": "modified",
+      "sha256": "387d0eec760ab46c02e0f59146c92c6d0361a817b27c6949858bb8b6f57d0649",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/customEditor/browser/customEditorDiffInput.ts",
+      "status": "modified",
+      "sha256": "937486497e5573147d8f475229f151773e2b041f89cdaaf95ed378f5d68bd605",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/customEditor/common/contributedCustomEditors.ts",
+      "status": "modified",
+      "sha256": "882e4c8e97ff4562bdf0329e2df81eef330102565abeb013ffac18ec0e8df2d9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/customEditor/common/customEditor.ts",
+      "status": "modified",
+      "sha256": "12539b0b6af5e788a5eab3f2141bc5f831162d10f343856c0415b8c573f78d7f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/customEditor/common/extensionPoint.ts",
+      "status": "modified",
+      "sha256": "35047cf47d3e033649fa551c2364aa6c2297394af1ce8628080d505dc3c11eff",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/editTelemetry/browser/settingIds.ts",
+      "status": "modified",
+      "sha256": "c28636efa0df68ed58ac85a8e7a3aa997b46292f7c138dc7c4af09e338dfcec2",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/editTelemetry/browser/telemetry/arcTelemetrySender.ts",
+      "status": "modified",
+      "sha256": "6d72aab51ace9b76b83c34afdb47e7c72da7afc9153301aee20d75cc00545e73",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/editTelemetry/common/arcTracker.ts",
+      "status": "modified",
+      "sha256": "4494f276cb6a0d8f0dfb862199751db76e1d0b31e75222f10f45956fa742d5f0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts",
+      "status": "modified",
+      "sha256": "137aa7465be99ab3a2df033841da27968a6145f0772d1e524cf20021b8ae4d13",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/extensions/browser/extensionsActions.ts",
+      "status": "modified",
+      "sha256": "aee2a13bb9d1c6993b277c2b87b7bf6f01feabc15a297d777ab3a611490e5222",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts",
+      "status": "modified",
+      "sha256": "f1278c9829875b09b8cd26d03abfb903a3ffb814f1961d13f8023de47814a0bb",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/files/browser/explorerService.ts",
+      "status": "modified",
+      "sha256": "1b9bdd688db4610a21c3cb1bd4e1e45591f62ec3a900cb355535ee35d13f29ba",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/files/browser/media/explorerviewlet.css",
+      "status": "modified",
+      "sha256": "8cf0c1a6957608f11aa796a470085bf04c4cb48f7699f810cde0097bd5612c16",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/files/browser/views/explorerDecorationsProvider.ts",
+      "status": "modified",
+      "sha256": "3de6655785bd54f2316718131b71ce978fe9bb83f154f130081d17318ad95a0b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/files/browser/views/explorerView.ts",
+      "status": "modified",
+      "sha256": "fb8771ce8aef405f7b53267e59ce2d365cfcba630e1a92c88866aa131afed02b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/keybindingsExport/electron-browser/keybindingsExport.contribution.ts",
+      "status": "modified",
+      "sha256": "aeedb0c290dc83317bbfa8b1bc0922b1e78f4ebcf170bb4145a336eb777cec94",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/mcp/browser/mcpWorkbenchService.ts",
+      "status": "modified",
+      "sha256": "68b7d519a4455dbfa07013a18fb647b490c2cde4feee9385df0ee44b2a7757f7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/mcp/common/discovery/pluginMcpDiscovery.ts",
+      "status": "modified",
+      "sha256": "d065bd6383573a256ea226ea73bf946bf109a509dec467f2319af11406718b18",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/mcp/common/discovery/workspaceDotMcpDiscovery.ts",
+      "status": "modified",
+      "sha256": "a73d9e80eb4c9519c2eceb2c6ee4e0b425234363ee8e847c3d6685f3f3bf53c4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/mcp/common/mcpRegistry.ts",
+      "status": "modified",
+      "sha256": "a8fe2c6dcbf59274227de34d0f7a0fd2af96ab3f0d573165d9f1e9dd0b71e045",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/mcp/common/mcpServerConnection.ts",
+      "status": "modified",
+      "sha256": "b3298d59596c88336db285838e7560773030e2979f41c9ece2edc5e87c97511c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/mcp/common/mcpService.ts",
+      "status": "modified",
+      "sha256": "70cf632474fa31e3c11359bdcc0335aa38867de0cad7dcd7411373d0b456cc3a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/mcp/common/mcpTypes.ts",
+      "status": "modified",
+      "sha256": "21901a7ead203f49c38378154b51296576337b2a799b9e9da42f656628fa2aa0",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/multiDiffEditor/browser/multiDiffEditorInput.ts",
+      "status": "modified",
+      "sha256": "377db22f5bf802ed07e632291db53626f253e6e7a5c3f7fa3ac42de42f12addc",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/notebook/browser/view/renderers/backLayerWebView.ts",
+      "status": "modified",
+      "sha256": "e2e28b911ec63da25dc0742b50b1c280e793496da4383ebb9a633f05076f4826",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/notebook/browser/viewModel/notebookViewModelImpl.ts",
+      "status": "modified",
+      "sha256": "6bd54fbd35ff38f3811ec70ad043e4e5d48760a4cfb465e44304ea5a2c2869b6",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/preferences/browser/settingsTree.ts",
+      "status": "modified",
+      "sha256": "2ce8daa476dedb4af9345d53210c662c5ac3ea1a3b2ae950606c2f9f88be8189",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/search/browser/searchChatContext.ts",
+      "status": "modified",
+      "sha256": "c7b03c7c6a5513a1c9fc20fdb79e78b4feed7a77749416fc12d28929a16298c7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/styleOverrides/browser/media/activityBar.css",
+      "status": "modified",
+      "sha256": "f0ee4249524b3c0c55e75ae8989d4b7b7797a9bbc43e546b4e6f7e8c8c0123b4",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/styleOverrides/browser/media/tabs.css",
+      "status": "modified",
+      "sha256": "bf41abe715e3e172bcaac02a1323c780cf7c0e52e52fa9367ccb24db342e01ab",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminal/browser/chatTerminalCommandMirror.ts",
+      "status": "modified",
+      "sha256": "6f903c7710c1a69dda52bf0cf015a8ddf10daff053046379c7a5f1f20bbcc04e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminal/browser/media/terminalVoice.css",
+      "status": "modified",
+      "sha256": "d0f9897dd73163e642887b1fb410ec6318a5b9de25dc1233d5e8bd29472ceb66",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.css.map",
+        "vs/workbench/workbench.desktop.main.css.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminal/browser/terminal.ts",
+      "status": "modified",
+      "sha256": "86a621305705266dbcac4ac1e0cc9a213fee9087c1d5d71f7b4c2421afb02f8d",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminal/browser/xterm/decorationAddon.ts",
+      "status": "modified",
+      "sha256": "8bec5b613dd8e96c319189f93db18d97e33e16b9cc0ee81cacdca10177bae510",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminal/electron-browser/localTerminalBackend.ts",
+      "status": "modified",
+      "sha256": "32b2843aa7b1da7cb8f71d50fd387cd55f267739734c8e531ae489bc528b98c9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminalContrib/chat/browser/terminalChatService.ts",
+      "status": "modified",
+      "sha256": "b0aeaeae5749c89f36f59d21b5f107d29f4e61581ff0ab4284601a0708354266",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminalContrib/chatAgentTools/browser/runInTerminalHelpers.ts",
+      "status": "modified",
+      "sha256": "94db46c3391a9e1fca024fb2fdf39f7f27b3c5548e0338beeb6e563bef4fa8c9",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminalContrib/chatAgentTools/browser/tools/commandLineAnalyzer/commandLineAutoApproveAnalyzer.ts",
+      "status": "modified",
+      "sha256": "d6e10e49beae6ec24ef9a573f228d51f4df801e0156d8a717ff101b65dc13eef",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminalContrib/chatAgentTools/browser/tools/runInTerminalTool.ts",
+      "status": "modified",
+      "sha256": "c64e798930c7d6a5dd010b3fd3649c0b997190c21cfba3f78137bc15f8604152",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminalContrib/chatAgentTools/browser/tools/sendToTerminalTool.ts",
+      "status": "modified",
+      "sha256": "89521dee60de07d2573fb8fabf5ac966f99991ab9f65384985ed688b6c38dbb1",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/terminalContrib/chatAgentTools/browser/treeSitterCommandParser.ts",
+      "status": "modified",
+      "sha256": "34e5bf459df5c63b0ceba9beabd2b1584d738c929ae32cc988e9987a838bd556",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts",
+      "status": "modified",
+      "sha256": "a9e2a019992b7e5b562c2f36bd280d6fa4519a6ef6024b2aaf4a85d91fbe12f7",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts",
+      "status": "modified",
+      "sha256": "754a69446cc0e895ff564a8806d5a49874a2b23fd57170da7ebf78ea5b2d0b16",
+      "sourceMaps": [
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/accounts/browser/defaultAccount.ts",
+      "status": "modified",
+      "sha256": "3701bcc624b20cd66efbec161018d9f84d30a268705f3377dba1f6ca7a6e341e",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/accounts/browser/managedSettings.ts",
+      "status": "modified",
+      "sha256": "e0f497b7015095c57d1ea58bcbeb0ca7ab0a32d153cb175972a75f3beec883c7",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/agentEditorComments/common/agentEditorComments.ts",
+      "status": "modified",
+      "sha256": "585551b0622cf0cfccdc169b876282196458675b1d36668b5084f2146518a05a",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/agentHost/browser/editorRemoteAgentHostServiceClient.ts",
+      "status": "modified",
+      "sha256": "e808a8f962dc85f1521bc0f605f5f7ed0dcc0fa27aee8b235a08531e279482f4",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/agentHost/common/agentHostFileSystemService.ts",
+      "status": "modified",
+      "sha256": "e95a5540fbf76f4487ad1153dc3dc7183c0b7414e495affbfd029ad29cb1194f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/agentHost/common/agentHostResourceService.ts",
+      "status": "modified",
+      "sha256": "ea2d778fbd207f2f3eb9a531b8df111d80c7123b26766e91090a5d466e1f0139",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/editor/browser/editorResolverService.ts",
+      "status": "modified",
+      "sha256": "c6c703d021a800730eca6c347e964768818654d71c4e4c67892802e281fe04ea",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/editor/common/editorResolverService.ts",
+      "status": "modified",
+      "sha256": "1be90bae8f32f3c917356a54a3b6be49004494245e7a72fb80af7f435371f4ab",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/editor/common/editorService.ts",
+      "status": "modified",
+      "sha256": "94511496ea4d49e1e28fcb0c123fb78e84df6436d9b81762cfac12a999683b5b",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/extensionManagement/browser/builtinExtensionsScannerService.ts",
+      "status": "modified",
+      "sha256": "1de877ebca605f2067e1d02219dc659666a5d58582c14f15b3f78baf6df1410f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/history/browser/historyService.ts",
+      "status": "modified",
+      "sha256": "1e78bfe26ebbf759105baa5d67fe809b44be4c1da5690a455a1784f9e987d092",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/layout/browser/layoutService.ts",
+      "status": "modified",
+      "sha256": "c39be343ceb4f9dfa8106a128370d11b4cf35f03701c997759a2fd8dde04a6e6",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/localTranscription/electron-browser/localTranscriptionService.ts",
+      "status": "modified",
+      "sha256": "57508251ff591911622992f9fdcc1f24a6661fc8d6f8f2b4547152fa014b3499",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/mcp/common/mcpWorkbenchManagementService.ts",
+      "status": "modified",
+      "sha256": "5d01b63284f153b0b70bf480e5309d8ecdec6ebab060a3e49f41c9d86a06382c",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/api/node/extensionHostProcess.js.map",
+        "vs/workbench/api/worker/extensionHostWorkerMain.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    },
+    {
+      "path": "src/vs/workbench/services/views/common/viewContainerModel.ts",
+      "status": "modified",
+      "sha256": "b44aeeaf7a71fc3028959d2bbb26b7cdb95460cb6d4039cdaacf2151b0bd632f",
+      "sourceMaps": [
+        "vs/sessions/sessions.desktop.main.js.map",
+        "vs/workbench/workbench.desktop.main.js.map"
+      ]
+    }
+  ]
+}

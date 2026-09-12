@@ -1,0 +1,89 @@
+# ShunCode Open Source
+
+ShunCode 是一个基于 **Code - OSS / Visual Studio Code** 的 AI 编程环境。本仓库以 VS Code `1.132.0` 为上游基线，整理了 ShunCode 当前安装版本中可恢复的第一方源码，并把当前 WebMCP、Browser MCP Gateway 与 Personal Edge Bridge 一并纳入开源目录。
+
+> 当前仓库是从现有 ShunCode 安装包、随包 TypeScript 源码和 source map 重建的开源工作副本。它用于继续开发和公开审阅，不会修改本机已安装的 `C:\Program Files\ShunCode`。
+
+## 上游基线
+
+- 上游：`https://github.com/microsoft/vscode`
+- VS Code / Code - OSS：`1.132.0`
+- 官方 `1.132.0` tag commit：`df53daabb18cd157bdb08c7f01c34df936cf12f4`
+- 本机 ShunCode 产品版本：`1.132.0`
+- ShunCode 第一方扩展版本：`0.7.2`
+- Web MCP Bridge：`0.4.10`
+- WebMCP page agent：`v20`
+
+安装包 `product.json` 中的 `09533f921029d9d073c06e70f566ebe31e43cebc` 并不是 Microsoft VS Code 仓库可抓取的 commit，因此本仓库没有把它伪装成上游提交；重建依据与差异说明见 [docs/RECONSTRUCTION.md](docs/RECONSTRUCTION.md)。
+
+## ShunCode 增量
+
+主要新增/修改内容包括：
+
+- `extensions/shuncode/`：ShunCode 原生 Chat / Agent、模型提供器、Codex 登录、Bridge、MCP、LSP、终端与多模型能力。
+- `src/agent-host.ts`、`src/mcp-server.ts`、`src/file-tool-registry.ts` 等：从随包 source map 恢复出的 ShunCode Agent Runtime 与工具层源码。
+- `product.json` / `package.json`：ShunCode 品牌、URL scheme、Open VSX、API proposals 与去除默认 Copilot Chat 集成等产品配置。
+- `extensions/shuncode-webmcp/`：给普通 AI 网页注入 ShunCode MCP 能力的 WebMCP Bridge。
+- `tools/webmcp-gateway/`：WebMCP / Browser MCP Gateway，包含 gateway-managed Edge 与 Personal Edge 的网关层。
+- `extensions/shuncode-personal-edge-bridge/`：用户主动共享单个日常 Edge 标签页的 Manifest V3 扩展。
+
+架构图和端口说明见 [docs/ARCHITECTURE.zh-CN.md](docs/ARCHITECTURE.zh-CN.md)。
+
+## 目录
+
+```text
+extensions/shuncode/                      ShunCode 第一方 VS Code 扩展源码
+extensions/shuncode-webmcp/               WebMCP VS Code 扩展
+extensions/shuncode-personal-edge-bridge/ Personal Edge 浏览器扩展
+tools/webmcp-gateway/                     WebMCP / Browser MCP 网关
+src/agent-host.ts                         Agent Runtime
+src/mcp-server.ts                         文件工具 MCP server
+src/file-tool-registry.ts                 文件工具注册与调用
+src/ide-tool-definitions.ts               IDE 工具定义
+docs/                                     ShunCode 开源与架构文档
+```
+
+## 开发
+
+Code - OSS 主体仍遵循 VS Code 上游开发方式。首次开发通常需要安装 Node.js / npm 与上游依赖：
+
+```powershell
+npm install
+```
+
+ShunCode 第一方扩展的源码可以单独做类型检查：
+
+```powershell
+npx tsc -p extensions/shuncode/tsconfig.json --noEmit
+```
+
+WebMCP Gateway：
+
+```powershell
+cd tools/webmcp-gateway
+npm install
+$env:SHUNCODE_MCP_URL = "https://your-shuncode-bridge.example/mcp/<route-token>"
+npm start
+```
+
+不要把真实 `SHUNCODE_MCP_URL`、route token、API key、Cloudflare/ngrok token、浏览器 profile 或登录态提交到仓库。
+
+## 安全边界
+
+这个开源副本刻意不包含：
+
+- `browser-profile/` 和任何真实浏览器登录数据；
+- WebMCP 运行截图；
+- 本机 ShunCode 用户目录；
+- API key、Bridge route token、Cloudflare/ngrok token；
+- `C:\Program Files\ShunCode` 中的已安装二进制快照；
+- 历史 Workbench / preload 大型 patched/original 编译产物。
+
+开发时优先修改本仓库，不要直接 patch 已安装 ShunCode。更多边界见 [docs/SHUNCODE_SECURITY.md](docs/SHUNCODE_SECURITY.md)。
+
+## 许可证与归属
+
+Code - OSS 上游代码继续遵循原仓库的 MIT License 和第三方声明，详见 [LICENSE.txt](LICENSE.txt) 与 [ThirdPartyNotices.txt](ThirdPartyNotices.txt)。ShunCode 新增源码按仓库 MIT 条款公开；上游归属和重建说明见 [NOTICE-SHUNCODE.md](NOTICE-SHUNCODE.md)。
+
+原 VS Code README 已保留在 [docs/UPSTREAM_VSCODE_README.md](docs/UPSTREAM_VSCODE_README.md)。
+

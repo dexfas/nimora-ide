@@ -1,0 +1,890 @@
+.shuncode-bridge-session-view {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
+	flex-direction: column;
+	background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+	color: var(--vscode-foreground);
+}
+
+.shuncode-bridge-session-todos-region {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 950px;
+	flex: none;
+	margin: 0 auto;
+	padding: 14px 12px 0;
+}
+
+.shuncode-bridge-session-todos-region:empty {
+	display: none;
+}
+
+.shuncode-bridge-session-todos-region .shuncode-bridge-todos {
+	margin-bottom: 0;
+}
+
+.shuncode-bridge-session-scroll {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	overscroll-behavior: contain;
+}
+
+/* VS Code styled scrollbars for any scrollable region in the Bridge session view */
+.shuncode-bridge-session-view *::-webkit-scrollbar,
+.shuncode-bridge-session-view ::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+.shuncode-bridge-session-view *::-webkit-scrollbar-corner,
+.shuncode-bridge-session-view ::-webkit-scrollbar-corner,
+.shuncode-bridge-session-view *::-webkit-scrollbar-track,
+.shuncode-bridge-session-view ::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.shuncode-bridge-session-view *::-webkit-scrollbar-thumb,
+.shuncode-bridge-session-view ::-webkit-scrollbar-thumb {
+	background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
+	border-radius: 0;
+}
+
+.shuncode-bridge-session-view *::-webkit-scrollbar-thumb:hover,
+.shuncode-bridge-session-view ::-webkit-scrollbar-thumb:hover {
+	background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
+}
+
+.shuncode-bridge-session-view *::-webkit-scrollbar-thumb:active,
+.shuncode-bridge-session-view ::-webkit-scrollbar-thumb:active {
+	background: var(--vscode-scrollbarSlider-activeBackground, rgba(191, 191, 191, 0.4));
+}
+
+.shuncode-bridge-session-timeline {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 950px;
+	min-height: 100%;
+	margin: 0 auto;
+	padding: 14px 12px 24px;
+}
+
+.shuncode-bridge-session-empty {
+	display: flex;
+	min-height: 180px;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	gap: 7px;
+	padding: 24px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-session-empty > span.codicon {
+	font-size: 24px;
+}
+
+.shuncode-bridge-session-empty strong {
+	color: var(--vscode-foreground);
+	font-weight: 600;
+}
+
+.shuncode-bridge-todos {
+	box-sizing: border-box;
+	margin: 0 0 12px;
+	border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--vscode-editorWidget-background, var(--vscode-sideBar-background)) 78%, transparent);
+}
+
+.shuncode-bridge-todos-summary {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 7px;
+	min-height: 30px;
+	padding: 4px 7px;
+	list-style: none;
+	cursor: pointer;
+}
+
+.shuncode-bridge-todos-summary::-webkit-details-marker {
+	display: none;
+}
+
+.shuncode-bridge-todos-summary:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.shuncode-bridge-todos:not([open]) > .shuncode-bridge-todos-body {
+	display: none;
+}
+
+.shuncode-bridge-todos-icon,
+.shuncode-bridge-todos-count {
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-todos-summary strong {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.shuncode-bridge-todos-count {
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+.shuncode-bridge-todos-body {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding: 0 6px 7px 7px;
+}
+
+.shuncode-bridge-todo {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 6px;
+	min-height: 24px;
+	padding: 1px 5px;
+	border-radius: 4px;
+	font-size: 11px;
+}
+
+.shuncode-bridge-todo.in-progress {
+	background: color-mix(in srgb, var(--vscode-list-activeSelectionBackground) 35%, transparent);
+	color: var(--vscode-foreground);
+}
+
+.shuncode-bridge-todo-icon {
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-todo.in-progress .shuncode-bridge-todo-icon {
+	color: var(--vscode-progressBar-background);
+}
+
+.shuncode-bridge-todo.completed .shuncode-bridge-todo-icon {
+	color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+}
+
+.shuncode-bridge-todo.completed .shuncode-bridge-todo-title {
+	color: var(--vscode-descriptionForeground);
+	text-decoration: line-through;
+	text-decoration-color: color-mix(in srgb, var(--vscode-descriptionForeground) 55%, transparent);
+}
+
+.shuncode-bridge-todo-labels {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.shuncode-bridge-todo-title,
+.shuncode-bridge-todo-progress {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.shuncode-bridge-todo-progress {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-todo-percent {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+	font-variant-numeric: tabular-nums;
+}
+
+.shuncode-bridge-progress-row {
+	display: grid;
+	box-sizing: border-box;
+	grid-template-columns: 18px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 7px;
+	min-height: 28px;
+	margin: 0 0 8px;
+	padding: 4px 6px;
+	border: 1px solid transparent;
+	border-radius: 5px;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-progress-row:hover {
+	background: var(--vscode-list-hoverBackground);
+	background-clip: padding-box;
+}
+
+.shuncode-bridge-progress-icon {
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-progress-body {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.shuncode-bridge-progress-body strong {
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+
+.shuncode-bridge-progress-task {
+	overflow: hidden;
+	color: var(--vscode-foreground);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+}
+
+.shuncode-bridge-progress-percent {
+	font-variant-numeric: tabular-nums;
+}
+
+.shuncode-bridge-tool-card {
+	box-sizing: border-box;
+	margin: 0 0 8px;
+	border: 1px solid transparent;
+	border-radius: 5px;
+	background: transparent;
+}
+
+.shuncode-bridge-tool-card[open] {
+	border-color: var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+}
+
+.shuncode-bridge-tool-card.state-error {
+	border-color: color-mix(in srgb, var(--vscode-errorForeground) 38%, transparent);
+}
+
+.shuncode-bridge-tool-summary {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 7px;
+	min-height: 28px;
+	padding: 4px 6px;
+	border-radius: 4px;
+	cursor: pointer;
+	list-style: none;
+	font-size: 12px;
+}
+
+.shuncode-bridge-tool-summary::-webkit-details-marker {
+	display: none;
+}
+
+.shuncode-bridge-tool-summary:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+
+.shuncode-bridge-tool-card:not([open]) > .shuncode-bridge-tool-body {
+	display: none;
+}
+
+.shuncode-bridge-tool-icon {
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-tool-card.state-running .shuncode-bridge-tool-icon {
+	color: var(--vscode-progressBar-background);
+}
+
+.shuncode-bridge-tool-card.state-error .shuncode-bridge-tool-icon,
+.shuncode-bridge-tool-card.state-error .shuncode-bridge-tool-meta {
+	color: var(--vscode-errorForeground);
+}
+
+.shuncode-bridge-tool-labels {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.shuncode-bridge-tool-title,
+.shuncode-bridge-tool-subtitle {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.shuncode-bridge-tool-title {
+	color: var(--vscode-foreground);
+}
+
+.shuncode-bridge-tool-subtitle,
+.shuncode-bridge-tool-meta {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-tool-meta {
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.shuncode-bridge-tool-body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 3px 8px 10px 31px;
+}
+
+.shuncode-bridge-tool-items,
+.shuncode-bridge-tool-files {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.shuncode-bridge-tool-item,
+.shuncode-bridge-tool-file {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 6px;
+	min-height: 25px;
+	padding: 2px 5px;
+	border-radius: 4px;
+	font-size: 12px;
+}
+
+.shuncode-bridge-tool-item {
+	cursor: pointer;
+}
+
+.shuncode-bridge-tool-item:hover,
+.shuncode-bridge-tool-item:focus-visible {
+	outline: none;
+	background: var(--vscode-list-hoverBackground);
+}
+
+.shuncode-bridge-tool-item-icon {
+	flex: none;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-tool-item.severity-error .shuncode-bridge-tool-item-icon {
+	color: var(--vscode-errorForeground);
+}
+
+.shuncode-bridge-tool-item.severity-warning .shuncode-bridge-tool-item-icon {
+	color: var(--vscode-editorWarning-foreground);
+}
+
+.shuncode-bridge-tool-item-labels {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.shuncode-bridge-tool-item-primary,
+.shuncode-bridge-tool-item-secondary {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.shuncode-bridge-tool-item-primary {
+	color: var(--vscode-foreground);
+}
+
+.shuncode-bridge-tool-item-secondary {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-tool-item-action,
+.shuncode-bridge-tool-action {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	height: 24px;
+	padding: 0 7px;
+	border: 1px solid var(--vscode-button-secondaryBorder, transparent);
+	border-radius: 3px;
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 11px;
+}
+
+.shuncode-bridge-tool-item-action {
+	width: 25px;
+	padding: 0;
+	background: transparent;
+	border-color: transparent;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-tool-item-action:hover,
+.shuncode-bridge-tool-action:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+	color: var(--vscode-button-secondaryForeground);
+}
+
+.shuncode-bridge-tool-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.shuncode-bridge-tool-card.kind-edit .shuncode-bridge-tool-summary {
+	grid-template-rows: auto auto;
+}
+
+.shuncode-bridge-edit-summary-files {
+	display: flex;
+	min-width: 0;
+	grid-column: 2 / 4;
+	flex-direction: column;
+	gap: 1px;
+	margin-top: 3px;
+}
+
+.shuncode-bridge-edit-summary-file {
+	display: grid;
+	min-width: 0;
+	grid-template-columns: 16px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 6px;
+	height: 24px;
+	padding: 0 5px;
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font: inherit;
+	font-size: 11px;
+	text-align: left;
+}
+
+.shuncode-bridge-edit-summary-file:hover,
+.shuncode-bridge-edit-summary-file:focus-visible {
+	outline: none;
+	background: var(--vscode-list-hoverBackground);
+}
+
+.shuncode-bridge-edit-summary-file-icon {
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-edit-summary-file-path {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.shuncode-bridge-edit-summary-file-stats {
+	display: inline-flex;
+	gap: 5px;
+	white-space: nowrap;
+	font-family: var(--monaco-monospace-font);
+	font-size: 10px;
+}
+
+.shuncode-bridge-edit-summary-file-stats .additions {
+	color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+}
+
+.shuncode-bridge-edit-summary-file-stats .deletions {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground));
+}
+
+.shuncode-bridge-edit-summary-more {
+	padding: 2px 5px 1px 22px;
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-mini-diff {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.shuncode-bridge-mini-diff-file {
+	min-width: 0;
+	overflow: hidden;
+	border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	border-radius: 5px;
+	background: var(--vscode-textCodeBlock-background);
+}
+
+.shuncode-bridge-mini-diff-header {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 4px;
+	min-height: 28px;
+	padding: 0 4px 0 6px;
+	border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	background: color-mix(in srgb, var(--vscode-editorWidget-background) 72%, transparent);
+}
+
+.shuncode-bridge-mini-diff-file-button,
+.shuncode-bridge-mini-diff-open {
+	display: inline-flex;
+	min-width: 0;
+	align-items: center;
+	gap: 6px;
+	height: 24px;
+	padding: 0 4px;
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font: inherit;
+}
+
+.shuncode-bridge-mini-diff-file-button {
+	flex: 1;
+	justify-content: flex-start;
+}
+
+.shuncode-bridge-mini-diff-open {
+	flex: none;
+	width: 24px;
+	justify-content: center;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-mini-diff-file-button:hover,
+.shuncode-bridge-mini-diff-open:hover {
+	background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.shuncode-bridge-mini-diff-path {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+}
+
+.shuncode-bridge-mini-diff-code {
+	min-width: 0;
+	font-family: var(--monaco-monospace-font);
+	font-size: 11px;
+	line-height: 18px;
+}
+
+.shuncode-bridge-mini-diff-line {
+	display: grid;
+	min-width: 0;
+	grid-template-columns: 36px 14px minmax(0, 1fr);
+	min-height: 18px;
+}
+
+.shuncode-bridge-mini-diff-line.add {
+	background: var(--vscode-diffEditor-insertedLineBackground, color-mix(in srgb, var(--vscode-testing-iconPassed) 12%, transparent));
+}
+
+.shuncode-bridge-mini-diff-line.delete {
+	background: var(--vscode-diffEditor-removedLineBackground, color-mix(in srgb, var(--vscode-errorForeground) 10%, transparent));
+}
+
+.shuncode-bridge-mini-diff-line-number {
+	padding-right: 7px;
+	border-right: 1px solid color-mix(in srgb, var(--vscode-widget-border) 65%, transparent);
+	color: var(--vscode-editorLineNumber-foreground);
+	text-align: right;
+	user-select: none;
+}
+
+.shuncode-bridge-mini-diff-marker {
+	color: var(--vscode-descriptionForeground);
+	text-align: center;
+	user-select: none;
+}
+
+.shuncode-bridge-mini-diff-line.add .shuncode-bridge-mini-diff-marker {
+	color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+}
+
+.shuncode-bridge-mini-diff-line.delete .shuncode-bridge-mini-diff-marker {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground));
+}
+
+.shuncode-bridge-mini-diff-text {
+	min-width: 0;
+	overflow: hidden;
+	padding: 0 7px 0 2px;
+	color: var(--vscode-editor-foreground);
+	text-overflow: ellipsis;
+	white-space: pre;
+}
+
+.shuncode-bridge-mini-diff-gap,
+.shuncode-bridge-mini-diff-truncated {
+	padding: 2px 8px 2px 50px;
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-tool-file > span:last-child {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.shuncode-bridge-tool-more {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-tool-section {
+	min-width: 0;
+}
+
+.shuncode-bridge-tool-section-label {
+	display: block;
+	margin: 0 0 4px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-tool-section pre {
+	box-sizing: border-box;
+	max-height: 260px;
+	margin: 0;
+	padding: 7px 9px;
+	overflow: auto;
+	border-radius: 4px;
+	background: var(--vscode-textCodeBlock-background);
+	color: var(--vscode-textPreformat-foreground);
+	font-family: var(--monaco-monospace-font);
+	font-size: 11px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.shuncode-bridge-tool-error {
+	font-size: 12px;
+	color: var(--vscode-errorForeground);
+	white-space: pre-wrap;
+}
+
+.shuncode-bridge-session-footer {
+	flex: none;
+	box-sizing: border-box;
+	padding: 10px 12px 11px;
+	border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
+	background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.shuncode-bridge-session-connection-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.shuncode-bridge-session-connection-actions {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 5px;
+}
+
+.shuncode-bridge-session-action-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.shuncode-bridge-session-start-stop-button.monaco-button,
+.shuncode-bridge-session-action-button.monaco-button,
+.shuncode-bridge-session-collapse-button.monaco-button {
+	flex: 0 0 auto;
+	width: auto !important;
+	height: 28px;
+	min-height: 28px;
+	white-space: nowrap;
+	line-height: 26px;
+}
+
+.shuncode-bridge-session-start-stop-button.monaco-button {
+	min-width: 92px;
+	padding: 0 10px;
+}
+
+.shuncode-bridge-session-action-button.monaco-button {
+	min-width: 0;
+	padding: 0 9px;
+}
+
+/* Scheme B: secondary buttons stay neutral, only the icon carries a hint colour. */
+.shuncode-bridge-session-health-button.monaco-button .codicon-pulse {
+	color: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+}
+
+.shuncode-bridge-session-clear-button.monaco-button .codicon-clear-all {
+	color: var(--vscode-charts-orange, #d18616);
+}
+
+.shuncode-bridge-session-action-button.monaco-button.disabled .codicon {
+	color: inherit;
+}
+
+.shuncode-bridge-session-collapse-button.monaco-button {
+	min-width: 30px;
+	padding: 0 6px;
+}
+
+.shuncode-bridge-session-health {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	margin-top: 8px;
+	font-size: 11px;
+	line-height: 1.4;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-session-health .shuncode-bridge-session-dot {
+	flex: none;
+}
+
+.shuncode-bridge-session-health-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.shuncode-bridge-session-connection-info {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.shuncode-bridge-session-connection-heading {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 12px;
+}
+
+.shuncode-bridge-session-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-session-dot.state-connected,
+.shuncode-bridge-session-dot.state-running {
+	background: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+}
+
+.shuncode-bridge-session-dot.state-starting {
+	background: var(--vscode-progressBar-background);
+}
+
+.shuncode-bridge-session-dot.state-error {
+	background: var(--vscode-errorForeground);
+}
+
+.shuncode-bridge-session-connection-description,
+.shuncode-bridge-session-meta,
+.shuncode-bridge-session-hint {
+	font-size: 11px;
+	line-height: 1.4;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-session-stats {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 7px;
+	margin-top: 10px;
+}
+
+.shuncode-bridge-session-stat {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 3px;
+	padding: 7px 9px;
+	border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	border-radius: 4px;
+}
+
+.shuncode-bridge-session-stat span {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.shuncode-bridge-session-stat strong {
+	font-size: 13px;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+
+.shuncode-bridge-session-meta {
+	margin-top: 8px;
+}
+
+.shuncode-bridge-session-hint {
+	margin-top: 5px;
+}
+
+.shuncode-bridge-session-view.footer-collapsed .shuncode-bridge-session-footer {
+	padding-top: 7px;
+	padding-bottom: 7px;
+}
+
+.shuncode-bridge-session-view.footer-collapsed .shuncode-bridge-session-connection-info {
+	gap: 1px;
+}
+
+.shuncode-bridge-session-view.footer-collapsed .shuncode-bridge-session-action-row {
+	margin-top: 6px;
+}
+
+.shuncode-bridge-session-view.footer-collapsed .shuncode-bridge-session-connection-description {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+@media (max-width: 340px) {
+	.shuncode-bridge-session-connection-description {
+		display: none;
+	}
+
+	.shuncode-bridge-session-start-stop-button.monaco-button {
+		min-width: 86px;
+		padding-left: 8px;
+		padding-right: 8px;
+	}
+
+	.shuncode-bridge-session-stats {
+		grid-template-columns: 1fr;
+	}
+}
