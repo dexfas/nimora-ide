@@ -35,6 +35,26 @@
 
 安装包中的 `tsconfig.json` 原本仍引用开发目录 `../../vscode-main/src/vscode-dts/...`；在本仓库中已改为 `../../src/vscode-dts/...`，使路径适配当前完整 Code - OSS 根目录。
 
+## 生产源码完整性审计
+
+安装版 `resources/app/out/**/*.js.map` 中包含可验证的 `sourcesContent`。重建过程中对全部 27 个 JavaScript source map 做了反向哈希审计：
+
+- 可恢复的生产 `src/` 文件：4,995 个；
+- 当前仓库与安装版 source map 一致：4,995 / 4,995；
+- 缺失：0；
+- 内容不一致：0；
+- 同一路径 source map 冲突：0。
+
+其中 `src/vs/platform/agentHost` 相对 Microsoft VS Code `1.132.0` 官方基线有 86 个内容差异文件和 2 个新增文件；这 88 个文件全部与安装版 ShunCode source map 精确一致。因此这些差异被视为已验证的 ShunCode 生产增量，而不是错误混入的上游版本。
+
+这项审计证明的是“当前安装版实际发布源码”的恢复完整性，不等同于逐字节复现最终安装包，也不恢复原始私有 Git 历史。
+
+## 构建时类型层差异
+
+严格执行 Code - OSS 核心 `src` 的 tsgo no-emit 检查时，当前重建树仍会报告一批错误，主要来自没有进入安装版生产 bundle 的测试、类型声明和外围入口与发布源码快照不同步。生产 source map 覆盖的 4,995 个文件已经通过上述一致性审计，因此不能通过回退生产代码到官方 `1.132.0` 来“消除”这些错误。
+
+默认上游编译行为仍保留严格核心 typecheck。`scripts/shuncode-dev.*` 会显式设置 `SHUNCODE_SKIP_CORE_TYPECHECK=1`，仅在重建开发启动流程中跳过核心 tsgo no-emit 阶段；实际 esbuild transpilation、内置扩展编译、ShunCode 第一方扩展 typecheck 和 Runtime 构建仍会执行。这个兼容模式用于验证恢复出的发布代码能否从源码运行，后续仍应逐步同步未发布的测试/类型层。
+
 ## 未声称完全恢复的内容
 
 - 原始私有 Git 历史；

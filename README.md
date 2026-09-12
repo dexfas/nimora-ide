@@ -45,17 +45,35 @@ docs/                                     ShunCode 开源与架构文档
 
 ## 开发
 
-Code - OSS 主体仍遵循 VS Code 上游开发方式。首次开发通常需要安装 Node.js / npm 与上游依赖：
+Code - OSS 主体仍遵循 VS Code 上游开发方式。当前 `.nvmrc` 要求 Node.js `24.18.0` 或更新的 Node 24 版本。首次安装依赖建议使用 lockfile：
 
 ```powershell
-npm install
+npm ci
 ```
 
-ShunCode 第一方扩展的源码可以单独做类型检查：
+Windows 下可以直接准备完整源码开发环境：
 
 ```powershell
-npx tsc -p extensions/shuncode/tsconfig.json --noEmit
+.\scripts\shuncode-dev.bat --prepare-only
 ```
+
+启动隔离的源码开发实例：
+
+```powershell
+.\scripts\shuncode-dev.bat --new-window
+```
+
+开发启动器会把用户数据、扩展和 shared storage 分别放在 `.build/shuncode-dev-user-data`、`.build/shuncode-dev-extensions`、`.build/shuncode-dev-shared-data`，并清除从已安装 ShunCode 扩展宿主继承的 Electron / VS Code IPC 环境变量，因此不会复用已安装实例的开发状态。
+
+ShunCode 第一方扩展和 Runtime 可以独立验证：
+
+```powershell
+npm run typecheck-shuncode
+npm run compile-shuncode
+npm run test-shuncode-runtime
+```
+
+如果 Electron 原生绑定不存在，开发启动器会调用 `npm run rebuild-shuncode-native` 定向重建直接 native dependencies。完整构建说明、当前严格类型检查状态与已验证范围见 [docs/BUILDING.zh-CN.md](docs/BUILDING.zh-CN.md)。
 
 WebMCP Gateway：
 

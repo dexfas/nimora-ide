@@ -300,6 +300,41 @@ declare module 'vscode' {
 		 * The output to display.
 		 */
 		output: string;
+		/**
+		 * Optional ShunCode-specific presentation style for native tool cards.
+		 */
+		presentationStyle?: 'shuncode';
+		presentationKind?: 'files' | 'search' | 'edit' | 'terminal' | 'diagnostics' | 'lsp' | 'generic';
+		isError?: boolean;
+		durationMs?: number;
+		terminalId?: string;
+		diff?: string;
+		diffPreview?: Array<{
+			path: string;
+			truncated?: boolean;
+			hunks: Array<{
+				truncated?: boolean;
+				lines: Array<{
+					kind: 'context' | 'add' | 'delete';
+					oldLine?: number;
+					newLine?: number;
+					text: string;
+				}>;
+			}>;
+		}>;
+		summary?: string;
+		detailsLabel?: string;
+		items?: Array<{
+			label: string;
+			description?: string;
+			resource?: Uri | Location;
+			added?: number;
+			removed?: number;
+		}>;
+		metrics?: Array<{
+			label: string;
+			value: string;
+		}>;
 	}
 
 

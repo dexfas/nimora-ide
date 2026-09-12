@@ -18,3 +18,11 @@ WebMCP / browser tools 可以写文件、执行命令、点击网页和提交表
 
 不要把 `C:\Program Files\ShunCode` 当作日常开发目录直接修改。应优先从本仓库构建或使用可回滚测试安装；如确实需要测试核心文件替换，先保留并验证可恢复备份。
 
+源码开发启动器必须与已安装实例隔离。当前 `scripts/shuncode-dev.*` 使用：
+
+- `.build/shuncode-dev-user-data`：开发用户数据；
+- `.build/shuncode-dev-extensions`：开发扩展；
+- `.build/shuncode-dev-shared-data`：开发 shared storage。
+
+启动器还会清除继承的 `ELECTRON_RUN_AS_NODE` 和已安装 VS Code/ShunCode 的 IPC/extension-host 环境变量，避免源码 Electron 进程误接入当前运行中的安装版实例。
+

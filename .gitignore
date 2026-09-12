@@ -8,6 +8,7 @@ node_modules/
 /extensionsCG/
 .vscode/extensions/**/out/
 extensions/**/dist/
+extensions/shuncode/runtime/
 src/vs/base/browser/ui/codicons/codicon/codicon.ttf
 /out*/
 /extensions/**/out/

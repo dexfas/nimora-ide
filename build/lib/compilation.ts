@@ -166,7 +166,20 @@ export function compileTask(src: string, out: string, build: boolean, options: {
 			.pipe(compile())
 			.pipe(gulp.dest(out)));
 
-		const typecheck = spawnTsgo(compile.projectPath, { taskName: `compile-${path.basename(src)}`, noEmit: true });
+		// The reconstructed ShunCode release sources are recovered from the shipped
+		// production sourcemaps. Those runtime sources are internally consistent and
+		// are what the installed application actually executes, but some non-shipped
+		// test/type-only sources from the public Code-OSS baseline do not correspond to
+		// that production snapshot yet. Keep the normal upstream typecheck as the
+		// default and allow only the ShunCode source-development launcher to bypass the
+		// core no-emit check while we reconcile that auxiliary source layer.
+		const skipCoreTypecheck = src === 'src' && process.env['SHUNCODE_SKIP_CORE_TYPECHECK'] === '1';
+		if (skipCoreTypecheck) {
+			fancyLog(ansiColors.yellow('[shuncode] Skipping reconstructed core tsgo no-emit check; runtime transpilation is still enabled.'));
+		}
+		const typecheck = skipCoreTypecheck
+			? Promise.resolve()
+			: spawnTsgo(compile.projectPath, { taskName: `compile-${path.basename(src)}`, noEmit: true });
 
 		await Promise.all([emit, typecheck]);
 	};

@@ -11,12 +11,18 @@ import tseslint from 'typescript-eslint';
 
 import stylisticTs from '@stylistic/eslint-plugin-ts';
 import * as pluginLocal from './.eslint-plugin-local/index.ts';
-import * as pluginCopilotLocal from './extensions/copilot/.eslintplugin/index.ts';
 import pluginImport from 'eslint-plugin-import';
 import pluginJsdoc from 'eslint-plugin-jsdoc';
 
 import pluginHeader from 'eslint-plugin-header';
 pluginHeader.rules.header.meta.schema = false;
+
+// ShunCode intentionally does not ship the upstream Copilot extension. Keep the
+// upstream lint configuration loadable while still using its local rules when a
+// contributor happens to restore that source tree for comparison work.
+const pluginCopilotLocal = fs.existsSync(path.join(import.meta.dirname, 'extensions/copilot/.eslintplugin/index.ts'))
+	? await import('./extensions/copilot/.eslintplugin/index.ts')
+	: { rules: {} };
 
 const ignores = fs.readFileSync(path.join(import.meta.dirname, '.eslint-ignore'), 'utf8')
 	.toString()

@@ -23,6 +23,13 @@ const GITEE_CALLBACK_PAGE_PENDING = `<!doctype html><html><head><meta charset="u
 const GITEE_CALLBACK_PAGE_DENIED = `<!doctype html><html><head><meta charset="utf-8"><title>ShunCode</title></head><body style="font-family: system-ui; padding: 24px;"><h2>Gitee 授权已取消</h2><p>可以关闭此页面并返回 ShunCode。</p></body></html>`;
 const GITEE_CALLBACK_PAGE_INVALID = `<!doctype html><html><head><meta charset="utf-8"><title>ShunCode</title></head><body style="font-family: system-ui; padding: 24px;"><h2>Gitee 登录回调无效</h2><p>请返回 ShunCode 后重新登录。</p></body></html>`;
 
+// Licensing is intentionally disabled in the open-source desktop build. Keep
+// this behind a function so the dormant licensed path remains type-checkable
+// and can still be audited without changing the current runtime behavior.
+function isBridgeFreeAccessEnabled(): boolean {
+  return true;
+}
+
 export interface BridgeLicenseStatusSnapshot {
   readonly serverConfigured: boolean;
   readonly signedIn: boolean;
@@ -170,12 +177,14 @@ export class BridgeLicenseService implements vscode.Disposable {
   ) {}
 
   async initialize(): Promise<void> {
-    this.stopPaymentMonitor();
-    this.plans = [];
-    this.paymentTypes = [];
-    this.plansError = "";
-    this.output.appendLine("[bridge] free access enabled; licensing and payments are disabled");
-    return;
+    if (isBridgeFreeAccessEnabled()) {
+      this.stopPaymentMonitor();
+      this.plans = [];
+      this.paymentTypes = [];
+      this.plansError = "";
+      this.output.appendLine("[bridge] free access enabled; licensing and payments are disabled");
+      return;
+    }
     const storedOrder = this.context.globalState.get<BridgePaymentOrderSnapshot>(PAYMENT_ORDER_STATE_KEY);
     if (storedOrder?.id && storedOrder.status === "pending") {
       this.startPaymentMonitor(storedOrder.id, 1_000);
@@ -207,26 +216,28 @@ export class BridgeLicenseService implements vscode.Disposable {
   }
 
   async getStatus(error = ""): Promise<BridgeAccessSnapshot> {
-    const freeInstallationId = await this.getInstallationId();
-    return {
-      serverConfigured: true,
-      signedIn: true,
-      installationId: freeInstallationId,
-      githubUserId: "",
-      githubLogin: "",
-      giteeUserId: "",
-      giteeLogin: "",
-      email: "",
-      avatarUrl: "",
-      licensed: true,
-      expiresAt: "",
-      permanent: true,
-      error: "",
-      plans: [],
-      paymentTypes: [],
-      plansError: "",
-      paymentOrder: this.emptyPaymentOrder(""),
-    };
+    if (isBridgeFreeAccessEnabled()) {
+      const freeInstallationId = await this.getInstallationId();
+      return {
+        serverConfigured: true,
+        signedIn: true,
+        installationId: freeInstallationId,
+        githubUserId: "",
+        githubLogin: "",
+        giteeUserId: "",
+        giteeLogin: "",
+        email: "",
+        avatarUrl: "",
+        licensed: true,
+        expiresAt: "",
+        permanent: true,
+        error: "",
+        plans: [],
+        paymentTypes: [],
+        plansError: "",
+        paymentOrder: this.emptyPaymentOrder(""),
+      };
+    }
     const { serverUrl, publicKeyPem, issuer } = this.configuration;
     const account = this.context.globalState.get<AccountState>(ACCOUNT_STATE_KEY);
     const [licenseToken, sessionToken, installationId] = await Promise.all([
@@ -471,8 +482,10 @@ export class BridgeLicenseService implements vscode.Disposable {
   }
 
   async requireFeature(feature: "bridge"): Promise<void> {
-    void feature;
-    return;
+    if (isBridgeFreeAccessEnabled()) {
+      void feature;
+      return;
+    }
     const { serverUrl, publicKeyPem, issuer } = this.configuration;
     if (!serverUrl || !publicKeyPem || !issuer) {
       throw new Error("Bridge licensing trust anchor is not configured in this build.");
