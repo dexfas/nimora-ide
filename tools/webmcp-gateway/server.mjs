@@ -8,6 +8,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { defineGatewayCapability, retryPolicyForTool } from './capability-contract.mjs';
 
 const PORT = Number(process.env.PORT || 48321);
 const UPSTREAM_URL = process.env.SHUNCODE_MCP_URL || '';
@@ -31,53 +32,83 @@ const personalEdgeCommandQueue = [];
 const personalEdgePendingResults = new Map();
 const personalEdgePollWaiters = [];
 
+const gatewayMetadata = (id, title, risk, idempotency, retry, approval, { destructive = false, openWorld = true, tags = [] } = {}) => ({
+  id,
+  version: 1,
+  title,
+  category: 'browser',
+  tags,
+  environment: 'gateway',
+  risk,
+  idempotency,
+  retry,
+  approval,
+  destructive,
+  openWorld,
+});
+
 const browserTools = [
-  { name: 'browser_open', description: 'EXTERNAL COMPUTER BROWSER: open a URL in the gateway-managed persistent Microsoft Edge. This browser is outside ShunCode Integrated Browser and keeps its own persistent profile/session across calls.', inputSchema: { type: 'object', required: ['url'], properties: { url: { type: 'string' }, new_tab: { type: 'boolean', default: false } }, additionalProperties: false } },
-  { name: 'browser_pages', description: 'EXTERNAL COMPUTER BROWSER: list tabs in the gateway-managed persistent Edge with page_id, title and URL.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'browser_click', description: 'EXTERNAL COMPUTER BROWSER: click a DOM element in the gateway-managed Edge by CSS selector.', inputSchema: { type: 'object', required: ['selector'], properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, timeout_ms: { type: 'integer', minimum: 100, maximum: 120000, default: 15000 } }, additionalProperties: false } },
-  { name: 'browser_fill', description: 'EXTERNAL COMPUTER BROWSER: fill an input, textarea, or contenteditable element in the gateway-managed Edge.', inputSchema: { type: 'object', required: ['selector', 'value'], properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, timeout_ms: { type: 'integer', minimum: 100, maximum: 120000, default: 15000 } }, additionalProperties: false } },
-  { name: 'browser_get_text', description: 'EXTERNAL COMPUTER BROWSER: read visible text from a selector or full page body in the gateway-managed Edge.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, max_chars: { type: 'integer', minimum: 1, maximum: 100000, default: 20000 } }, additionalProperties: false } },
-  { name: 'browser_dom', description: 'EXTERNAL COMPUTER BROWSER: read DOM HTML from a selector or full document in the gateway-managed Edge.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, max_chars: { type: 'integer', minimum: 1, maximum: 200000, default: 50000 } }, additionalProperties: false } },
-  { name: 'browser_evaluate', description: 'EXTERNAL COMPUTER BROWSER: evaluate JavaScript in the gateway-managed Edge page and return a JSON-serializable result.', inputSchema: { type: 'object', required: ['expression'], properties: { expression: { type: 'string' }, page_id: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
-  { name: 'browser_screenshot', description: 'EXTERNAL COMPUTER BROWSER: take a screenshot of a gateway-managed Edge page and save it under this MCP project.', inputSchema: { type: 'object', properties: { page_id: { type: 'integer', minimum: 0 }, full_page: { type: 'boolean', default: false }, filename: { type: 'string' } }, additionalProperties: false } },
+  defineGatewayCapability({ name: 'browser_open', description: 'EXTERNAL COMPUTER BROWSER: open a URL in the gateway-managed persistent Microsoft Edge. This browser is outside ShunCode Integrated Browser and keeps its own persistent profile/session across calls.', inputSchema: { type: 'object', required: ['url'], properties: { url: { type: 'string' }, new_tab: { type: 'boolean', default: false } }, additionalProperties: false } }, gatewayMetadata('browser.managed.open', 'Open Managed Browser URL', 'external-side-effect', 'unknown', 'never', 'none', { tags: ['browser', 'managed', 'navigate'] })),
+  defineGatewayCapability({ name: 'browser_pages', description: 'EXTERNAL COMPUTER BROWSER: list tabs in the gateway-managed persistent Edge with page_id, title and URL.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } }, gatewayMetadata('browser.managed.pages', 'List Managed Browser Pages', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'managed', 'read'] })),
+  defineGatewayCapability({ name: 'browser_click', description: 'EXTERNAL COMPUTER BROWSER: click a DOM element in the gateway-managed Edge by CSS selector.', inputSchema: { type: 'object', required: ['selector'], properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, timeout_ms: { type: 'integer', minimum: 100, maximum: 120000, default: 15000 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.click', 'Click Managed Browser Element', 'external-side-effect', 'non-idempotent', 'never', 'none', { destructive: true, tags: ['browser', 'managed', 'interaction'] })),
+  defineGatewayCapability({ name: 'browser_fill', description: 'EXTERNAL COMPUTER BROWSER: fill an input, textarea, or contenteditable element in the gateway-managed Edge.', inputSchema: { type: 'object', required: ['selector', 'value'], properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, timeout_ms: { type: 'integer', minimum: 100, maximum: 120000, default: 15000 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.fill', 'Fill Managed Browser Field', 'external-side-effect', 'non-idempotent', 'never', 'none', { destructive: true, tags: ['browser', 'managed', 'interaction'] })),
+  defineGatewayCapability({ name: 'browser_get_text', description: 'EXTERNAL COMPUTER BROWSER: read visible text from a selector or full page body in the gateway-managed Edge.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, max_chars: { type: 'integer', minimum: 1, maximum: 100000, default: 20000 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.read-text', 'Read Managed Browser Text', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'managed', 'read'] })),
+  defineGatewayCapability({ name: 'browser_dom', description: 'EXTERNAL COMPUTER BROWSER: read DOM HTML from a selector or full document in the gateway-managed Edge.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, max_chars: { type: 'integer', minimum: 1, maximum: 200000, default: 50000 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.dom', 'Read Managed Browser DOM', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'managed', 'dom', 'read'] })),
+  defineGatewayCapability({ name: 'browser_evaluate', description: 'EXTERNAL COMPUTER BROWSER: evaluate JavaScript in the gateway-managed Edge page and return a JSON-serializable result.', inputSchema: { type: 'object', required: ['expression'], properties: { expression: { type: 'string' }, page_id: { type: 'integer', minimum: 0 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.evaluate', 'Evaluate Managed Browser JavaScript', 'external-side-effect', 'unknown', 'never', 'none', { destructive: true, tags: ['browser', 'managed', 'javascript'] })),
+  defineGatewayCapability({ name: 'browser_screenshot', description: 'EXTERNAL COMPUTER BROWSER: take a screenshot of a gateway-managed Edge page and save it under this MCP project.', inputSchema: { type: 'object', properties: { page_id: { type: 'integer', minimum: 0 }, full_page: { type: 'boolean', default: false }, filename: { type: 'string' } }, additionalProperties: false } }, gatewayMetadata('browser.managed.screenshot', 'Capture Managed Browser Screenshot', 'write', 'unknown', 'never', 'none', { openWorld: false, tags: ['browser', 'managed', 'artifact'] })),
 ];
 
+const personalEdgeMetadata = (id, title, risk, idempotency, retry, approval, { destructive = false, tags = [] } = {}) => ({
+  id,
+  version: 1,
+  title,
+  category: 'browser',
+  tags,
+  environment: 'personal-browser',
+  risk,
+  idempotency,
+  retry,
+  approval,
+  destructive,
+  openWorld: true,
+});
+
 const personalEdgeTools = [
-  {
+  defineGatewayCapability({
     name: 'personal_edge_status',
     description: 'PERSONAL EDGE BRIDGE: report whether the user explicitly shared a tab from their normal Microsoft Edge and return that tab metadata.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-  },
-  {
+  }, personalEdgeMetadata('browser.personal.status', 'Personal Edge Status', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'personal', 'read'] })),
+  defineGatewayCapability({
     name: 'personal_edge_read',
     description: 'PERSONAL EDGE BRIDGE (READ ONLY): read title, URL and visible body text from the single normal http/https Edge tab the user explicitly shared. Does not click, type, navigate, or evaluate arbitrary JavaScript.',
     inputSchema: { type: 'object', properties: { max_chars: { type: 'integer', minimum: 1, maximum: 50000, default: 20000 } }, additionalProperties: false },
-  },
-  {
+  }, personalEdgeMetadata('browser.personal.read', 'Read Personal Edge Page', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'personal', 'read'] })),
+  defineGatewayCapability({
     name: 'personal_edge_elements',
     description: 'PERSONAL EDGE BRIDGE (READ ONLY): inspect visible interactive elements in the shared personal Edge tab. Returns generated CSS selectors plus safe metadata such as tag/text/role/placeholder; does not return current input values.',
     inputSchema: { type: 'object', properties: { max_elements: { type: 'integer', minimum: 1, maximum: 200, default: 100 } }, additionalProperties: false },
-  },
-  {
+  }, personalEdgeMetadata('browser.personal.elements', 'Inspect Personal Edge Elements', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'personal', 'read', 'elements'] })),
+  defineGatewayCapability({
     name: 'personal_edge_click',
     description: 'PERSONAL EDGE BRIDGE: click one element in the user-shared personal Edge tab by CSS selector. This can cause account/page side effects and is subject to WebMCP approval.',
     inputSchema: { type: 'object', required: ['selector'], properties: { selector: { type: 'string', minLength: 1 } }, additionalProperties: false },
-  },
-  {
+  }, personalEdgeMetadata('browser.personal.click', 'Click Personal Edge Element', 'external-side-effect', 'non-idempotent', 'never', 'session', { destructive: true, tags: ['browser', 'personal', 'interaction'] })),
+  defineGatewayCapability({
     name: 'personal_edge_fill',
     description: 'PERSONAL EDGE BRIDGE: replace text in an input, textarea, or contenteditable element in the user-shared personal Edge tab. Subject to WebMCP approval.',
     inputSchema: { type: 'object', required: ['selector', 'value'], properties: { selector: { type: 'string', minLength: 1 }, value: { type: 'string' } }, additionalProperties: false },
-  },
-  {
+  }, personalEdgeMetadata('browser.personal.fill', 'Fill Personal Edge Field', 'external-side-effect', 'non-idempotent', 'never', 'session', { destructive: true, tags: ['browser', 'personal', 'interaction'] })),
+  defineGatewayCapability({
     name: 'personal_edge_navigate',
     description: 'PERSONAL EDGE BRIDGE: navigate the user-shared personal Edge tab to an http/https URL. The same tab remains shared. Subject to WebMCP approval.',
     inputSchema: { type: 'object', required: ['url'], properties: { url: { type: 'string', minLength: 1 } }, additionalProperties: false },
-  },
-  {
+  }, personalEdgeMetadata('browser.personal.navigate', 'Navigate Personal Edge', 'external-side-effect', 'non-idempotent', 'never', 'session', { destructive: true, tags: ['browser', 'personal', 'navigate'] })),
+  defineGatewayCapability({
     name: 'personal_edge_reload',
     description: 'PERSONAL EDGE BRIDGE: reload the user-shared personal Edge tab. Subject to WebMCP approval because it can discard transient page state.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-  },
+  }, personalEdgeMetadata('browser.personal.reload', 'Reload Personal Edge', 'external-side-effect', 'non-idempotent', 'never', 'session', { destructive: true, tags: ['browser', 'personal', 'navigate'] })),
 ];
 
 function personalEdgeStatusData() {
@@ -249,10 +280,22 @@ async function callShunCodeTool(name, args = {}) {
   return await callUpstreamToolStable(name, args);
 }
 
-const retryableReadOnlyUpstreamTools = new Set([
-  'find_files', 'read_files', 'search_files', 'list_directory',
-  'get_diagnostics', 'lsp', 'get_command_output',
+// Compatibility only for an older upstream Bridge that predates capability
+// metadata. Current Nimora Bridge tools carry `nimora/capability` metadata and
+// use that as the source of truth for retry policy.
+const legacyRetryableReadOnlyUpstreamTools = new Set([
+  'find_files', 'read_files', 'search_files', 'list_directory', 'get_diagnostics', 'lsp', 'get_command_output',
 ]);
+
+async function upstreamToolDefinition(name) {
+  let found = upstreamToolsCache.find(tool => tool.name === name);
+  if (found) return found;
+  try {
+    const tools = await listUpstreamToolsStable();
+    found = tools.find(tool => tool.name === name);
+  } catch {}
+  return found;
+}
 
 function isUpstreamTransportError(error) {
   const message = error instanceof Error ? error.message : String(error);
@@ -260,12 +303,14 @@ function isUpstreamTransportError(error) {
 }
 
 async function callUpstreamToolStable(name, args = {}) {
+  const toolDefinition = await upstreamToolDefinition(name);
   try {
     return await (await getUpstream()).callTool({ name, arguments: args });
   } catch (error) {
     if (!isUpstreamTransportError(error)) throw error;
     await resetUpstream();
-    if (retryableReadOnlyUpstreamTools.has(name)) {
+    const retryPolicy = toolDefinition ? retryPolicyForTool(toolDefinition) : undefined;
+    if (retryPolicy === 'automatic' || (retryPolicy === undefined && legacyRetryableReadOnlyUpstreamTools.has(name))) {
       await new Promise(resolve => setTimeout(resolve, 180));
       return await (await getUpstream()).callTool({ name, arguments: args });
     }

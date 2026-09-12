@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { capabilityMcpFields } from "./capability-registry.js";
 import { FILE_TOOL_DEFINITIONS, invokeFileTool } from "./file-tool-registry.js";
 
 function getWorkspaceRoots(): string[] {
@@ -26,7 +27,7 @@ export function createFileToolsServer(dependencies: FileToolsServerDependencies 
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [...FILE_TOOL_DEFINITIONS],
+    tools: FILE_TOOL_DEFINITIONS.map((tool) => ({ ...tool, ...capabilityMcpFields(tool.name) })),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {

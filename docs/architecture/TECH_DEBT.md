@@ -12,14 +12,14 @@
 | 优先级 | 债务 | 事实依据 | 风险 | 处理方向 |
 | --- | --- | --- | --- | --- |
 | P0 | Personal Edge 使用开发 pairing token | MV3/Gateway hard-coded local-development token | 发布环境本地恶意进程冒充/劫持 | per-install/session pairing secret + origin binding |
-| P0 | execution semantics 分散 | WebMCP/Gateway 各自 dedupe/retry | side-effect 重放 | central Execution Ledger + capability retry metadata |
+| P0 | execution ledger 尚未统一 | Capability retry metadata 已统一第一版，但 WebMCP/Gateway 仍各自维护 execution/delivery state | side-effect 重放/状态不一致 | central Execution Ledger；继续保留 metadata-driven retry |
 | P1 | 两套 Agent runtime 无统一 domain | Core AgentHost + first-party Runtime | session/task/worker 重复建模 | Worker Contract + Task Runtime |
 | P1 | Nimora product logic 进入 Chat Core | Bridge/branch/model/tool renderer patches | 上游升级成本、AI 误改 | Thin Core migration |
 | P1 | Bridge 职责过宽 | `bridge-server.ts` 同时 MCP/tunnel/state/UI | 修改牵连大、难测试 | split exposure/tunnel/task state |
 | P1 | Gateway 单文件职责过宽 | `server.mjs` federation/browser/personal/web agent | failure isolation 差 | modular providers |
 | P1 | WebMCP 两套 page agent 漂移 | v24 rich agent vs simpler generic agent | site fix 只修一边 | shared WebMCP Core + adapters |
 | P1 | 固定 localhost ports | 48321/48322 与安装版真实冲突 | 并行开发/多 workspace 失败 | dynamic port + discovery/handshake |
-| P1 | Context/tool 全量暴露趋势 | WebMCP prime 可发送 37 tools | token/attention/attack surface | Capability Router / Context Budget |
+| P1 | Context/tool 全量暴露趋势 | Capability metadata 已存在，但 WebMCP prime 仍可发送大量 tools | token/attention/attack surface | Capability Router / Context Budget / dynamic loading |
 | P1 | Multi-model state 绑定 Chat | Core branch + extension globalState | 无法服务 Task/Web worker | migrate to Task WorkerAttempt |
 | P1 | Bridge todo/progress 是 transport-owned | Bridge adds state tools | Task continuity 差 | Task progress store |
 | P1 | upstream baseline diff 不可离线复核 | repo 缺 1.132.0 commit object | Core audit 难重复 | baseline fetch/cache/audit script |

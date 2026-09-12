@@ -111,6 +111,12 @@
 
 当前 Tool Layer 已经是 Nimora 最成熟的长期资产之一。
 
+### Capability metadata
+
+`src/capability-registry.ts` 现在提供第一版统一 capability semantic metadata。Runtime/Bridge 核心工具拥有稳定 capability id 与 risk/idempotency/retry/approval/environment 描述；MCP transport 将其投影为标准 tool annotations 与 `nimora/capability` namespaced metadata。Gateway browser providers 使用相同 contract，并以 metadata 决定 transport-level automatic retry 是否允许。
+
+这一步只统一语义，尚未改变现有 provider dispatch，也还没有实现 Task-scoped Capability Router。
+
 ### 文件工具
 
 `src/file-tool-registry.ts` 同时定义 schema 和 dispatch：

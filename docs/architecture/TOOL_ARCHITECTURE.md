@@ -9,6 +9,9 @@
 ## 2. 当前分布
 
 ```text
+src/capability-registry.ts
+    └─ canonical semantic metadata (risk / retry / approval / environment)
+
 root src/file-tool-registry.ts
     └─ file schemas + pure implementation dispatch
 
@@ -26,6 +29,19 @@ tools/webmcp-gateway/server.mjs
 ```
 
 现在 schema、risk、retry、approval、environment metadata 分散在不同组件。
+
+### Phase 1 implementation status
+
+Phase 1 已建立第一版统一 semantic metadata contract：`src/capability-registry.ts`。
+
+- 当前 13 个 Runtime / Bridge 核心 capability 都有稳定 `id`、`risk`、`idempotency`、`retry`、`approval`、`environment` 与 tags；
+- Bridge 和 file-tools stdio MCP 在 `tools/list` 中投影标准 MCP `annotations`，并通过 `_meta["nimora/capability"]` 携带完整 Nimora metadata；
+- Gateway-managed Browser 与 Personal Edge 使用同一 metadata shape；
+- Gateway 的 upstream transport retry 优先读取 capability metadata，不再把硬编码 tool-name 白名单当作当前 Source of Truth；
+- 为兼容尚未携带 metadata 的旧 Bridge，原 read-only retry 白名单暂时保留为明确的 legacy fallback；
+- tool name、input schema、provider dispatch 与现有审批行为均未在 Phase 1 改变。
+
+当前 registry 是 **semantic registry**，不是“所有实现必须物理放进一个文件”。Gateway/browser provider 可以在正确的进程定义 provider-local capability，再使用相同 contract 暴露；后续 Phase 2 会进一步形成正式 provider registration。
 
 ## 3. 目标 Capability Definition
 
@@ -163,7 +179,7 @@ requested
 
 ## 10. 当前工具迁移优先级
 
-1. 先给现有工具补统一 metadata，不改 behavior；
+1. ~~先给现有工具补统一 metadata，不改 behavior；~~ **Phase 1 已完成第一版**；
 2. 从 `IdeToolBroker` 拆 provider；
 3. Bridge/Gateway 改为读取 Registry，而不是复制 tool semantics；
 4. 把 `set_todos/report_progress` 移入 Task Capability；

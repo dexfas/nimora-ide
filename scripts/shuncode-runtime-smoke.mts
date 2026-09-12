@@ -75,6 +75,12 @@ async function smokeMcpServer(): Promise<void> {
 		for (const expected of ['apply_patch', 'find_files', 'read_files', 'search_files']) {
 			assert.ok(names.has(expected), `MCP server should expose ${expected}`);
 		}
+		const readTool = listed.tools.find(tool => tool.name === 'read_files');
+		const patchTool = listed.tools.find(tool => tool.name === 'apply_patch');
+		assert.equal(readTool?.annotations?.readOnlyHint, true, 'read_files should advertise read-only MCP semantics');
+		assert.equal(patchTool?.annotations?.destructiveHint, true, 'apply_patch should advertise destructive MCP semantics');
+		assert.equal((readTool?._meta?.['nimora/capability'] as { retry?: unknown } | undefined)?.retry, 'automatic');
+		assert.equal((patchTool?._meta?.['nimora/capability'] as { retry?: unknown } | undefined)?.retry, 'never');
 
 		const searched = await client.callTool({
 			name: 'search_files',

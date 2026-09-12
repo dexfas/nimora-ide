@@ -67,6 +67,7 @@ Read facts
 ```powershell
 npm run typecheck-shuncode
 npm run compile-shuncode
+npm run test-shuncode-capabilities
 npm run test-shuncode-runtime
 ```
 

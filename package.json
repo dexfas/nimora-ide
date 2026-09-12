@@ -18,6 +18,7 @@
 		"test-build-scripts": "cd build && npm run test",
 		"test-agent-host-e2e-coverage": "node scripts/agent-host-e2e-coverage.ts",
 		"test-shuncode-runtime": "node scripts/shuncode-runtime-smoke.mts",
+		"test-shuncode-capabilities": "node scripts/shuncode-capability-smoke.mts",
 		"check-cyclic-dependencies": "node build/lib/checkCyclicDependencies.ts out",
 		"preinstall": "node build/npm/preinstall.ts",
 		"postinstall": "node build/npm/postinstall.ts",

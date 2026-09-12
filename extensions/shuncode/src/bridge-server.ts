@@ -8,6 +8,7 @@ import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport, type EventStore } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, type CallToolResult, isInitializeRequest, type JSONRPCMessage, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import * as vscode from "vscode";
+import { capabilityMcpFields } from "../../../src/capability-registry.js";
 import { FILE_TOOL_DEFINITIONS, invokeFileTool, isFileToolName } from "../../../src/file-tool-registry.js";
 import { BRIDGE_EXCLUDED_TOOL_NAMES, getIdeToolDefinition, IDE_TOOL_DEFINITIONS } from "../../../src/ide-tool-definitions.js";
 import type { IdeToolBroker } from "./ide-tool-broker.js";
@@ -175,7 +176,7 @@ export const BRIDGE_TOOL_DEFINITIONS = [
     })),
   SET_TODOS_TOOL,
   REPORT_PROGRESS_TOOL,
-] as const;
+].map((tool) => ({ ...tool, ...capabilityMcpFields(tool.name) }));
 
 export interface BridgeActivity {
   readonly id: number;
@@ -1996,6 +1997,8 @@ export class BridgeManager implements vscode.Disposable {
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
+        _meta: tool._meta,
       })),
     }));
 

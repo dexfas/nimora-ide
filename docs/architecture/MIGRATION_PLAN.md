@@ -43,17 +43,29 @@
 
 ## 3. Phase 1 — Capability Metadata, No Behavior Change
 
+**Status: Completed (2026-09-13)**
+
 ### 目标
 
 建立统一 Capability Registry 的 metadata contract，但不改变现有 tool execution route。
 
 ### 工作
 
-1. 把 file/IDE/browser tool metadata 映射到统一 definition；
-2. 补 risk/idempotency/retry/approval/environment tags；
-3. Bridge/Gateway 先只读 Registry 生成 tool list；
-4. 原 dispatch 继续存在；
-5. 写 schema snapshot tests。
+1. 把 file/IDE/browser tool metadata 映射到统一 definition；✅
+2. 补 risk/idempotency/retry/approval/environment tags；✅
+3. Bridge/Gateway 先只读 Registry/metadata 生成 tool list 与 retry policy；✅
+4. 原 dispatch 继续存在；✅
+5. 写 metadata / MCP projection smoke tests。✅
+
+### 实现结果
+
+- 新增 `src/capability-registry.ts`，作为 Runtime/Bridge 核心 capability 的 semantic metadata Source of Truth；
+- MCP `tools/list` 保持原名称/schema，同时增加标准 `annotations` 与 `_meta["nimora/capability"]`；
+- Gateway browser / Personal Edge tools 使用同一 contract；
+- Gateway upstream retry 从当前 hard-coded rule 迁到 metadata；对不携带 metadata 的旧 Bridge 保留 legacy read-only fallback；
+- 新增 `npm run test-shuncode-capabilities`；runtime MCP smoke 也验证 metadata 真正穿过 stdio MCP transport。
+
+Phase 1 没有启用 dynamic tool loading、统一 Policy Engine 或 Execution Ledger；这些仍属于后续阶段。
 
 ### 为什么先做
 
