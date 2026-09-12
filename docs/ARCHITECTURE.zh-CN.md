@@ -1,4 +1,6 @@
-# ShunCode 架构概览
+# Nimora IDE 架构概览
+
+> 本文保留为快速入口。完整的事实架构、进程图、协议、Core Patch 审计、目标架构和迁移计划见 [`docs/architecture/README.md`](architecture/README.md)。
 
 ## 1. 主体
 
@@ -16,7 +18,7 @@ Agent Runtime 的主要源码位于仓库根 `src/agent-host.ts`、`src/openai-a
 
 ## 2. WebMCP
 
-当前 WebMCP Bridge 为 `0.4.10`，page agent 为 `v20`。
+当前 WebMCP Bridge 为 `0.4.10`，page agent 为 `v24`。
 
 ```text
 AI 网页（Arena / DeepSeek 等）

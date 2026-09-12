@@ -1,0 +1,240 @@
+# AI Worker / Session Architecture
+
+## 1. 目标
+
+Nimora 不应该把“模型厂商”或“网页聊天”当作产品核心。ChatGPT Web、DeepSeek Web、API 模型、本地模型和 Core AgentHost provider 都应该被视为可以替换、可以并存、可以失败迁移的 **AI Worker**。
+
+Task 才是业务对象，Worker 是执行 Task 的资源。
+
+## 2. 领域对象
+
+### WorkerDefinition
+
+描述一类可用 AI 能力：
+
+```text
+id
+provider
+kind = web | api | local | agent-host | remote
+models
+capabilities
+cost/latency hints
+auth state
+availability
+```
+
+### WorkerSession
+
+具体的一次可持续交互连接：
+
+```text
+sessionId
+workerId
+model
+transport
+state
+contextHandle
+rateLimit
+health
+currentTaskId?
+createdAt / lastActiveAt
+```
+
+WorkerDefinition ≠ WorkerSession。一个 ChatGPT worker 可以有多个会话；一个 Task 也可以先后或同时使用多个 WorkerSession。
+
+## 3. 最小 Worker Contract
+
+建议抽象语义，不强迫 transport 相同：
+
+```ts
+interface WorkerAdapter {
+  describe(): Promise<WorkerDescriptor>;
+  createSession(options: WorkerSessionOptions): Promise<WorkerSessionHandle>;
+  send(session: WorkerSessionHandle, input: WorkerInput): AsyncIterable<WorkerEvent>;
+  interrupt(session: WorkerSessionHandle): Promise<void>;
+  resume?(session: WorkerSessionHandle, checkpoint: unknown): Promise<void>;
+  dispose(session: WorkerSessionHandle): Promise<void>;
+  health(session?: WorkerSessionHandle): Promise<WorkerHealth>;
+}
+```
+
+`send` 的 event 可以包括：
+
+- text/reasoning delta；
+- capability request；
+- artifact proposal；
+- checkpoint；
+- rate-limit/usage；
+- terminal state。
+
+## 4. Adapter 不负责什么
+
+Worker Adapter **不应该**拥有：
+
+- Task state；
+- global memory；
+- capability policy；
+- approval；
+- tool implementation；
+- artifact storage；
+- cross-worker merge policy。
+
+这些属于 Task Runtime / Capability Layer。
+
+## 5. API Worker
+
+当前 `src/agent-host.ts` + `openai-agent.ts` 已经证明 API/BYOK Worker 可独立运行。
+
+未来把它拆成：
+
+- API protocol adapters：OpenAI Chat / Responses / Anthropic / Codex；
+- model loop runner；
+- Runtime transport adapter；
+- WorkerAdapter facade。
+
+现有 `ShunCodeLanguageModelProvider` 可继续把这些模型暴露给 VS Code model picker，但不再成为 Worker domain 的唯一 Source of Truth。
+
+## 6. Core AgentHost Worker
+
+Code-OSS `IAgentHostService` / Sessions provider 已经拥有 session/provider/remote/worktree 能力。
+
+不要重写 AHP。增加一个 **AgentHostWorkerAdapter**：
+
+```text
+Task Runtime
+   ↓ Worker Contract
+AgentHostWorkerAdapter
+   ↓ IAgentHostService / Sessions provider
+Core Agent Host / remote host
+```
+
+这样 Core Claude/Codex/Copilot 和未来 remote agent 能与 Web/API worker 进入同一个 Task 体系。
+
+## 7. Web Worker / WebMCP
+
+### 正式 Adapter Layer
+
+WebMCP 应建立明确分层：
+
+```text
+WebWorkerAdapter
+├─ DeepSeekAdapter
+├─ ClaudeWebAdapter
+├─ GeminiWebAdapter
+├─ ArenaAdapter
+└─ GenericChatAdapter
+```
+
+Site Adapter 只负责网页变化：
+
+- `matches(location)`；
+- `detectAuthState()`；
+- `findComposer()`；
+- `sendUserMessage()`；
+- `observeAssistantMessages()`；
+- `isStreaming()`；
+- `encodeCapabilityRequestInstruction()`；
+- `parseCapabilityRequest()`；
+- `deliverCapabilityResult()`。
+
+WebMCP Core 负责：
+
+- semantic call/result envelope；
+- session lifecycle；
+- execution ledger binding；
+- dedupe；
+- result delivery retry；
+- context/tool refresh；
+- policy hook。
+
+### 为什么必须 Adapter
+
+DeepSeek E2E 已经证明：
+
+- auth page 能被 generic composer 错判；
+- JSON request 在该网页模型上会截断；
+- Markdown renderer 的 `textContent` 与 `innerText` 行为不同。
+
+这些都应该被限制在 DeepSeek Adapter，而不是污染 Capability Router/Gateway。
+
+## 8. ChatGPT
+
+如果平台已经支持原生 MCP，默认**不使用 WebMCP**。
+
+```text
+ChatGPT
+  ↓ native MCP
+MCP Exposure Adapter
+  ↓
+Capability Service
+```
+
+WebMCP 只作为无法原生接入时的 fallback，不为了“统一”增加脆弱网页依赖。
+
+## 9. Local Model
+
+本地 Ollama/llama.cpp/vLLM/Qwen 等未来走 API/Local Worker Adapter：
+
+- 模型本身不需要知道 VS Code internals；
+- Task Runtime 根据模型 tool/context 能力选择 schema 数量和 prompt；
+- 小模型可以只获得高度裁剪的 capabilities/skills。
+
+## 10. Session Manager
+
+Session Manager 属于 Task Runtime 服务层，维护：
+
+- active WorkerSessions；
+- health/online/offline；
+- provider/model/capability；
+- rate-limit/backoff；
+- usage/cost metadata；
+- context state handle；
+- task assignment；
+- reconnect/recovery。
+
+它**不在 Gateway**。Gateway 可以提供 Web/browser transport health，但不决定 Worker 调度策略。
+
+## 11. Worker 选择与迁移
+
+Task Runtime 可根据：
+
+- capability requirements；
+- user choice；
+- model strength；
+- local/privacy preference；
+- latency/cost；
+- rate-limit；
+- session health；
+- context compatibility；
+
+选择 Worker。
+
+失败迁移不是简单把原聊天全文复制给另一个模型，而是由 Context Engine 构建 **handoff package**：task goal、decisions、artifacts、current state、relevant evidence、pending work、grants。
+
+## 12. 多 Worker 协作
+
+未来支持的模式统一建模为 Task graph，而不是 Chat 特例：
+
+- parallel candidates；
+- planner → executor；
+- implementer → reviewer；
+- debate；
+- specialist routing；
+- merge/synthesis；
+- failover。
+
+当前 multi-model branch/merge 是这一方向的可用原型，应迁移其用户价值而不是复制其 Chat-specific state model。
+
+## 13. Web Session 安全边界
+
+每个 Web WorkerSession 必须绑定：
+
+- exact origin/site adapter；
+- page/session identity；
+- current tool/capability grants；
+- page token/session secret；
+- execution ledger；
+- auth state；
+- no-credential-exfiltration policy。
+
+刷新/重新注入后 token 变化必须重新建立绑定；不能只按 page-agent version 复用。

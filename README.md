@@ -14,7 +14,7 @@ Nimora IDE 是一个基于 **Code - OSS / Visual Studio Code** 的开源 AI 编�
 - 本机 ShunCode 产品版本：`1.132.0`
 - ShunCode 第一方扩展版本：`0.7.2`
 - Web MCP Bridge：`0.4.10`
-- WebMCP page agent：`v20`
+- WebMCP page agent：`v24`
 
 安装包 `product.json` 中的 `09533f921029d9d073c06e70f566ebe31e43cebc` 并不是 Microsoft VS Code 仓库可抓取的 commit，因此本仓库没有把它伪装成上游提交；重建依据与差异说明见 [docs/RECONSTRUCTION.md](docs/RECONSTRUCTION.md)。
 
@@ -29,7 +29,7 @@ Nimora IDE 是一个基于 **Code - OSS / Visual Studio Code** 的开源 AI 编�
 - `tools/webmcp-gateway/`：WebMCP / Browser MCP Gateway，包含 gateway-managed Edge 与 Personal Edge 的网关层。
 - `extensions/shuncode-personal-edge-bridge/`：用户主动共享单个日常 Edge 标签页的 Manifest V3 扩展。
 
-架构图和端口说明见 [docs/ARCHITECTURE.zh-CN.md](docs/ARCHITECTURE.zh-CN.md)。
+简要架构和端口说明见 [docs/ARCHITECTURE.zh-CN.md](docs/ARCHITECTURE.zh-CN.md)。完整的当前架构、进程/协议、Core Patch 审计、目标架构与迁移路线见 [docs/architecture/README.md](docs/architecture/README.md)。
 
 ## 目录
 

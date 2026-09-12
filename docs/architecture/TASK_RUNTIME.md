@@ -1,0 +1,231 @@
+# Task-Centric Runtime
+
+## 1. 为什么 Task 应成为最高业务对象
+
+当前最顶层体验仍以 Chat session 为中心，但长期任务经常跨：
+
+- 多次聊天；
+- 多个模型；
+- Web/API/local worker；
+- terminal/background process；
+- file artifacts；
+- browser state；
+- review/merge；
+- 用户中断和恢复。
+
+如果 Chat 是最高对象，换 Worker 或关闭网页就会丢失业务连续性。
+
+因此目标关系是：
+
+```text
+Task
+├─ Goal / Constraints
+├─ State / Plan
+├─ Context
+├─ Memory references
+├─ Capability Grants
+├─ Worker Sessions
+├─ Executions
+├─ Progress
+├─ Artifacts
+├─ Checkpoints
+└─ Result
+```
+
+Chat 只是 Task 的一个 interaction projection。
+
+## 2. Task 基本状态机
+
+```text
+draft
+→ ready
+→ running
+↔ waiting_user / waiting_external
+→ completed
+↘ failed
+↘ cancelled
+```
+
+复杂 Task 内部可以有 steps/attempts，但不要把每次 tool call 都升级成顶层 Task。
+
+## 3. Task Store
+
+Task Store 是 Nimora-owned Source of Truth，至少持久化：
+
+- task metadata / goal；
+- current phase/status；
+- worker assignments；
+- execution references；
+- artifact references；
+- progress/todos；
+- checkpoints；
+- decisions；
+- context summary；
+- capability grants。
+
+不要把完整巨大模型 transcript 复制到每个 state event；transcript/worker-native history 可以引用外部 session storage。
+
+## 4. Event Model
+
+推荐 append-oriented Task events：
+
+```text
+TaskCreated
+WorkerAttached
+ContextPrepared
+CapabilityGranted
+WorkerMessage
+ExecutionRequested
+ExecutionStarted
+ExecutionFinished
+ArtifactProduced
+ProgressUpdated
+WorkerDetached
+CheckpointCreated
+TaskCompleted
+```
+
+UI、Chat、Bridge timeline 都可以投影相同事件，而不是各自维护一套活动状态。
+
+## 5. Context Engine
+
+Context Engine 属于 Task Runtime，负责：
+
+- task goal/constraints；
+- relevant files/artifacts；
+- conversation evidence；
+- durable memory references；
+- worker-specific context format；
+- compression/summarization；
+- context budget；
+- stale-context invalidation；
+- handoff packages。
+
+### Context Budget
+
+预算至少区分：
+
+- task instructions；
+- history/decisions；
+- workspace evidence；
+- tool schemas；
+- skills；
+- model output reserve。
+
+Capability Router 与 Skill Router 根据预算动态决定暴露内容。
+
+## 6. Memory
+
+Memory 不等于“把所有旧聊天塞进 prompt”。
+
+建议分：
+
+- Task-local memory：当前任务事实/决策；
+- Project memory：架构约束、项目规范、已验证事实；
+- User preference memory：不应写进公共 repo；
+- Worker-native history：某个 provider/session 的原生对话状态。
+
+Project architecture docs / ADR / AGENTS 优先于隐式聊天记忆。
+
+## 7. Progress / Todos
+
+现有 Bridge 的 `set_todos` / `report_progress` 已证明 UI 价值，但 ownership 应移到 Task Runtime：
+
+```text
+Task Runtime progress state
+    ├─ Native Chat projection
+    ├─ Task Center projection
+    ├─ external MCP set_todos/report_progress adapter
+    └─ notification/status projection
+```
+
+外部 Worker 仍可以调用相同 capability，但它不直接“拥有 Bridge todos”。
+
+## 8. Artifact
+
+Artifact 是 Task 的一等结果引用：
+
+- files/patches；
+- diffs；
+- terminal commands/logs；
+- screenshots；
+- documents；
+- plans/reports；
+- URLs/browser outputs；
+- checkpoints。
+
+Artifact contract 让 UI 不需要通过 tool id/name 猜“这是不是文件 diff”。这也是移除 Core `shuncode_` tool renderer 特判的前提。
+
+## 9. Execution
+
+Task Runtime 的 Execution Service 与 Capability Layer 协作：
+
+```text
+Worker requests capability
+→ Router resolves provider
+→ Policy decides approval
+→ Ledger records requested/approved
+→ Provider executes
+→ Artifact/result persisted
+→ Worker result delivery
+→ Ledger marks delivered
+```
+
+发生 transport uncertainty 时，按 capability retry metadata 处理，而不是统一 retry。
+
+## 10. Multi-model 映射
+
+当前 Chat branch：
+
+```text
+one question
+→ branch A
+→ branch B
+→ merge
+→ adopted variant
+```
+
+目标 Task 模型：
+
+```text
+Task Step
+├─ WorkerAttempt A → CandidateResult A
+├─ WorkerAttempt B → CandidateResult B
+└─ Review/Merge Attempt → Decision/Artifact
+```
+
+这样同一机制可用于代码 review、research、planning、视觉任务，而不局限于 Chat turn。
+
+## 11. 与 Core Sessions 的关系
+
+不应另外造一个完全平行 Task Window。
+
+建议：
+
+- `src/vs/sessions` 继续提供 Workbench session/workspace/chat shell；
+- Nimora Task Runtime 提供 Task domain；
+- `TaskSessionsProvider` 把 Task projection 映射给 Sessions UI；
+- Core AgentHost sessions 也可以作为 Task 中一种 WorkerSession/compute environment。
+
+这样既利用 VS Code 成熟 UI，又避免让 Core `ISession` 直接变成 Nimora 全部业务模型。
+
+## 12. Ask / Plan / Code
+
+迁移成 Task Policy Preset：
+
+### Ask
+- 默认 read capabilities；
+- 更低副作用 grant；
+- result 偏解释/回答。
+
+### Plan
+- read/search/diagnostics；
+- 可启用多 Worker candidates；
+- 不默认写入。
+
+### Code
+- edit/terminal capabilities；
+- explicit approval policy；
+- artifacts = patch/files/tests。
+
+底层 Task/Worker/Capability contract 保持一致。
