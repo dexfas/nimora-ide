@@ -37,6 +37,12 @@ if not exist "node_modules\@vscode\policy-watcher\build\Release\vscode-policy-wa
 	if errorlevel 1 goto fail
 )
 
+if not exist "node_modules\windows-foreground-love\build\Release\foreground_love.node" (
+	echo [shuncode] windows-foreground-love native binding is missing. Rebuilding direct native dependencies...
+	call npm run rebuild-shuncode-native
+	if errorlevel 1 goto fail
+)
+
 call npm run typecheck-shuncode
 if errorlevel 1 goto fail
 

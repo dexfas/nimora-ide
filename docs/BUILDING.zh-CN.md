@@ -57,7 +57,7 @@ macOS / Linux：
 npm run rebuild-shuncode-native
 ```
 
-该命令只重建已确认需要 Electron ABI 的直接依赖，避免直接执行根级 `npm rebuild` 时再次触发整个项目的 preinstall。
+该命令只重建已确认需要 Electron ABI 的直接依赖，避免直接执行根级 `npm rebuild` 时再次触发整个项目的 preinstall。Windows 开发启动器还会显式检查 `@vscode/policy-watcher` 与 `windows-foreground-love` 的 native binding；任一缺失时会自动触发这组重建。
 
 ## 当前严格 typecheck 状态
 

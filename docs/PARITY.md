@@ -4,9 +4,9 @@
 
 ## 结论
 
-Nimora IDE 已经恢复并实测通过当前发行版的主要本地 AI IDE / Agent 能力，包括源码版启动、Chat participant、模型 Provider、Ask / Plan / Code 模式、IDE 工具 broker、Agent Host、MCP 文件工具、WebMCP 受管浏览器以及 Personal Edge Bridge。
+Nimora IDE 已经恢复并实测通过当前发行版的主要 AI IDE / Agent 能力，包括源码版启动、Chat participant、模型 Provider、Ask / Plan / Code 模式、IDE 工具 broker、Agent Host、MCP 文件工具、WebMCP 受管浏览器、Personal Edge Bridge，以及通过本地和 Cloudflare Quick Tunnel 暴露的外部 Bridge MCP 调用链。
 
-目前不能把结论表述为“所有功能 100% 完全等价”。仍有一批依赖外部账号、私有/云端服务或完整人工 UI 回归的场景没有逐项验收，例如 Codex / Copilot 的真实账号登录和推理请求、Cloudflare/ngrok 公网隧道、远端服务、更新流程及所有 UI 边缘状态。
+目前不能把结论表述为“所有功能 100% 完全等价”。仍有一批依赖外部账号、特定云端配置或完整人工 UI 回归的场景没有逐项验收，例如 Codex / Copilot 的真实账号登录和推理请求、Cloudflare Named Tunnel / ngrok、远端服务、更新流程及所有 UI 边缘状态。
 
 ## 静态源码对照
 
@@ -82,6 +82,36 @@ Nimora 源码版启动时 Main、Renderer、Extension Host 和 Agent Host 均正
 
 完整交互测试使用本机临时 HTTP 页面：输入框被填入 `Nimora`，按钮点击后页面内容实际变为 `Hello Nimora`；reload 后状态恢复为 `Waiting`。因此 Personal Edge 的读、元素发现、填写、点击、导航和重载链路均完成真实端到端验证。
 
+## Bridge / 外部 AI MCP 端到端实测
+
+本轮使用 Nimora 主扩展自身的 `BridgeManager` 启动真实 Streamable HTTP MCP server，再以独立 Node.js MCP Client 模拟“外部 AI 客户端”。客户端与 Nimora 进程完全分离，不直接调用扩展内部对象。
+
+本地 Bridge 验证结果：
+
+| 功能 | 结果 |
+| --- | --- |
+| Extension Development Host 中启动 Bridge 本地 smoke server | 通过 |
+| 外部 MCP Client 建立 Streamable HTTP 会话 | 通过 |
+| 工具枚举 | 通过，返回 12 个工具 |
+| `list_directory` | 通过 |
+| `read_files` | 通过 |
+| `run_command` | 通过，实际输出 `BRIDGE_E2E_OK` |
+
+外部 Client 实际看到的 12 个工具为：`apply_patch`、`find_files`、`read_files`、`search_files`、`list_directory`、`run_command`、`get_command_output`、`send_command_input`、`get_diagnostics`、`lsp`、`set_todos`、`report_progress`。
+
+随后将隔离开发配置的 tunnel provider 切换为 `cloudflare`，由同一个 Bridge 启动 Cloudflare Quick Tunnel。`cloudflared` 成功完成 DNS、QUIC、HTTP/2 和 Cloudflare API 连通性预检，并建立临时 `trycloudflare.com` 公网 endpoint。独立 MCP Client 通过该公网 HTTPS MCP URL 回连 Nimora：
+
+| 公网链路 | 结果 |
+| --- | --- |
+| Quick Tunnel 建立 | 通过 |
+| 公网 MCP Client 工具枚举 | 通过，12 个工具 |
+| 公网 `read_files` | 通过，成功读取 README |
+| 公网 `run_command` | 通过，实际输出 `PUBLIC_BRIDGE_E2E_OK` |
+
+因此 **外部 AI / MCP Client → 公网 HTTPS Tunnel → Nimora Bridge → IDE/MCP tools** 已完成真实端到端闭环。测试使用的 Quick Tunnel、源码 Nimora 进程和临时测试文件在验收结束后均已关闭/清理。
+
+首次公网尝试时，隔离开发设置中残留的 provider 为 `ngrok`，而本机 ngrok 会话认证失败，因此该次启动没有建立公网 tunnel；这不影响随后 Cloudflare Quick Tunnel 的成功验收，也意味着 ngrok 路径仍应单独列为未验证项。
+
 ## 尚未逐项验证的能力
 
 以下项目并不代表源码缺失，而是本轮没有用真实外部账号/服务做完整验收：
@@ -90,7 +120,7 @@ Nimora 源码版启动时 Main、Renderer、Extension Host 和 Agent Host 均正
 - Codex OAuth 登录、退出、重新登录、状态页及真实推理请求。
 - GitHub Copilot 账号授权与真实 Agent 推理会话。
 - 多模型分支 / merge 在多个真实模型同时在线时的完整行为。
-- Bridge 的 Cloudflare Quick Tunnel、Named Tunnel、ngrok 与公网 endpoint 轮换。
+- Bridge 的 Cloudflare Named Tunnel、ngrok 与公网 endpoint 轮换；Cloudflare Quick Tunnel 已完成真实公网 MCP 回连。
 - Bridge 许可证旧路径；当前发行行为本身为 free access，许可和支付处于关闭状态。
 - 远端 Agent / 隧道、更新流程、崩溃恢复、所有菜单/快捷键/UI 边缘状态。
 - 全仓库严格 TypeScript / 测试层与发布快照的完全一致性；开发启动目前显式跳过重建核心 `src` 的 tsgo no-emit 检查，但仍执行实际 transpile、第一方扩展 typecheck 和 runtime build。
@@ -104,6 +134,6 @@ Nimora 源码版启动时 Main、Renderer、Extension Host 和 Agent Host 均正
 
 ## 当前判断
 
-就已经能够离线/本地验证的主要生产链路而言，Nimora IDE 与当前 ShunCode 的功能恢复度已经很高，核心 Agent、文件工具、浏览器工具和 Personal Edge 均有真实运行证据。
+就已经能够验证的主要生产链路而言，Nimora IDE 与当前 ShunCode 的功能恢复度已经很高，核心 Agent、文件工具、浏览器工具、Personal Edge，以及本地/公网 Bridge MCP 均有真实运行证据。
 
 若要把状态提升到“完整发行验收”，下一阶段应重点补齐真实账号与云端服务矩阵，而不是继续猜测本地源码是否缺失。

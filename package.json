@@ -27,7 +27,7 @@
 		"build-fast-extensions": "npm run gulp copy-codicons compile-extensions compile-extension-media && npm run compile-shuncode",
 		"compile-shuncode": "node extensions/shuncode/esbuild.mts",
 		"typecheck-shuncode": "tsc --project extensions/shuncode/tsconfig.json",
-		"rebuild-shuncode-native": "npm rebuild @parcel/watcher @vscode/deviceid @vscode/fs-copyfile @vscode/native-watchdog @vscode/policy-watcher @vscode/spdlog @vscode/sqlite3 @vscode/windows-mutex @vscode/windows-process-tree @vscode/windows-registry kerberos native-is-elevated native-keymap node-pty",
+		"rebuild-shuncode-native": "npm rebuild @parcel/watcher @vscode/deviceid @vscode/fs-copyfile @vscode/native-watchdog @vscode/policy-watcher @vscode/spdlog @vscode/sqlite3 @vscode/windows-mutex @vscode/windows-process-tree @vscode/windows-registry kerberos native-is-elevated native-keymap node-pty windows-foreground-love",
 		"typecheck-client": "tsc --project ./src/tsconfig.json --noEmit --skipLibCheck",
 		"codex:gen-protocol": "node build/codex/generate-protocol.mjs",
 		"codex:check-protocol": "node build/codex/check-protocol-sync.ts",
