@@ -79,7 +79,7 @@ async function smokeMcpServer(): Promise<void> {
 		const searched = await client.callTool({
 			name: 'search_files',
 			arguments: {
-				pattern: 'ShunCode Open Source',
+				pattern: 'Nimora IDE',
 				path: '.',
 				include: ['README.md'],
 				max_results: 5,
@@ -91,7 +91,7 @@ async function smokeMcpServer(): Promise<void> {
 			.map(part => part.text)
 			.join('\n');
 		assert.match(text, /README\.md/);
-		assert.match(text, /ShunCode Open Source/);
+		assert.match(text, /Nimora IDE/);
 	} finally {
 		await client.close();
 	}

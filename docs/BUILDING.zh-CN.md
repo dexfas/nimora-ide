@@ -1,4 +1,4 @@
-# ShunCode 源码构建
+# Nimora IDE 源码构建
 
 ## 环境
 

@@ -1,4 +1,4 @@
-# ShunCode 开源重建说明
+# Nimora IDE 开源重建说明
 
 ## 为什么需要重建
 

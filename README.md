@@ -1,8 +1,8 @@
-# ShunCode Open Source
+# Nimora IDE
 
-ShunCode 是一个基于 **Code - OSS / Visual Studio Code** 的 AI 编程环境。本仓库以 VS Code `1.132.0` 为上游基线，整理了 ShunCode 当前安装版本中可恢复的第一方源码，并把当前 WebMCP、Browser MCP Gateway 与 Personal Edge Bridge 一并纳入开源目录。
+Nimora IDE 是一个基于 **Code - OSS / Visual Studio Code** 的开源 AI 编程环境。本仓库以 VS Code `1.132.0` 为上游基线，整理了一套现有 AI IDE 发行构建中可验证恢复的第一方源码，并把 WebMCP、Browser MCP Gateway 与 Personal Edge Bridge 一并纳入开源目录。
 
-> 当前仓库是从现有 ShunCode 安装包、随包 TypeScript 源码和 source map 重建的开源工作副本。它用于继续开发和公开审阅，不会修改本机已安装的 `C:\Program Files\ShunCode`。
+> **项目公开名称是 Nimora IDE。** 为保持与已恢复发行源码、扩展 ID、协议和运行时路径兼容，仓库中仍保留部分历史 `shuncode` / `ShunCode` 内部标识；这些兼容标识不代表公开项目名称。当前仓库是从现有发行安装包、随包 TypeScript 源码和 source map 重建的开源工作副本，不会修改本机已安装程序。
 
 ## 上游基线
 
@@ -16,7 +16,7 @@ ShunCode 是一个基于 **Code - OSS / Visual Studio Code** 的 AI 编程环境
 
 安装包 `product.json` 中的 `09533f921029d9d073c06e70f566ebe31e43cebc` 并不是 Microsoft VS Code 仓库可抓取的 commit，因此本仓库没有把它伪装成上游提交；重建依据与差异说明见 [docs/RECONSTRUCTION.md](docs/RECONSTRUCTION.md)。
 
-## ShunCode 增量
+## Nimora IDE / 已恢复发行增量
 
 主要新增/修改内容包括：
 

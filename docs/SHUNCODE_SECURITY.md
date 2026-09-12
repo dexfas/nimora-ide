@@ -1,4 +1,4 @@
-# ShunCode Security Notes
+# Nimora IDE Security Notes
 
 ## Secrets
 

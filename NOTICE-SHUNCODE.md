@@ -1,4 +1,4 @@
-# ShunCode attribution and reconstruction notice
+# Nimora IDE attribution and reconstruction notice
 
 This repository is derived from Microsoft Code - OSS / Visual Studio Code source code and preserves the upstream MIT license and third-party notices.
 
@@ -6,5 +6,5 @@ The upstream source baseline used for this reconstruction is the public `microso
 
 The installed product metadata also contains the value `09533f921029d9d073c06e70f566ebe31e43cebc`. That value could not be resolved as a public commit in `microsoft/vscode`, so this repository does not claim it as the upstream source commit.
 
-Microsoft, Visual Studio Code and related marks belong to their respective owners. ShunCode is a separate downstream project.
+Microsoft, Visual Studio Code and related marks belong to their respective owners. **Nimora IDE** is the public project name for this open-source repository. Historical `ShunCode` identifiers remain in recovered source paths, extension IDs, protocols and provenance notes where changing them would reduce traceability or break runtime compatibility.
 
