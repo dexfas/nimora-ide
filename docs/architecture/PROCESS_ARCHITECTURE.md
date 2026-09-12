@@ -17,7 +17,7 @@ Windows / macOS / Linux
 ├─ Extension Host
 │  ├─ extensions/shuncode
 │  │  ├─ Native Chat / LM Providers
-│  │  ├─ IdeToolBroker
+│  │  ├─ IdeToolBroker facade + capability providers
 │  │  ├─ Bridge HTTP MCP server
 │  │  └─ spawn → first-party Runtime child
 │  └─ extensions/shuncode-webmcp (UI extension)
@@ -89,7 +89,7 @@ Windows / macOS / Linux
 
 Runtime 反向调用 Extension Host：
 
-- `ide/tool/invoke` → `IdeToolBroker`；
+- `ide/tool/invoke` → `IdeToolBroker` facade → Workspace/Terminal/Diagnostics/LSP provider；
 - `network/fetch` / cancel → Extension Host 代理网络；
 - `agent/trace` notification；
 - `agent/checkpoint` notification。
@@ -100,7 +100,7 @@ Runtime 反向调用 Extension Host：
 
 Bridge HTTP server 当前**没有独立进程**：它在 `extensions/shuncode` Extension Host 内创建 Streamable HTTP MCP endpoint。
 
-好处：可以直接调用 `IdeToolBroker` 和 workspace context。
+好处：可以直接调用 `IdeToolBroker` facade，再由 provider 使用真实 Extension Host workspace/LSP/terminal context。
 
 代价：MCP transport、tunnel lifecycle、tool execution metadata、UI state 都与 Extension Host 生命周期绑定；Bridge 变复杂时会扩大扩展主进程职责。
 

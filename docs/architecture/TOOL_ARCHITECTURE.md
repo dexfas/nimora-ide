@@ -41,7 +41,32 @@ Phase 1 已建立第一版统一 semantic metadata contract：`src/capability-re
 - 为兼容尚未携带 metadata 的旧 Bridge，原 read-only retry 白名单暂时保留为明确的 legacy fallback；
 - tool name、input schema、provider dispatch 与现有审批行为均未在 Phase 1 改变。
 
-当前 registry 是 **semantic registry**，不是“所有实现必须物理放进一个文件”。Gateway/browser provider 可以在正确的进程定义 provider-local capability，再使用相同 contract 暴露；后续 Phase 2 会进一步形成正式 provider registration。
+当前 registry 是 **semantic registry**，不是“所有实现必须物理放进一个文件”。Gateway/browser provider 可以在正确的进程定义 provider-local capability，再使用相同 contract 暴露。
+
+### Phase 2 provider split status
+
+Extension Host 的 IDE capability 已按 owner 拆分：
+
+```text
+IdeToolBroker (thin facade)
+├─ WorkspaceCapabilityProvider
+│  └─ list_directory
+├─ TerminalCapabilityProvider
+│  ├─ run_command
+│  ├─ get_command_output
+│  ├─ send_command_input
+│  └─ wait
+│      ↓
+│    TerminalCommandManager (PTY / direct backend)
+├─ DiagnosticsCapabilityProvider
+│  └─ get_diagnostics
+└─ LspCapabilityProvider
+   └─ lsp
+```
+
+`src/ide-tool-definitions.ts` 是 IDE tool → provider owner 的 canonical mapping。`IdeToolBroker` 只负责 provider composition、VS Code LM registration，以及 Native Chat / Bridge 需要的兼容 facade；它不再实现 Workspace/Diagnostics/LSP/Terminal 业务本身。
+
+Terminal subsystem 没有为了“拆文件”而重写：原有 persistent PTY、ConPTY、echo gate、direct execution、output capture、interactive input 和 terminal reuse 逻辑整体迁入 `terminal-command-manager.ts`，并已通过真实 Extension Host terminal smoke。
 
 ## 3. 目标 Capability Definition
 
@@ -180,7 +205,7 @@ requested
 ## 10. 当前工具迁移优先级
 
 1. ~~先给现有工具补统一 metadata，不改 behavior；~~ **Phase 1 已完成第一版**；
-2. 从 `IdeToolBroker` 拆 provider；
+2. ~~从 `IdeToolBroker` 拆 provider；~~ **Phase 2 已完成 Extension Host provider split**；
 3. Bridge/Gateway 改为读取 Registry，而不是复制 tool semantics；
 4. 把 `set_todos/report_progress` 移入 Task Capability；
 5. browser tools 统一 provider metadata；

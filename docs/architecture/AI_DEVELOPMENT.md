@@ -71,6 +71,16 @@ npm run test-shuncode-capabilities
 npm run test-shuncode-runtime
 ```
 
+如果改动 `TerminalCapabilityProvider` / `TerminalCommandManager` / `LspCapabilityProvider` 或 provider routing，除了上述自动测试，还应在隔离源码实例中打开一个真实 workspace，并按需使用：
+
+```powershell
+$env:SHUNCODE_TERMINAL_SMOKE = "1"
+$env:SHUNCODE_LSP_SMOKE = "1"
+.\scripts\shuncode-dev.bat --new-window .
+```
+
+确认 Extension Host output 中对应 smoke 为 `PASS`。只允许结束路径精确属于仓库 `.build/electron/ShunCode.exe` 的源码进程。
+
 ### WebMCP/Gateway changes
 
 最少：

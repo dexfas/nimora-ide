@@ -44,6 +44,12 @@ assert.equal(capabilityMcpFields('read_files')._meta[NIMORA_CAPABILITY_META_KEY]
 const ids = capabilityRegistrySnapshot().map(item => item.id);
 assert.equal(ids.length, new Set(ids).size, 'capability ids must be unique');
 
+assert.deepEqual(
+  [...new Set(IDE_TOOL_DEFINITIONS.map(tool => tool.provider))].sort(),
+  ['diagnostics', 'lsp', 'terminal', 'workspace'],
+  'IDE tool definitions must declare the expected capability provider owners',
+);
+
 const browserRead = defineGatewayCapability(
   { name: 'browser_test_read', description: 'test', inputSchema: { type: 'object', properties: {} } },
   {

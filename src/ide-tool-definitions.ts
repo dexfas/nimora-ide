@@ -4,6 +4,7 @@ export interface AgentToolDefinition {
   inputSchema: Record<string, unknown>;
   vscodeToolName: string;
   capability: "read" | "execute";
+  provider: "workspace" | "terminal" | "diagnostics" | "lsp";
 }
 
 export const IDE_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
@@ -11,6 +12,7 @@ export const IDE_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     name: "list_directory",
     vscodeToolName: "shuncode_list_directory",
     capability: "read",
+    provider: "workspace",
     description: "List the immediate contents of a workspace directory. Use this to understand what is in a known directory; use find_files when searching by filename/path pattern. Depth is intentionally limited to 1 or 2.",
     inputSchema: {
       type: "object",
@@ -28,6 +30,7 @@ export const IDE_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     name: "run_command",
     vscodeToolName: "shuncode_run_command",
     capability: "execute",
+    provider: "terminal",
     description: "Run a shell command in a ShunCode-managed persistent real PTY that is independent of the user's terminal profiles and VS Code Shell Integration. Windows is backed by the bundled node-pty runtime and ConPTY, using one long-lived system Windows PowerShell (powershell.exe) with -NoProfile per terminal slot; POSIX uses a long-lived native PTY with /bin/bash without profile files when available, otherwise /bin/sh. Shell state such as environment variables, functions and the current directory persists when the same terminal is reused. Omit cwd to continue from the most recently used idle ShunCode terminal's current directory; the first command defaults to the workspace root. Interactive input, terminal resize and TTY-aware CLI behavior are supported. Concurrent/busy commands may use additional terminals. Always explicitly choose background=true for long-running servers/watchers and background=false for commands whose result should be awaited. Returns a command_id for later output inspection or interactive input. Execution modes: pty (default) runs in the managed persistent terminal above and supports interactive input; direct runs the command through a one-shot child process with piped output and a process-level exit code (no terminal view, no interactive input). Prefer execution=\"direct\" for non-interactive one-shot commands such as builds, tests and scripts; keep the default pty for interactive programs, TUIs, and background=true servers that should stay visible in a terminal. The result header always carries the same fixed fields: facts that would be absent are explicit instead (script_bridge is null when the command was not bridged through a temp script, recovered_by_abort and suspected_parser_error default to false, shell_prompt_seq is null in direct mode, hint is \"none\" when not running) — parse the header by field name, never by line presence.",
     inputSchema: {
       type: "object",
@@ -46,6 +49,7 @@ export const IDE_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     name: "get_command_output",
     vscodeToolName: "shuncode_get_command_output",
     capability: "execute",
+    provider: "terminal",
     description: "Read new output and status from a previously started run_command using its command_id. Use next_offset on subsequent reads to avoid repeating old output.",
     inputSchema: {
       type: "object",
@@ -62,6 +66,7 @@ export const IDE_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     name: "send_command_input",
     vscodeToolName: "shuncode_send_command_input",
     capability: "execute",
+    provider: "terminal",
     description: "Send text to the terminal of a running command. Use for interactive prompts or REPL input. A newline is appended by default.",
     inputSchema: {
       type: "object",
@@ -78,6 +83,7 @@ export const IDE_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     name: "wait",
     vscodeToolName: "shuncode_wait",
     capability: "execute",
+    provider: "terminal",
     description: "Block for a fixed amount of time (ms), then return. Use to let a background command started with run_command (background=true) make progress before reading its output with get_command_output, or to give a server/watcher time to emit more output. Choose one wait long enough for the expected work (e.g. 10_000-30_000 ms for builds, up to 120_000 for slow compiles) instead of polling get_command_output in a tight loop. The wait only sleeps; it does not check command status.",
     inputSchema: {
       type: "object",
@@ -92,6 +98,7 @@ export const IDE_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     name: "get_diagnostics",
     vscodeToolName: "shuncode_get_diagnostics",
     capability: "read",
+    provider: "diagnostics",
     description: "Read current diagnostics from VS Code and active language services, including unsaved editor state when providers report it. Use after edits/builds to inspect errors and warnings structurally instead of parsing compiler output when diagnostics are available.",
     inputSchema: {
       type: "object",
@@ -112,6 +119,7 @@ export const IDE_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
     name: "lsp",
     vscodeToolName: "shuncode_lsp",
     capability: "read",
+    provider: "lsp",
     description: "Navigate code semantically through the language services already active in VS Code. Use this for code symbols rather than text search: workspace/document symbols, go-to-definition, references, implementations, and hover/type information. Results include provider_state, project_anchor, project_anchor_source, warmup_performed, and semantic_result_inconclusive metadata so empty semantic results and heuristic warm-up anchors are not over-interpreted. Use search_files for raw text and read_files after lsp locates the relevant implementation.",
     inputSchema: {
       type: "object",

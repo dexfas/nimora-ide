@@ -143,6 +143,10 @@ VS Code `LanguageModelChatProvider` 只是其中一个 presentation/integration 
 
 通过统一 Capability Registry 注册。
 
+### Phase 2 状态
+
+该拆分已经完成第一轮落地。`IdeToolBroker` 现为薄 facade；四类 provider 已成为显式 owner，Terminal 的成熟执行引擎独立在 `terminal-command-manager.ts`。真实源码 Extension Host 的 terminal/LSP smoke 均通过，因此后续 provider 演进应继续在这些边界内进行，而不是把逻辑重新塞回 broker。
+
 ## 9. Bridge
 
 ### 保留

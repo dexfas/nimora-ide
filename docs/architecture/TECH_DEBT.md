@@ -23,7 +23,7 @@
 | P1 | Multi-model state 绑定 Chat | Core branch + extension globalState | 无法服务 Task/Web worker | migrate to Task WorkerAttempt |
 | P1 | Bridge todo/progress 是 transport-owned | Bridge adds state tools | Task continuity 差 | Task progress store |
 | P1 | upstream baseline diff 不可离线复核 | repo 缺 1.132.0 commit object | Core audit 难重复 | baseline fetch/cache/audit script |
-| P2 | `IdeToolBroker` 过大 | ~1900 lines multiple domains | 维护/测试困难 | split providers |
+| P2 | Terminal backend 仍较大 | `IdeToolBroker` 已在 Phase 2 收缩为薄 facade，但 PTY/ConPTY/direct execution 本身约 1500 行且状态复杂 | Terminal 修改仍需高强度回归 | 保持独立 backend；只在有明确收益时继续内部模块化，不为 LOC 强拆 |
 | P2 | `model-provider.ts` 过大 | catalog/auth/protocol/config mixed | provider change 高风险 | split catalog/auth/worker adapters |
 | P2 | `native-chat.ts` 混 UI/orchestration | runtime/tool/branch/checkpoint | Chat 变 state owner | thin Chat projection |
 | P2 | Core↔extension magic command IDs | `shuncode.branch.*`, Bridge commands | 类型弱/隐藏依赖 | typed adapter/proposed API |

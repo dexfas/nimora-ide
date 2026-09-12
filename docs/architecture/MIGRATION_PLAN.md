@@ -89,19 +89,41 @@ Registry 只做 adapter；可退回旧 arrays/definitions。
 
 ## 4. Phase 2 — Split Capability Providers
 
+**Status: Completed (2026-09-13)**
+
 ### 目标
 
 拆 `IdeToolBroker` / Gateway monolith，但不改变外部 tool names。
 
 ### 工作
 
-- WorkspaceCapabilityProvider；
-- TerminalCapabilityProvider；
-- DiagnosticsCapabilityProvider；
-- LspCapabilityProvider；
-- ManagedBrowserProvider；
-- PersonalBrowserProvider；
-- 保留 facade 兼容旧 caller。
+- WorkspaceCapabilityProvider；✅
+- TerminalCapabilityProvider；✅
+- DiagnosticsCapabilityProvider；✅
+- LspCapabilityProvider；✅
+- TerminalCommandManager 独立 backend；✅
+- `IdeToolBroker` 收缩为 provider composition / VS Code LM registration / native-direct invoke facade；✅
+- 保留原 tool names、result shape、Native Chat 与 Bridge caller contract。✅
+
+Gateway-managed Browser / Personal Edge 已在 Phase 1 具备 provider-local capability contract；更进一步的 Gateway monolith 模块化仍留给 Phase 6，不在本阶段强行与 Extension Host provider 拆分绑在一起。
+
+### 实现结果
+
+- `src/ide-tool-definitions.ts` 的每个 IDE tool 现在显式声明 `provider` owner；
+- 新增 `ide-capability-provider.ts` 作为 Extension Host provider contract；
+- `WorkspaceCapabilityProvider`、`DiagnosticsCapabilityProvider`、`LspCapabilityProvider` 已从旧 broker 物理拆出；
+- `TerminalCapabilityProvider` 持有 terminal capability 语义与 Chat presentation；成熟 PTY/ConPTY/direct execution 实现机械迁移到 `terminal-command-manager.ts`，没有重写执行协议；
+- `IdeToolBroker` 从约 1900 行历史大模块收缩为约百行 facade；
+- capability smoke 会验证 IDE tool definitions 的 provider owner 集合，避免新增工具绕过 provider architecture。
+
+### 实机验证
+
+除 typecheck / compile / runtime smoke 外，源码隔离实例在真实 Extension Host 中以当前仓库作为 workspace 启动：
+
+- `SHUNCODE_TERMINAL_SMOKE=1` → `[terminal-smoke] PASS`
+- `SHUNCODE_LSP_SMOKE=1` → `[lsp-smoke] PASS`
+
+首次空窗口验证曾得到 `No workspace folder is open.`，随后改为显式打开当前仓库 workspace 后两项均通过。只结束了 `.build/electron/ShunCode.exe` 的源码实例，没有操作安装版 ShunCode。
 
 ### 风险
 

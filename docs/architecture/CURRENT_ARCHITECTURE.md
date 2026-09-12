@@ -19,7 +19,7 @@
                             │ VS Code Extension API / proposed API
 ┌───────────────────────────▼──────────────────────────────────┐
 │ extensions/shuncode                                         │
-│ Native Chat · Model Provider · RuntimeClient · IdeToolBroker │
+│ Native Chat · Model Provider · RuntimeClient · IDE Providers │
 │ BridgeManager · BranchState · Codex auth · commands          │
 └───────────────┬──────────────────────┬───────────────────────┘
                 │ JSON-RPC JSONL       │ Streamable HTTP MCP
@@ -82,7 +82,7 @@
 
 `extensions/shuncode/src/extension.ts` 是当前第一方功能的 composition root。它创建或注册：
 
-- `IdeToolBroker`；
+- `IdeToolBroker` thin facade + Workspace/Terminal/Diagnostics/LSP capability providers；
 - `BridgeManager`；
 - Bridge access/license compatibility stack；
 - `RuntimeClient`；
@@ -141,6 +141,8 @@
 - `lsp`
 
 `extensions/shuncode/src/ide-tool-broker.ts` 在 Extension Host 内执行真实 IDE/terminal/LSP/diagnostics 操作。它所在进程合理，但一个类承担过多 capability。
+
+这一点已在 Phase 2 改造：`IdeToolBroker` 现在只负责 provider composition、VS Code LM registration 与兼容 invoke facade；Workspace、Diagnostics、LSP 已分别成为独立 provider，Terminal capability 语义与 PTY backend 也已拆开。tool 名称和外部调用 contract 没有变化。
 
 ### Bridge-only state tools
 
