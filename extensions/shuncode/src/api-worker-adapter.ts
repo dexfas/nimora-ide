@@ -279,6 +279,7 @@ export class ApiWorkerAdapter implements WorkerAdapter<ApiWorkerSessionOptions, 
         callId: typeof data.id === "string" ? data.id : undefined,
         name: typeof data.name === "string" ? data.name : "unknown",
         arguments: data.arguments,
+        dispatch: "observed",
         extensions: { step: item.step },
       });
       return;

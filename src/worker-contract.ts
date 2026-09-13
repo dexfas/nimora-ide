@@ -60,6 +60,8 @@ export interface WorkerCapabilityDefinition {
   inputSchema: Record<string, unknown>;
 }
 
+export type WorkerCapabilityDispatch = "observed" | "host-requested";
+
 export interface WorkerInput {
   /** Stable identity for one turn/send inside the logical WorkerSession. */
   inputId: string;
@@ -79,7 +81,7 @@ export type WorkerTerminalStatus = "completed" | "interrupted" | "cancelled" | "
 export type WorkerEvent =
   | { type: "text_delta"; inputId: string; text: string }
   | { type: "reasoning_delta"; inputId: string; text: string }
-  | { type: "capability_call"; inputId: string; callId?: string; name: string; arguments?: unknown; extensions?: Record<string, unknown> }
+  | { type: "capability_call"; inputId: string; callId?: string; name: string; arguments?: unknown; dispatch: WorkerCapabilityDispatch; extensions?: Record<string, unknown> }
   | { type: "capability_result"; inputId: string; callId?: string; name: string; text?: string; isError?: boolean; durationMs?: number; extensions?: Record<string, unknown> }
   | { type: "artifact_proposal"; inputId: string; artifact: unknown; extensions?: Record<string, unknown> }
   | { type: "checkpoint"; inputId: string; checkpoint: unknown }

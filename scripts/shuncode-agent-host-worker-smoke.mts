@@ -148,6 +148,7 @@ try {
   const capabilityCall = events.find(event => event.type === 'capability_call');
   assert.equal(capabilityCall.name, 'read_files');
   assert.deepEqual(capabilityCall.arguments, { files: [{ path: 'README.md' }] });
+  assert.equal(capabilityCall.dispatch, 'observed');
   const capabilityResult = events.find(event => event.type === 'capability_result');
   assert.equal(capabilityResult.name, 'read_files');
   assert.equal(capabilityResult.text, 'ok');

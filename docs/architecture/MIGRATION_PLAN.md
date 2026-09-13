@@ -279,6 +279,8 @@ Phase 5.2 在同一 v25 page runtime 上增加 `workerSession / workerSend / wor
 
 Phase 5.3 在 `WorkerSessionManager.send()` 增加 provider-neutral execution projection。绑定 Task 的 Worker 发出 `capability_call` 时生成 Nimora execution id 并写入 `TaskExecutionRequested/Started`；`capability_result` 推进到 `succeeded|failed + result prepared`；WebMCP 的 `capability_result_delivered` provider event 再推进到 `TaskExecutionDelivered`。如果 turn 终止前没有看到 capability result，execution 以 `unknown + pending` 收口。每条 Worker-origin execution 结构化保存 `managedSessionId / workerId / inputId / callId`，不要求调用方解析 execution id。**这仍是 shadow projection，不代表 Task Execution Service 已接管 WebMCP dispatch/dedupe。**
 
+Phase 5.4.1 已先建立 execution ownership handoff 的语义前提：`capability_call.dispatch` 必须显式为 `observed | host-requested`。现有 API/AgentHost/WebMCP page-local 全部是 `observed`，因此 Manager/Task ledger 只能记录，绝不能重复执行；后续只有 WebMCP host-managed 路径明确发出 `host-requested` 时，Task Execution Service 才有资格接管 dispatch。下一步仍需 capability executor + result-return contract，当前没有启用 host-managed production path。
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

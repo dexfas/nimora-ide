@@ -196,7 +196,7 @@ export class WebMcpCommandTransport implements WebWorkerTransport {
           ? [{ type: "status", name: "assistant_text_reset", data: { seq: event.seq } }, { type: "assistant_text", text: String(event.text ?? "") }]
           : [{ type: "assistant_text", text: String(event.text ?? "") }];
       case "capability_call":
-        return [{ type: "capability_call", callId: event.callId || undefined, name: String(event.name ?? ""), arguments: event.arguments }];
+        return [{ type: "capability_call", callId: event.callId || undefined, name: String(event.name ?? ""), arguments: event.arguments, dispatch: "observed" }];
       case "capability_result":
         return [{ type: "capability_result", callId: event.callId || undefined, name: String(event.name ?? ""), text: typeof event.text === "string" ? event.text : undefined, isError: event.isError === true }];
       case "status":

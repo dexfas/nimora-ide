@@ -281,6 +281,8 @@ Page Agent 的 worker turn 输出 sequence-numbered `status / assistant_text / c
 
 这一步仍然没有迁移 WebMCP 的执行 ownership：page Core 继续负责当前网页调用的 occurrence dedupe、实际 dispatch、pending delivery 与 delivery retry；TaskRuntime 当前是跨 Worker 的 durable projection/审计视图。下一阶段若要让 Task Execution Service 成为真正 owner，必须先设计 dispatch handoff/at-most-once 兼容迁移，不能简单删除 page-local ledger。Native Chat/未来 Work orchestrator 也尚未自动选择 Web worker。
 
+Phase 5.4.1 已把这条 handoff 变成 Worker Contract 的显式字段：每个 `capability_call` 必须声明 `dispatch: observed | host-requested`。当前三种已接入 Worker 均声明 `observed`，代表 capability lifecycle 是“被统一 Worker 层观察到”，并不授权 Manager 再执行一次。只有未来实现 host-managed WebMCP 时，page runtime 才能发 `host-requested`，并要求 adapter/manager 有对应的 result-return channel 后才能启用。
+
 ### 正式 Adapter Layer
 
 WebMCP 应建立明确分层：

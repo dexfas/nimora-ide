@@ -48,7 +48,7 @@ export interface WebWorkerTransportInput {
 export type WebWorkerTransportEvent =
   | { type: "assistant_text"; text: string }
   | { type: "reasoning"; text: string }
-  | { type: "capability_call"; callId?: string; name: string; arguments?: unknown; extensions?: Record<string, unknown> }
+  | { type: "capability_call"; callId?: string; name: string; arguments?: unknown; dispatch: "observed" | "host-requested"; extensions?: Record<string, unknown> }
   | { type: "capability_result"; callId?: string; name: string; text?: string; isError?: boolean; durationMs?: number; extensions?: Record<string, unknown> }
   | { type: "usage"; usage: Record<string, unknown> }
   | { type: "status"; name: string; data: unknown }
@@ -209,7 +209,7 @@ export class WebWorkerAdapter implements WorkerAdapter<WebWorkerSessionOptions> 
             yield { type: "reasoning_delta", inputId: input.inputId, text: event.text };
             break;
           case "capability_call":
-            yield { type: "capability_call", inputId: input.inputId, callId: event.callId, name: event.name, arguments: event.arguments, extensions: event.extensions };
+            yield { type: "capability_call", inputId: input.inputId, callId: event.callId, name: event.name, arguments: event.arguments, dispatch: event.dispatch, extensions: event.extensions };
             break;
           case "capability_result":
             yield { type: "capability_result", inputId: input.inputId, callId: event.callId, name: event.name, text: event.text, isError: event.isError, durationMs: event.durationMs, extensions: event.extensions };

@@ -54,7 +54,7 @@ class FakeWebTransport {
     this.lastInput = input;
     yield { type: 'assistant_text', text: 'working ' };
     yield { type: 'reasoning', text: 'checking' };
-    yield { type: 'capability_call', callId: 'call-1', name: 'read_files', arguments: { files: [{ path: 'README.md' }] } };
+    yield { type: 'capability_call', callId: 'call-1', name: 'read_files', arguments: { files: [{ path: 'README.md' }] }, dispatch: 'observed' };
     yield { type: 'capability_result', callId: 'call-1', name: 'read_files', text: 'ok', isError: false };
     yield { type: 'status', name: 'site', data: { lane: 'A' } };
     yield { type: 'usage', usage: { inputTokens: 12 } };
@@ -101,6 +101,7 @@ try {
     'text_delta', 'reasoning_delta', 'capability_call', 'capability_result', 'provider_event', 'usage', 'text_delta', 'terminal',
   ]);
   assert.equal(events.find(event => event.type === 'capability_call').name, 'read_files');
+  assert.equal(events.find(event => event.type === 'capability_call').dispatch, 'observed');
   assert.equal(events.at(-1).status, 'completed');
   assert.deepEqual(transport.lastInput.allowedCapabilities, ['workspace.read']);
   assert.equal(session.state, 'idle');

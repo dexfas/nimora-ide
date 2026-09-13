@@ -318,6 +318,7 @@ export class AgentHostWorkerAdapter implements WorkerAdapter<AgentHostWorkerSess
 			callId: action.toolCallId,
 			name: toolNames.get(action.toolCallId) ?? 'unknown',
 			arguments: parseToolInput(action.toolInput),
+			dispatch: 'observed',
 			extensions: { phase: 'ready', invocationMessage: stringOrMarkdown(action.invocationMessage), meta: action._meta },
 		});
 	}

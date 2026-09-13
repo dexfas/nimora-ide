@@ -131,6 +131,8 @@ Phase 5.2 额外建立 page Worker control contract：page session 具有稳定 
 
 Phase 5.3 的 projection 规则是：Manager 为每个 managed session/input 内观察到的 capability-call occurrence 生成独立 Nimora `executionId`；model/provider `callId` 只作为 origin metadata 和 FIFO 配对线索，不作为全局 execution 主键。`capability_result` 表示执行结果已观察并将 delivery 状态推进到 pending；只有显式的 `capability_result_delivered` provider event 才能记录 delivered。若 terminal 先于 capability result 到达，则 execution 必须记录为 `unknown/pending`，禁止猜测成功。
 
+Phase 5.4.1 开始显式区分 capability dispatch ownership。`WorkerEvent.capability_call.dispatch` 是必填字段：`observed` 表示该 Worker/runtime/page 已经拥有并执行这次调用，Host **禁止再次 dispatch**；`host-requested` 表示 Worker 只提出调用请求，必须由 Nimora host/Execution Service 执行并显式把结果送回 Worker。当前 API Runtime、AgentHost 与 WebMCP page-local 三条生产链全部标记为 `observed`。未来 host-managed WebMCP 只能通过显式切换到 `host-requested` 进入，不允许用“有没有 capability_result”之类启发式猜 ownership。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

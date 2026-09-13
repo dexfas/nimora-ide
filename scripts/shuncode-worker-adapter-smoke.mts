@@ -107,6 +107,7 @@ try {
   assert.deepEqual(runtime.calls[0].allowedTools, ['read_files']);
   assert.equal(runtime.calls[0].externalTools[0].name, 'external_tool');
   assert.equal(runtime.invocations[0].toolInvocationToken, 'opaque-tool-token');
+  assert.equal(events.find(event => event.type === 'capability_call').dispatch, 'observed');
   const toolCallTrace = workerEventToRuntimeTrace(events.find(event => event.type === 'capability_call'));
   assert.deepEqual(toolCallTrace, {
     type: 'tool_call',
