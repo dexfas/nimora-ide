@@ -446,6 +446,12 @@ Work Sessions 已经能稳定展示 per-Task todos/progress 后，Bridge 不再�
 
 因此 coordination presentation 现在只有一条正式路径：`TaskRuntime → task-center-projection → Nimora Work Sessions`。MCP acknowledgement 文案也明确指向 Work Sessions。`test-shuncode-bridge-task-coordination` 继续保护 strict fail-closed/replay/linkage，并新增“没有 manager-global todos/progress activity”的源码 contract。
 
+### Phase 7.7 — Decouple Bridge Startup from Chat Core
+
+`shuncode.bridge.persistentMode` 继续保留用户价值，但不再代表“持久 Bridge Chat 模式”。extension activation 现在在 `bridgeReady + bridgeLicenseReady` 后直接调用 `bridgeAccess.start()`；不会先执行 `workbench.action.chat.open`，也不会等待 Chat view render。`shuncode.bridge.start` 同样只负责启动 Bridge，不再顺带打开/切换 Bridge Session。旧 diagnostics/tool-card surface 仍可通过显式 `shuncode.bridge.openSession` 进入。
+
+对应地，`ChatViewPane` 已删除 `persistentBridgeStartupScheduled`、`schedulePersistentBridgeStartup()` 和对 `shuncode.bridge.persistentMode` 的认知。Bridge settings 中的开关文案改为“后台自动启动，不打开 Chat”。`test-shuncode-bridge-startup-decoupling` 保护 extension-owned startup、start-command 无 Chat side effect、Chat Core 不依赖 Bridge startup config，以及显式 legacy diagnostics 入口仍在。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

@@ -165,6 +165,8 @@ Phase 7.5 开始把 generic Artifact presentation 放进 Work Sessions：Task `c
 
 Phase 7.6 已停止 Bridge coordination 双份 presentation：`set_todos/report_progress` 完成 strict Task write 后只返回 MCP acknowledgement，不再写 `BridgeManager.todos`、不再创建 `status=progress` 的 Bridge activity，也不因 coordination-only 更新 Bridge revision。Work Sessions 因 Task change notification 自行刷新；Bridge 普通 tool activity 与 connection/tunnel reliability layer 不受影响。
 
+Phase 7.7 已把 Bridge 自动启动从 Chat Core 移回 first-party extension。`shuncode.bridge.persistentMode` 现在只是“后台自动启动 Bridge”的连接设置：extension 等待 Bridge/license 初始化后直接调用 `bridgeAccess.start()`，不会打开 Chat；手动 `shuncode.bridge.start` 也不再切换 UI。`ChatViewPane` 已没有 persistent Bridge startup 逻辑或配置依赖。旧 Bridge Session 仅在用户显式执行 `shuncode.bridge.openSession` 时打开，继续作为 rich tool/diagnostics 过渡面。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

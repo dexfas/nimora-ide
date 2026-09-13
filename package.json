@@ -24,6 +24,7 @@
 		"test-shuncode-task-center-projection": "node scripts/shuncode-task-center-projection-smoke.mts",
 		"test-shuncode-task-center-sessions": "node scripts/shuncode-task-center-sessions-smoke.mts",
 		"test-shuncode-work-sessions-handoff": "node scripts/shuncode-work-sessions-handoff-smoke.mts",
+		"test-shuncode-bridge-startup-decoupling": "node scripts/shuncode-bridge-startup-decoupling-smoke.mts",
 		"test-shuncode-worker-adapter": "node scripts/shuncode-worker-adapter-smoke.mts",
 		"test-shuncode-agent-host-worker": "node scripts/shuncode-agent-host-worker-smoke.mts",
 		"test-shuncode-worker-session-manager": "node scripts/shuncode-worker-session-manager-smoke.mts",

@@ -523,13 +523,13 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 		const persistentRow = dom.append(configurationCard, dom.$('.shuncode-bridge-persistent-row'));
 		const persistentText = dom.append(persistentRow, dom.$('.shuncode-bridge-persistent-text'));
 		const persistentLabel = dom.append(persistentText, dom.$('label.shuncode-bridge-label'));
-		persistentLabel.textContent = localizeBridge('shuncodeBridge.persistentMode', "Start Bridge with ShunCode");
+		persistentLabel.textContent = localizeBridge('shuncodeBridge.persistentMode', "Start Bridge automatically");
 		dom.append(persistentText, dom.$('.shuncode-bridge-help', undefined,
-			localizeBridge('shuncodeBridge.persistentModeHelpShort', "Automatically open and start Bridge after the app is ready.")));
+			localizeBridge('shuncodeBridge.persistentModeHelpShort', "Start Bridge after the app is ready without opening Chat.")));
 		this.persistentModeToggle = dom.append(persistentRow, dom.$<HTMLButtonElement>('button.shuncode-bridge-switch'));
 		this.persistentModeToggle.type = 'button';
 		this.persistentModeToggle.setAttribute('role', 'switch');
-		this.persistentModeToggle.setAttribute('aria-label', localizeBridge('shuncodeBridge.persistentMode', "Start Bridge with ShunCode"));
+		this.persistentModeToggle.setAttribute('aria-label', localizeBridge('shuncodeBridge.persistentMode', "Start Bridge automatically"));
 		dom.append(this.persistentModeToggle, dom.$('span.shuncode-bridge-switch-track'));
 		this.renderPersistentModeToggle(this.configurationService.getValue<boolean>(BRIDGE_PERSISTENT_MODE) === true);
 		this._register(dom.addDisposableListener(this.persistentModeToggle, 'click', () => {
@@ -1326,8 +1326,8 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 	private renderPersistentModeToggle(enabled: boolean): void {
 		this.persistentModeToggle.setAttribute('aria-checked', String(enabled));
 		this.persistentModeToggle.title = enabled
-			? localizeBridge('shuncodeBridge.persistentModeOn', "Bridge will open and start automatically after restart")
-			: localizeBridge('shuncodeBridge.persistentModeOff', "ShunCode will start in Chat mode");
+			? localizeBridge('shuncodeBridge.persistentModeOn', "Bridge will start automatically after restart without opening Chat")
+			: localizeBridge('shuncodeBridge.persistentModeOff', "Bridge starts only when you choose Start");
 	}
 
 	private renderLocalError(message: string): void {

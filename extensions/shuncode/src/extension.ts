@@ -428,10 +428,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("shuncode.bridge.start", async (domain?: unknown) => {
       await Promise.all([bridgeReady, bridgeLicenseReady]);
       if (domain !== undefined && typeof domain !== "string") throw new Error("Bridge domain must be a string.");
-      const status = await bridgeAccess.start(domain as string | undefined);
-      await vscode.commands.executeCommand("workbench.action.chat.open");
-      await vscode.commands.executeCommand("_shuncode.bridge.showSession");
-      return status;
+      return bridgeAccess.start(domain as string | undefined);
     }),
     vscode.commands.registerCommand("shuncode.bridge.stop", async () => {
       await bridgeReady;
@@ -613,12 +610,15 @@ export function activate(context: vscode.ExtensionContext): void {
   output.appendLine("[extension] Bridge registered: Streamable HTTP MCP + Cloudflare Quick/Named Tunnel + ngrok + report_progress");
   output.appendLine("[extension] Web WorkerSessionManager wiring enabled: WebMCP command transport → WebWorkerAdapter → Task bindings");
   if (vscode.workspace.getConfiguration("shuncode.bridge").get<boolean>("persistentMode", false)) {
-    output.appendLine("[extension] persistent Bridge mode enabled; opening Chat and waiting for the rendered view to start Bridge");
-    setTimeout(() => {
-      void vscode.commands.executeCommand("workbench.action.chat.open").then(undefined, (error) => {
-        output.appendLine(`[extension] failed to open Chat for persistent Bridge mode: ${error instanceof Error ? error.message : String(error)}`);
-      });
-    }, 100);
+    output.appendLine("[extension] persistent Bridge startup enabled; starting Bridge without opening Chat");
+    void Promise.all([bridgeReady, bridgeLicenseReady]).then(() => bridgeAccess.start()).then(
+      (status) => output.appendLine(`[bridge] persistent startup ready state=${status.state}`),
+      (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        output.appendLine(`[bridge] persistent startup failed: ${message}`);
+        void vscode.window.showErrorMessage(`Bridge automatic startup failed: ${message}`);
+      },
+    );
   }
   if (process.env.SHUNCODE_TERMINAL_SMOKE === "1") {
     void ideToolBroker.runTerminalSmokeTest().then(

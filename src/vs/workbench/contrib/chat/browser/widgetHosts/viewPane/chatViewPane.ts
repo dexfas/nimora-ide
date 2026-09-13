@@ -78,7 +78,6 @@ import { IVoiceSessionController } from '../../voiceClient/voiceSessionControlle
 import { IVoiceInputModeService, SimulatedVoiceState } from '../../voiceInputMode/voiceInputMode.js';
 import { computeVoiceGlowStyle, isGlowingVoiceState, readVoiceGlowIntensity, VoiceGlowState } from '../../voiceClient/voiceGlow.js';
 import { combineVoiceInput } from '../../voiceClient/voiceInputUtils.js';
-import { localizeBridge } from '../../aiCustomization/shunCodeBridgeLocalization.js';
 import { IAgentTitleBarStatusService } from '../../agentSessions/experiments/agentTitleBarStatusService.js';
 import { IVoicePlaybackService } from '../../../common/voicePlaybackService.js';
 import { IWorkbenchEnvironmentService } from '../../../../../services/environment/common/environmentService.js';
@@ -124,7 +123,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 	private readonly bridgeModeContext: IContextKey<boolean>;
 	private bridgeMode = false;
 	private bridgeSessionView: ShunCodeBridgeSessionView | undefined;
-	private persistentBridgeStartupScheduled = false;
 	private containerTitleModel: IViewContainerModel | undefined;
 
 	private getModeViewTitle(): string {
@@ -442,39 +440,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 		this.refreshSessionsControlVisibility();
 		this.relayout();
 		this._widget?.focusInput();
-	}
-
-	private schedulePersistentBridgeStartup(container: HTMLElement): void {
-		if (this.persistentBridgeStartupScheduled || this.configurationService.getValue<boolean>('shuncode.bridge.persistentMode') !== true) {
-			return;
-		}
-
-		this.persistentBridgeStartupScheduled = true;
-		const targetWindow = getWindow(container);
-		let firstFrame = 0;
-		let secondFrame = 0;
-		let startupTimer: number | undefined;
-		firstFrame = targetWindow.requestAnimationFrame(() => {
-			secondFrame = targetWindow.requestAnimationFrame(() => {
-				startupTimer = targetWindow.setTimeout(() => {
-					if (this.configurationService.getValue<boolean>('shuncode.bridge.persistentMode') !== true) {
-						this.showChatSession();
-						return;
-					}
-					this.showBridgeSession();
-					void this.commandService.executeCommand('shuncode.bridge.start').catch(error => {
-						this.notificationService.error(localizeBridge('shuncodeBridge.autoStartFailed', "Bridge could not be started automatically: {0}", toErrorMessage(error)));
-					});
-				}, 300);
-			});
-		});
-		this._register(toDisposable(() => {
-			targetWindow.cancelAnimationFrame(firstFrame);
-			targetWindow.cancelAnimationFrame(secondFrame);
-			if (startupTimer !== undefined) {
-				targetWindow.clearTimeout(startupTimer);
-			}
-		}));
 	}
 
 	private createControls(parent: HTMLElement): void {
@@ -1118,8 +1083,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 			this.bridgeSessionView?.setVisible(this.bridgeMode && this.isBodyVisible());
 		}));
 		this._register(autorun(reader => updateWidgetVisibility(reader)));
-		this.schedulePersistentBridgeStartup(chatControlsContainer);
-
 		return this._widget;
 	}
 
