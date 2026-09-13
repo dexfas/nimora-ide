@@ -14,7 +14,7 @@ await esbuild.build({
   stdin: {
     contents: `
       export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';
-      export { taskFileNavigationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
+      export { taskDiagnosticsArtifact, taskFileNavigationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
     `,
     resolveDir: root,
     sourcefile: 'task-center-session-presentation-entry.ts',
@@ -28,7 +28,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskFileNavigationArtifact } = require(bundlePath);
+const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskFileNavigationArtifact } = require(bundlePath);
 
 const summary = {
   version: 1,
@@ -133,6 +133,44 @@ try {
   assert.equal((manySearchLocations?.metadata?.locations as unknown[]).length, 40, 'search location anchors must stay bounded');
   assert.equal(manySearchLocations?.metadata?.locationsTruncated, true);
 
+  const diagnosticsArtifact = taskDiagnosticsArtifact({ path: 'src' }, [
+    '=== GET_DIAGNOSTICS BEGIN ===',
+    'scope: "src"',
+    'returned: 2',
+    'total_matching: 3',
+    'truncated: true',
+    '--- DIAGNOSTICS ---',
+    '--- DIAGNOSTIC 1 ---',
+    'src/a.ts:4:2',
+    'severity: error',
+    'source: "ts"',
+    'code: "1001"',
+    ' First diagnostic ',
+    '--- DIAGNOSTIC 2 ---',
+    'src/b.ts:8:1',
+    'severity: warning',
+    'source: "ts"',
+    'code: null',
+    'Second diagnostic',
+    '=== GET_DIAGNOSTICS END ===',
+  ].join('\n'));
+  assert.equal(diagnosticsArtifact?.kind, 'file');
+  assert.equal(diagnosticsArtifact?.title, 'Diagnostics · src · 3 issues');
+  assert.deepEqual(diagnosticsArtifact?.metadata?.files, ['src/a.ts', 'src/b.ts']);
+  assert.deepEqual((diagnosticsArtifact?.metadata?.locations as Array<{ path: string; line: number; column?: number; label?: string }>)[0], { path: 'src/a.ts', line: 4, column: 2, label: '[error] First diagnostic' });
+  assert.equal(diagnosticsArtifact?.metadata?.locationCount, 3);
+  assert.equal(diagnosticsArtifact?.metadata?.resultTruncated, true);
+  const cleanDiagnosticsArtifact = taskDiagnosticsArtifact({}, [
+    '=== GET_DIAGNOSTICS BEGIN ===',
+    'returned: 0',
+    'total_matching: 0',
+    'truncated: false',
+    '--- DIAGNOSTICS ---',
+    '=== GET_DIAGNOSTICS END ===',
+  ].join('\n'));
+  assert.equal(cleanDiagnosticsArtifact?.kind, 'report', 'a successful no-diagnostics result should remain durable instead of disappearing');
+  assert.equal(cleanDiagnosticsArtifact?.title, 'No diagnostics · workspace');
+
   const markdown = formatTaskSessionMarkdown(detail);
   assert.match(markdown, /### Todos/);
   assert.match(markdown, /### AI Workers/);
@@ -165,13 +203,17 @@ try {
 
   const taskShadowSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-shadow.ts'), 'utf8');
   assert.match(taskShadowSource, /recordFileNavigationArtifact[\s\S]{0,500}taskFileNavigationArtifact\(toolName, structuredContent\)[\s\S]{0,500}recordArtifact/);
+  assert.match(taskShadowSource, /recordDiagnosticsArtifact[\s\S]{0,500}taskDiagnosticsArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
   const bridgeSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'bridge-server.ts'), 'utf8');
   assert.match(bridgeSource, /recordFileNavigationArtifact\(execution, toolName, result\.structuredContent\)/, 'successful Bridge file navigation must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "read_files"\)/, 'read_files must no longer have a Bridge-only rich presentation branch');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "find_files"\)/, 'find_files must no longer have a Bridge-only rich presentation branch');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "search_files"\)/, 'search_files must no longer have a Bridge-only rich presentation branch after native Location anchors exist');
+  assert.match(bridgeSource, /toolName === "get_diagnostics"[\s\S]{0,200}recordDiagnosticsArtifact\(execution, args, resultText\)/, 'successful Bridge diagnostics must be durably projected into Task artifacts');
+  assert.doesNotMatch(bridgeSource, /kind:\s*"diagnostics"|parseDiagnosticsItems\(/, 'get_diagnostics must no longer have a Bridge-only rich presentation branch');
   const bridgeSessionSource = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'shunCodeBridgeSessionView.ts'), 'utf8');
   assert.doesNotMatch(bridgeSessionSource, /case 'search'|item\.kind === 'match'/, 'dead search-specific Chat Core rendering must be removed');
+  assert.doesNotMatch(bridgeSessionSource, /case 'diagnostics'|item\.kind === 'diagnostic'|item\.severity/, 'dead diagnostics-specific Chat Core rendering must be removed');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));

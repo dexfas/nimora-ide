@@ -4,7 +4,7 @@ import { getCapabilityMetadata } from "../../../src/capability-registry.js";
 import { TaskRuntime } from "../../../src/task-runtime.js";
 import type { TaskArtifactRef, TaskInteractionOutcome, TaskProgress, TaskSnapshot, TaskTodo } from "../../../src/task-contract.js";
 import type { WorkerExecutionProjectionStore, WorkerTaskBindingStore } from "../../../src/worker-session-manager.js";
-import { taskFileNavigationArtifact } from "./task-file-artifacts.js";
+import { taskDiagnosticsArtifact, taskFileNavigationArtifact } from "./task-file-artifacts.js";
 
 export interface ShadowExecutionHandle {
   taskId: string;
@@ -161,6 +161,16 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
     const artifact = taskFileNavigationArtifact(toolName, structuredContent);
     if (!artifact) return undefined;
     return this.safe("record file navigation artifact", () => this.runtime.recordArtifact(handle.taskId, {
+      ...artifact,
+      executionId: handle.executionId,
+    }));
+  }
+
+  async recordDiagnosticsArtifact(handle: ShadowExecutionHandle | undefined, args: unknown, resultText: string): Promise<TaskArtifactRef | undefined> {
+    if (!handle) return undefined;
+    const artifact = taskDiagnosticsArtifact(args, resultText);
+    if (!artifact) return undefined;
+    return this.safe("record diagnostics artifact", () => this.runtime.recordArtifact(handle.taskId, {
       ...artifact,
       executionId: handle.executionId,
     }));

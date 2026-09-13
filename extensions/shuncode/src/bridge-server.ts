@@ -202,7 +202,7 @@ export interface BridgeTodo {
 }
 
 export interface BridgeActivityPresentation {
-  readonly kind: "files" | "edit" | "terminal" | "diagnostics" | "lsp" | "generic";
+  readonly kind: "files" | "edit" | "terminal" | "lsp" | "generic";
   readonly title: string;
   readonly subtitle?: string;
   readonly input?: string;
@@ -239,13 +239,12 @@ export interface BridgeDiffLinePreview {
 }
 
 export interface BridgeActivityItem {
-  readonly kind: "file" | "folder" | "diagnostic" | "symbol";
+  readonly kind: "file" | "folder" | "symbol";
   readonly path: string;
   readonly line?: number;
   readonly column?: number;
   readonly label?: string;
   readonly description?: string;
-  readonly severity?: "error" | "warning" | "information" | "hint";
   readonly additions?: number;
   readonly deletions?: number;
 }
@@ -367,29 +366,6 @@ function parseListDirectoryItems(text: string | undefined): BridgeActivityItem[]
     const match = line.match(/^\[(DIR|FILE|LINK|OTHER)\]\s+(.+)$/);
     if (!match) continue;
     items.push({ kind: match[1] === "DIR" ? "folder" : "file", path: match[2] });
-  }
-  return items;
-}
-
-function parseDiagnosticsItems(text: string | undefined): BridgeActivityItem[] {
-  if (!text) return [];
-  const items: BridgeActivityItem[] = [];
-  const blocks = text.split(/--- DIAGNOSTIC \d+ ---/).slice(1);
-  for (const block of blocks) {
-    const lines = block.trim().split(/\r?\n/);
-    const location = lines[0]?.match(/^(.+):(\d+):(\d+)$/);
-    if (!location) continue;
-    const severity = stringField(block, "severity") as BridgeActivityItem["severity"];
-    const messageStart = lines.findIndex((line) => line.startsWith("code:"));
-    const message = messageStart >= 0 ? lines.slice(messageStart + 1).join(" ").trim() : undefined;
-    items.push({
-      kind: "diagnostic",
-      path: location[1],
-      line: Number(location[2]),
-      column: Number(location[3]),
-      label: message || undefined,
-      severity,
-    });
   }
   return items;
 }
@@ -573,15 +549,6 @@ function bridgePresentation(
   if (toolName === "send_command_input") {
     const commandId = typeof args.command_id === "string" ? args.command_id : undefined;
     return { kind: "terminal", title: "Sent command input", subtitle: commandId, input: boundedText(args.input, 2_000), terminalId: stringField(resultText, "terminal_id"), commandId, output: isError ? output : undefined };
-  }
-
-  if (toolName === "get_diagnostics") {
-    const scope = typeof args.path === "string" && args.path.trim() ? args.path.trim() : "workspace";
-    const items = parseDiagnosticsItems(resultText);
-    const errors = items.filter((item) => item.severity === "error").length;
-    const warnings = items.filter((item) => item.severity === "warning").length;
-    const summary = items.length ? `${errors} error${errors === 1 ? "" : "s"} · ${warnings} warning${warnings === 1 ? "" : "s"}` : "No diagnostics";
-    return { kind: "diagnostics", title: `Checked diagnostics · ${scope}`, subtitle: summary, items, input: undefined, output: isError ? output : undefined };
   }
 
   if (toolName === "lsp") {
@@ -1973,6 +1940,9 @@ export class BridgeManager implements vscode.Disposable {
           await this.taskShadow.recordChangeset(execution, result.structuredContent);
         } else if (!result.isError) {
           await this.taskShadow.recordFileNavigationArtifact(execution, toolName, result.structuredContent);
+          if (toolName === "get_diagnostics") {
+            await this.taskShadow.recordDiagnosticsArtifact(execution, args, resultText);
+          }
         }
         // At this layer we know a CallToolResult exists, but not whether the
         // remote client actually received it. Delivery intentionally remains

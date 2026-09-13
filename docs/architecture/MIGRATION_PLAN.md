@@ -482,6 +482,12 @@ Work Sessions 现在把 `file` artifact 与 `changeset` artifact 一起投影成
 
 Work Sessions 使用 `ChatResponseAnchorPart(new vscode.Location(...))` 渲染这些行级位置，因此 search 的 file + line/column + snippet 导航不再依赖旧 Chat Bridge Session。`bridgePresentation()` 的 `search_files` 分支已删除，Bridge/Core 的 `search` presentation kind 与 `match` item kind 也一起删除。剩余 rich compatibility 主要收敛到 `apply_patch` mini diff、terminal、diagnostics/LSP 与 `list_directory`。
 
+### Phase 7.13 — Durable Diagnostics Locations
+
+`get_diagnostics` 的结果现在同样写入 Task artifact：有诊断时记录 `file` artifact 与有界的 `{ path, line, column, label }` locations，label 保留 severity 与 message；无诊断时也记录 `report` artifact，因此一次成功的 clean diagnostics check 不会从 durable Task history 中消失。`total_matching`、backend truncation 与 location-link truncation 分开保留。
+
+Work Sessions 直接复用 Phase 7.12 的 native `Location` anchors 与 file-tree 安全边界。旧 Bridge `parseDiagnosticsItems()` / `kind=diagnostics` presentation、Core `diagnostic` item/severity renderer 和对应 CSS 已删除。LSP 暂时保留旧 rich presentation，因为 `hover` 除 location 外还有内容块，必须先按 operation 拆分再迁；`list_directory` 的 folder semantics 也继续留待单独处理。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

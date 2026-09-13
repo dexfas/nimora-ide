@@ -35,6 +35,57 @@ function positiveInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 ? value : undefined;
 }
 
+function resultField(text: string, field: string): string | undefined {
+  const match = text.match(new RegExp(`^${field}:\\s*(.+)$`, "m"));
+  return match?.[1]?.trim();
+}
+
+function resultInteger(text: string, field: string): number | undefined {
+  const raw = resultField(text, field);
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
+function resultBoolean(text: string, field: string): boolean {
+  return resultField(text, field) === "true";
+}
+
+export function taskDiagnosticsArtifact(args: unknown, resultText: string): TaskFileNavigationArtifactInput | undefined {
+  if (!resultText.includes("=== GET_DIAGNOSTICS BEGIN ===")) return undefined;
+  const input = asRecord(args);
+  const scope = typeof input?.path === "string" && input.path.trim() ? input.path.trim() : "workspace";
+  const blocks = resultText.split(/--- DIAGNOSTIC \d+ ---/).slice(1);
+  const entries = blocks.flatMap(block => {
+    const lines = block.trim().split(/\r?\n/);
+    const location = lines[0]?.match(/^(.+):(\d+):(\d+)$/);
+    if (!location) return [];
+    const line = positiveInteger(Number(location[2]));
+    const column = positiveInteger(Number(location[3]));
+    if (line === undefined) return [];
+    const severity = resultField(block, "severity");
+    const messageStart = lines.findIndex(item => item.startsWith("code:"));
+    const message = messageStart >= 0 ? oneLine(lines.slice(messageStart + 1).join(" "), MAX_SEARCH_LABEL_CHARS) : undefined;
+    const label = [severity ? `[${severity}]` : undefined, message].filter((value): value is string => Boolean(value)).join(" ") || undefined;
+    return [{ path: location[1], line, column, label }];
+  });
+  const files = [...new Set(entries.map(entry => entry.path))];
+  const total = resultInteger(resultText, "total_matching") ?? resultInteger(resultText, "returned") ?? entries.length;
+  const locations = entries.slice(0, MAX_SEARCH_LOCATIONS);
+  return {
+    kind: files.length ? "file" : "report",
+    title: total === 0 ? `No diagnostics · ${scope}` : `Diagnostics · ${scope} · ${total} issue${total === 1 ? "" : "s"}`,
+    metadata: {
+      files,
+      locations,
+      locationCount: total,
+      locationsTruncated: entries.length > locations.length,
+      sourceTool: "get_diagnostics",
+      resultTruncated: resultBoolean(resultText, "truncated"),
+    },
+  };
+}
+
 export function taskFileNavigationArtifact(
   toolName: string,
   structuredContent: unknown,

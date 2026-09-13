@@ -14,7 +14,7 @@ import { ICommandService } from '../../../../../../platform/commands/common/comm
 import { defaultButtonStyles } from '../../../../../../platform/theme/browser/defaultStyles.js';
 
 interface BridgeActivityPresentation {
-	readonly kind: 'files' | 'edit' | 'terminal' | 'diagnostics' | 'lsp' | 'generic';
+	readonly kind: 'files' | 'edit' | 'terminal' | 'lsp' | 'generic';
 	readonly title: string;
 	readonly subtitle?: string;
 	readonly input?: string;
@@ -51,13 +51,12 @@ interface BridgeDiffLinePreview {
 }
 
 interface BridgeActivityItem {
-	readonly kind: 'file' | 'folder' | 'diagnostic' | 'symbol';
+	readonly kind: 'file' | 'folder' | 'symbol';
 	readonly path: string;
 	readonly line?: number;
 	readonly column?: number;
 	readonly label?: string;
 	readonly description?: string;
-	readonly severity?: 'error' | 'warning' | 'information' | 'hint';
 	readonly additions?: number;
 	readonly deletions?: number;
 }
@@ -132,7 +131,6 @@ function activityIcon(activity: BridgeActivity): ThemeIcon {
 		case 'files': return Codicon.files;
 		case 'edit': return Codicon.edit;
 		case 'terminal': return Codicon.terminal;
-		case 'diagnostics': return Codicon.warning;
 		case 'lsp': return Codicon.symbolMethod;
 		default: return Codicon.tools;
 	}
@@ -515,14 +513,12 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		const container = append(parent, $('.shuncode-bridge-tool-items'));
 		for (const item of items.slice(0, 40)) {
 			const row = append(container, $('div.shuncode-bridge-tool-item'));
-			if (item.severity) row.classList.add(`severity-${item.severity}`);
 			row.tabIndex = 0;
 			row.setAttribute('role', 'button');
 			row.setAttribute('title', item.line ? `${item.path}:${item.line}:${item.column ?? 1}` : item.path);
 			const icon = append(row, $('span.shuncode-bridge-tool-item-icon'));
 			const itemIcon = item.kind === 'folder' ? Codicon.folder
-				: item.kind === 'diagnostic' ? (item.severity === 'error' ? Codicon.error : item.severity === 'warning' ? Codicon.warning : Codicon.info)
-					: item.kind === 'symbol' ? Codicon.symbolMethod : Codicon.file;
+				: item.kind === 'symbol' ? Codicon.symbolMethod : Codicon.file;
 			icon.classList.add(...ThemeIcon.asClassNameArray(itemIcon));
 			const labels = append(row, $('.shuncode-bridge-tool-item-labels'));
 			append(labels, $('span.shuncode-bridge-tool-item-primary', undefined, item.label || item.path));

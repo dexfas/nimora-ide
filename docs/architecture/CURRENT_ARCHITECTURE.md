@@ -177,6 +177,8 @@ Phase 7.11 开始迁最后一组 rich tool presentation，但只迁能无损落�
 
 Phase 7.12 补齐了 search 的无损 native 表达：`search_files` Task artifact 除 file set 外，还保存有界的 line/column/snippet locations；Work Sessions 把它们渲染为 `ChatResponseAnchorPart(Location)`。因此 Bridge-only search presentation 与 Core 的 `search`/`match` renderer 已删除。当前 legacy Session 的真正不可替代部分进一步缩小到 apply-patch mini diff、terminal、diagnostics/LSP，以及尚未 artifact 化的 directory exploration。
 
+Phase 7.13 又把 `get_diagnostics` 从 Bridge rich card 迁成 durable Task location/report artifact：诊断 location 复用 Work Sessions 的 native `Location` anchors，clean result 也保留为 report。Bridge/Core 的 diagnostics-specific parser/kind/severity renderer 与 CSS 已删除。LSP 仍保留，因为 hover content 需要独立承接；旧 Session 的剩余不可替代部分现在主要是 apply-patch mini diff、terminal、LSP 和 directory exploration。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

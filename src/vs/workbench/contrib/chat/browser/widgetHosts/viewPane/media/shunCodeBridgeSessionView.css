@@ -200,14 +200,6 @@
 	color: var(--vscode-descriptionForeground);
 }
 
-.shuncode-bridge-tool-item.severity-error .shuncode-bridge-tool-item-icon {
-	color: var(--vscode-errorForeground);
-}
-
-.shuncode-bridge-tool-item.severity-warning .shuncode-bridge-tool-item-icon {
-	color: var(--vscode-editorWarning-foreground);
-}
-
 .shuncode-bridge-tool-item-labels {
 	display: flex;
 	min-width: 0;
