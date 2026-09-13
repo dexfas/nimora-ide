@@ -285,6 +285,8 @@ Phase 5.4.1 已把这条 handoff 变成 Worker Contract 的显式字段：每个
 
 Phase 5.4.2 已实现这条 result-return channel：Worker Contract 增加可选 `submitCapabilityResult`，Web Worker adapter/transport、first-party WorkerSessionManager 和 WebMCP command/page control 已全链路接通。Manager 只接受已观察到的 outstanding `host-requested` call，并要求 callId/name/inputId 一致；页面端已确认 delivery 后同一个 result 再提交会直接返回当前 turn snapshot，不会重复注入。真实 Edge synthetic smoke 已验证 duplicate host-result submission 只产生一次 tool-result message，之后 Worker 仍可继续到最终回答。生产 dispatch ownership 仍未切换。
 
+Phase 5.4.6 已在显式实验 lane 中把 Worker Session 与 Host execution 真正接通：Manager 对 `host-requested` 不再做 observed-style shadow projection，而只提供稳定 executionId；Host Execution Service 使用同一 TaskRuntime 的 strict ledger 与 Broker executor 执行并通过 Manager sink 回传 result。`hostManagedCapabilities` 不存在时行为不变，因此这是可回滚、非默认的 ownership handoff 实验，不是 live provider 默认迁移。
+
 ### 正式 Adapter Layer
 
 WebMCP 应建立明确分层：

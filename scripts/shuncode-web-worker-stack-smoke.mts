@@ -19,6 +19,7 @@ await esbuild.build({
       export { WebWorkerAdapter } from ${JSON.stringify(path.join(root, 'src', 'web-worker-adapter.ts'))};
       export { WorkerSessionManager } from ${JSON.stringify(path.join(root, 'src', 'worker-session-manager.ts'))};
       export { TaskRuntime } from ${JSON.stringify(path.join(root, 'src', 'task-runtime.ts'))};
+      export { HostCapabilityExecutionService } from ${JSON.stringify(path.join(root, 'extensions', 'shuncode', 'src', 'host-capability-execution-service.ts'))};
     `,
     resolveDir: root,
     sourcefile: 'web-worker-stack-entry.ts',
@@ -32,10 +33,12 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { WebMcpCommandTransport, WebWorkerAdapter, WorkerSessionManager, TaskRuntime } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { WebMcpCommandTransport, WebWorkerAdapter, WorkerSessionManager, TaskRuntime, HostCapabilityExecutionService } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
 
 class FakeCommands {
   mode = 'delivered';
+  hostResolved = false;
+  hostResultText = '';
 
   async executeCommand(command, arg) {
     if (command === '_shuncode.webMcp.workerConnect') {
@@ -46,9 +49,35 @@ class FakeCommands {
       };
     }
     if (command === '_shuncode.webMcp.workerSend') {
+      this.hostResolved = false;
       return { inputId: arg.input.inputId, state: 'running', text: '', events: [{ seq: 1, type: 'status', name: 'sent' }] };
     }
     if (command === '_shuncode.webMcp.workerPoll') {
+      if (this.mode === 'host-requested') {
+        return this.hostResolved
+          ? {
+              inputId: arg.inputId,
+              state: 'completed',
+              text: 'HOST_STACK_DONE',
+              events: [
+                { seq: 1, type: 'status', name: 'sent' },
+                { seq: 2, type: 'capability_call', callId: 'host-stack-call', name: 'list_directory', arguments: { path: '.' }, dispatch: 'host-requested' },
+                { seq: 3, type: 'capability_result', callId: 'host-stack-call', name: 'list_directory', text: this.hostResultText, isError: false },
+                { seq: 4, type: 'status', name: 'capability_result_delivered', callId: 'host-stack-call', capability: 'list_directory' },
+                { seq: 5, type: 'assistant_text', text: 'HOST_STACK_DONE' },
+                { seq: 6, type: 'completed', text: 'HOST_STACK_DONE' },
+              ],
+            }
+          : {
+              inputId: arg.inputId,
+              state: 'running',
+              text: '',
+              events: [
+                { seq: 1, type: 'status', name: 'sent' },
+                { seq: 2, type: 'capability_call', callId: 'host-stack-call', name: 'list_directory', arguments: { path: '.' }, dispatch: 'host-requested' },
+              ],
+            };
+      }
       if (this.mode === 'missing-result') {
         return {
           inputId: arg.inputId,
@@ -79,6 +108,11 @@ class FakeCommands {
       };
     }
     if (command === '_shuncode.webMcp.workerHealth') return { status: { enabled: true, composerFound: true, isDeepSeekAuthPage: false } };
+    if (command === '_shuncode.webMcp.workerResolve') {
+      this.hostResolved = true;
+      this.hostResultText = arg.result.text;
+      return { inputId: arg.result.inputId, state: 'running', events: [] };
+    }
     if (command === '_shuncode.webMcp.workerDisconnect') return { disconnected: true };
     if (command === '_shuncode.webMcp.workerInterrupt') return { interrupted: true };
     throw new Error(`Unexpected command: ${command}`);
@@ -121,6 +155,13 @@ try {
     taskBindings: tasks,
     executionProjection: projection,
     newId: () => `web-managed-${++managedId}`,
+  });
+  const brokerCalls = [];
+  const hostExecution = new HostCapabilityExecutionService(tasks, {
+    async invokeDirect(name, args) {
+      brokerCalls.push({ name, args });
+      return { text: 'HOST_BROKER_LIST_OK', isError: false };
+    },
   });
   const descriptor = await manager.register(adapter);
   assert.equal(descriptor.id, 'nimora.web-worker');
@@ -170,9 +211,53 @@ try {
   assert.match(unknownExecution.error, /before a capability result was observed/);
 
   await manager.dispose(unknownSession.managedSessionId);
+
+  commands.mode = 'host-requested';
+  const hostSession = await manager.createSession('nimora.web-worker', {}, task.taskId);
+  const hostIterator = manager.send(hostSession.managedSessionId, { inputId: 'stack-turn-host', prompt: 'host managed capability' })[Symbol.asyncIterator]();
+  let hostCall;
+  for (;;) {
+    const next = await hostIterator.next();
+    assert.equal(next.done, false);
+    if (next.value.type === 'capability_call') {
+      hostCall = next.value;
+      break;
+    }
+  }
+  assert.equal(hostCall.dispatch, 'host-requested');
+  assert.equal(hostCall.name, 'list_directory');
+  assert.match(hostCall.extensions.executionId, new RegExp(`^worker:${hostSession.managedSessionId}:stack-turn-host:1$`));
+  assert.equal(tasks.getTask(task.taskId).executions[hostCall.extensions.executionId], undefined, 'host-requested call must not be shadow-started before strict owner claim');
+  await hostExecution.executeAndDeliver({
+    executionId: hostCall.extensions.executionId,
+    managedSessionId: hostSession.managedSessionId,
+    workerId: hostSession.workerId,
+    taskId: hostSession.taskId,
+    inputId: hostCall.inputId,
+    callId: hostCall.callId,
+    name: hostCall.name,
+    arguments: hostCall.arguments,
+  }, manager);
+  assert.deepEqual(brokerCalls, [{ name: 'list_directory', args: { path: '.' } }]);
+  const hostOwnedExecution = tasks.getTask(task.taskId).executions[hostCall.extensions.executionId];
+  assert.equal(hostOwnedExecution.status, 'succeeded');
+  assert.equal(hostOwnedExecution.deliveryStatus, 'delivered');
+  assert.equal(hostOwnedExecution.resultPayload.text, 'HOST_BROKER_LIST_OK');
+  const hostRemaining = [];
+  for (;;) {
+    const next = await hostIterator.next();
+    if (next.done) break;
+    hostRemaining.push(next.value);
+  }
+  assert.equal(hostRemaining.at(-1).status, 'completed');
+  assert.equal(hostRemaining.find(event => event.type === 'capability_result')?.text, 'HOST_BROKER_LIST_OK');
+  assert.equal(tasks.getTask(task.taskId).executions[hostCall.extensions.executionId].duplicateObservations, 0, 'Manager must not shadow-project host-owned execution after strict owner claim');
+  await manager.dispose(hostSession.managedSessionId);
+
   assert.ok(tasks.getTask(task.taskId).workerSessions[session.managedSessionId].detachedAt);
   assert.ok(tasks.getTask(task.taskId).workerSessions[pendingSession.managedSessionId].detachedAt);
   assert.ok(tasks.getTask(task.taskId).workerSessions[unknownSession.managedSessionId].detachedAt);
+  assert.ok(tasks.getTask(task.taskId).workerSessions[hostSession.managedSessionId].detachedAt);
   await tasks.flush();
 
   const restarted = new TaskRuntime({ storageDirectory: taskDirectory });

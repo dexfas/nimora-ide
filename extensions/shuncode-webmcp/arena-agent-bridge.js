@@ -360,7 +360,7 @@
     }
     const postToolResponseObserved = turn.toolCallCount === 0 || turn.revision > turn.revisionAtLastDelivery;
     const stable = !!turn.text && now - turn.lastChangeAt >= 1200;
-    if (stable && postToolResponseObserved && core.pendingDeliveryCount() === 0 && !site.isResponseStreaming()) {
+    if (stable && postToolResponseObserved && core.pendingDeliveryCount() === 0 && turn.pendingHostCapabilities.size === 0 && !site.isResponseStreaming()) {
       turn.state = 'completed';
       turn.completedAt = now;
       appendWorkerEvent(turn, 'completed', { text: turn.text });
@@ -388,6 +388,8 @@
       revision: 0,
       revisionAtLastDelivery: 0,
       toolCallCount: 0,
+      hostManagedCapabilities: input?.extensions?.hostManagedCapabilities === true,
+      pendingHostCapabilities: new Set(),
       hostResultObserved: new Set(),
       hostResultDelivered: new Set(),
       nextEventSeq: 1,
@@ -458,6 +460,7 @@
       refreshWorkerTurn(activeWorkerTurn);
       activeWorkerTurn.revisionAtLastDelivery = activeWorkerTurn.revision;
       activeWorkerTurn.hostResultDelivered.add(key);
+      activeWorkerTurn.pendingHostCapabilities.delete(key);
       lastDeliveryError = '';
       appendWorkerEvent(activeWorkerTurn, 'status', { name: 'capability_result_delivered', callId, capability: name, source: 'host' });
       armResponseScanBurst();
@@ -500,9 +503,11 @@
     if (core.hasSeen(key)) return false;
     if (lockedLane && laneKey && laneKey !== lockedLane) return false;
     if (!lockedLane && laneKey) lockedLane = laneKey;
+    const workerTurn = activeWorkerTurn?.state === 'running' ? activeWorkerTurn : null;
+    const hostManaged = !!workerTurn?.hostManagedCapabilities;
+    if (hostManaged && !call.id) throw new Error(`Host-managed WebMCP capability requires a stable call id: ${call.name}`);
     core.rememberSeen(key);
     lastHandledCallKey = key;
-    const workerTurn = activeWorkerTurn?.state === 'running' ? activeWorkerTurn : null;
     if (workerTurn) {
       refreshWorkerTurn(workerTurn);
       workerTurn.toolCallCount += 1;
@@ -510,7 +515,12 @@
         callId: call.id || null,
         name: call.name,
         arguments: call.arguments || {},
+        dispatch: hostManaged ? 'host-requested' : 'observed',
       });
+      if (hostManaged) {
+        workerTurn.pendingHostCapabilities.add(`${call.id}\u0000${call.name}`);
+        return true;
+      }
     }
     let result = null;
     let invocationError = null;
@@ -641,7 +651,7 @@
     workerInterrupt,
     workerResolveCapability,
     workerSession: () => ({ sessionId: pageSessionId, site: site.id, origin: location.origin, href: location.href, transport: BINDING_TRANSPORT ? 'binding' : 'http' }),
-    status: () => ({ version: 25, coreVersion: 1, siteAdapter: site.id, transport: BINDING_TRANSPORT ? 'binding' : 'http', pageSessionId, enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: core.seenCount(), pendingDeliveries: core.pendingDeliveryCount(), lockedLane, isDeepSeek: site.isDeepSeek, isDeepSeekAuthPage: site.isDeepSeekAuthPage, deepSeekPacing: site.pacingMode, dedupeMode: 'call-occurrence-v2', workerTurn: activeWorkerTurn ? { inputId: activeWorkerTurn.inputId, state: activeWorkerTurn.state } : null, lastScanAt, lastHandledCallKey, lastDeliveryError }),
+    status: () => ({ version: 25, coreVersion: 1, siteAdapter: site.id, transport: BINDING_TRANSPORT ? 'binding' : 'http', pageSessionId, enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: core.seenCount(), pendingDeliveries: core.pendingDeliveryCount(), pendingHostCapabilities: activeWorkerTurn?.pendingHostCapabilities?.size || 0, lockedLane, isDeepSeek: site.isDeepSeek, isDeepSeekAuthPage: site.isDeepSeekAuthPage, deepSeekPacing: site.pacingMode, dedupeMode: 'call-occurrence-v2', workerTurn: activeWorkerTurn ? { inputId: activeWorkerTurn.inputId, state: activeWorkerTurn.state, hostManagedCapabilities: activeWorkerTurn.hostManagedCapabilities === true } : null, lastScanAt, lastHandledCallKey, lastDeliveryError }),
     stop: () => {
       enabled = false;
       observer.disconnect();

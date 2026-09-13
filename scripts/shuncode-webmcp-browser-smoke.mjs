@@ -284,6 +284,39 @@ try {
   assert.equal(toolDone.text, 'TOOL_WORKER_FINAL');
   assert.ok(!toolDone.events.some(event => event.type === 'assistant_text' && event.text.includes('[SHUNCODE_TOOL]')));
 
+  const hostManagedStart = await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerSend({
+    inputId: 'worker-host-managed-1',
+    prompt: 'Request read_files and wait for the host result.',
+    extensions: { hostManagedCapabilities: true },
+  }));
+  assert.equal(hostManagedStart.state, 'running');
+  await workerPage.evaluate(() => {
+    const response = document.createElement('div');
+    response.className = 'ds-assistant-message-main-content';
+    response.innerText = `[SHUNCODE_TOOL]\nid=host-managed-call-1\nname=read_files\narg.files.0.path=README.md\n[/SHUNCODE_TOOL]`;
+    document.getElementById('messages').appendChild(response);
+  });
+  await workerPage.waitForFunction(() => window.__shuncodeWebMcp.status().pendingHostCapabilities === 1, null, { timeout: 10000 });
+  const hostManagedPending = await workerPage.evaluate(() => window.__shuncodeWebMcp.workerPoll('worker-host-managed-1'));
+  const hostManagedCall = hostManagedPending.events.find(event => event.type === 'capability_call' && event.callId === 'host-managed-call-1');
+  assert.equal(hostManagedCall.dispatch, 'host-requested');
+  assert.equal(hostManagedPending.events.some(event => event.type === 'capability_result' && event.callId === 'host-managed-call-1'), false);
+  assert.equal(workerInvokeCount, 1, 'host-managed capability must not call the page-local invoke binding');
+  await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerResolveCapability({
+    inputId: 'worker-host-managed-1', callId: 'host-managed-call-1', name: 'read_files', text: 'HOST_MANAGED_READ_OK', isError: false,
+  }));
+  assert.equal(await workerPage.evaluate(() => window.__shuncodeWebMcp.status().pendingHostCapabilities), 0);
+  await workerPage.waitForFunction(() => window.__submittedMessages.some(text => text.includes('[SHUNCODE_TOOL_RESULT]') && text.includes('HOST_MANAGED_READ_OK')), null, { timeout: 10000 });
+  await workerPage.evaluate(() => {
+    const response = document.createElement('div');
+    response.className = 'ds-assistant-message-main-content';
+    response.innerText = 'HOST_MANAGED_WORKER_FINAL';
+    document.getElementById('messages').appendChild(response);
+  });
+  const hostManagedDone = await pollWorkerUntil(workerPage, 'worker-host-managed-1', 'completed');
+  assert.equal(hostManagedDone.text, 'HOST_MANAGED_WORKER_FINAL');
+  assert.equal(workerInvokeCount, 1);
+
   const hostResultStart = await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerSend({ inputId: 'worker-host-result-1', prompt: 'Wait for a host-managed capability result, then continue.' }));
   assert.equal(hostResultStart.state, 'running');
   const hostResolveInput = { inputId: 'worker-host-result-1', callId: 'host-call-1', name: 'read_files', text: 'HOST_RESULT_OK', isError: false };
@@ -324,7 +357,7 @@ try {
   assert.ok(cancelled.events.some(event => event.type === 'cancelled'));
   await workerContext.close();
 
-  console.log('[smoke] WebMCP v25 synthetic DeepSeek HTTP+binding + worker plain/tool/host-result/interrupt lifecycle ok');
+  console.log('[smoke] WebMCP v25 synthetic DeepSeek HTTP+binding + worker plain/tool/host-managed/host-result/interrupt lifecycle ok');
 } finally {
   await browser.close();
 }

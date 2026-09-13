@@ -318,6 +318,7 @@ export class WorkerSessionManager {
       executionId: string;
       callId?: string;
       name: string;
+      hostOwned: boolean;
       resultSeen: boolean;
       delivered: boolean;
     }> = [];
@@ -331,16 +332,24 @@ export class WorkerSessionManager {
       if (event.type === "capability_call") {
         occurrence += 1;
         const executionId = `worker:${record.managedSessionId}:${input.inputId}:${occurrence}`;
-        executions.push({ executionId, callId: event.callId, name: event.name, resultSeen: false, delivered: false });
-        await projection.beginWorkerExecution(taskId, {
-          executionId,
-          managedSessionId: record.managedSessionId,
-          workerId: record.workerId,
-          inputId: input.inputId,
-          callId: event.callId,
-          toolName: event.name,
-          arguments: event.arguments,
-        });
+        const hostOwned = event.dispatch === "host-requested";
+        executions.push({ executionId, callId: event.callId, name: event.name, hostOwned, resultSeen: false, delivered: false });
+        if (!hostOwned) {
+          await projection.beginWorkerExecution(taskId, {
+            executionId,
+            managedSessionId: record.managedSessionId,
+            workerId: record.workerId,
+            inputId: input.inputId,
+            callId: event.callId,
+            toolName: event.name,
+            arguments: event.arguments,
+          });
+        }
+        yield {
+          ...event,
+          extensions: { ...event.extensions, executionId },
+        };
+        continue;
       } else if (event.type === "capability_result") {
         let target = findResultTarget(event);
         if (!target) {
@@ -349,6 +358,7 @@ export class WorkerSessionManager {
             executionId: `worker:${record.managedSessionId}:${input.inputId}:${occurrence}`,
             callId: event.callId,
             name: event.name,
+            hostOwned: false,
             resultSeen: false,
             delivered: false,
           };
@@ -363,12 +373,14 @@ export class WorkerSessionManager {
           });
         }
         target.resultSeen = true;
-        await projection.completeWorkerExecution(taskId, target.executionId, {
-          status: event.isError ? "failed" : "succeeded",
-          durationMs: event.durationMs,
-          error: event.isError ? event.text : undefined,
-          resultSummary: event.text,
-        });
+        if (!target.hostOwned) {
+          await projection.completeWorkerExecution(taskId, target.executionId, {
+            status: event.isError ? "failed" : "succeeded",
+            durationMs: event.durationMs,
+            error: event.isError ? event.text : undefined,
+            resultSummary: event.text,
+          });
+        }
       } else if (event.type === "provider_event" && event.name === "capability_result_delivered") {
         const data = event.data && typeof event.data === "object" && !Array.isArray(event.data)
           ? event.data as Record<string, unknown>
@@ -378,16 +390,18 @@ export class WorkerSessionManager {
         const target = findDeliveryTarget(callId, name);
         if (target) {
           target.delivered = true;
-          await projection.markWorkerExecutionDelivered(taskId, target.executionId);
+          if (!target.hostOwned) await projection.markWorkerExecutionDelivered(taskId, target.executionId);
         }
       } else if (event.type === "terminal") {
         for (const target of executions) {
           if (target.resultSeen) continue;
           target.resultSeen = true;
-          await projection.completeWorkerExecution(taskId, target.executionId, {
-            status: "unknown",
-            error: `Worker turn ended with ${event.status} before a capability result was observed.`,
-          });
+          if (!target.hostOwned) {
+            await projection.completeWorkerExecution(taskId, target.executionId, {
+              status: "unknown",
+              error: `Worker turn ended with ${event.status} before a capability result was observed.`,
+            });
+          }
         }
       }
       yield event;

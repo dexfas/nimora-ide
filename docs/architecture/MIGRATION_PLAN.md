@@ -289,6 +289,8 @@ Phase 5.4.4 已把 Host execution claim/result/delivery 接到 TaskRuntime 的�
 
 Phase 5.4.5 已把真实 Extension Host `IdeToolBroker` 包装为 `HostCapabilityExecutor`，并把 Coordinator + Task-backed durable store + metadata policy authorizer 组合成 dormant `HostCapabilityExecutionService`。该 service 在第一方 Extension activate 时完成对象图 wiring，但**没有订阅 WorkerEvent、没有自动 dispatch caller**。Broker executor 只处理 `src/ide-tool-definitions.ts` 明确归属 Extension Host 的能力；Runtime/MCP-owned `read_files/search_files/apply_patch` 不会误路由进 Broker。默认 authorizer 只自动放行 `approval=none`，`session/task-grant/always` 没有显式 grant resolver 时 fail-closed，因此 `run_command/send_command_input` 当前不会因 service 存在而获得执行权限。
 
+Phase 5.4.6 已建立**显式实验**的 host-requested end-to-end lane。只有 `WorkerInput.extensions.hostManagedCapabilities === true` 时，WebMCP page agent 才停止 page-local `invokeTool`，记录 pending host capability 并发出 `dispatch=host-requested`；默认输入继续 `observed`。`WorkerSessionManager` 为 host-requested call 分配 Nimora executionId 并附在 event extensions，但不再 shadow-start/finish/deliver 这条 execution；第一方 `_shuncode.worker.web.run` 仅在同一实验 flag 下把该 event 交给 `HostCapabilityExecutionService`，再通过 Manager result sink 回填网页。真实 Edge synthetic smoke 已证明实验 lane 不调用 page-local tool binding；stack smoke 已证明 `page/transport → Manager → strict Task claim → Host service → Broker → result-return → final Worker terminal` 闭环，并且 Host-owned execution 只由 strict owner 写 ledger。**live DeepSeek/default WebMCP 仍未切换 ownership。**
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

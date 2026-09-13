@@ -465,8 +465,28 @@ export function activate(context: vscode.ExtensionContext): void {
       const workerInput = input.input as Partial<WorkerInput>;
       if (typeof workerInput.inputId !== "string" || !workerInput.inputId) throw new Error("Web worker inputId is required.");
       if (typeof workerInput.prompt !== "string" || !workerInput.prompt.trim()) throw new Error("Web worker prompt is required.");
+      const hostManagedCapabilities = workerInput.extensions?.hostManagedCapabilities === true;
       const events = [];
-      for await (const event of webWorkerSessions.send(input.managedSessionId, workerInput as WorkerInput)) events.push(event);
+      for await (const event of webWorkerSessions.send(input.managedSessionId, workerInput as WorkerInput)) {
+        events.push(event);
+        if (!hostManagedCapabilities || event.type !== "capability_call" || event.dispatch !== "host-requested") continue;
+        const executionId = typeof event.extensions?.executionId === "string" ? event.extensions.executionId : "";
+        if (!executionId) throw new Error("Host-requested Web worker capability is missing Nimora executionId.");
+        if (!event.callId) throw new Error("Host-requested Web worker capability is missing callId.");
+        const session = webWorkerSessions.getSession(input.managedSessionId);
+        if (!session) throw new Error("Host-managed Web worker session disappeared during execution.");
+        if (!session.taskId) throw new Error("Host-managed Web worker execution requires a bound Task.");
+        await hostCapabilityExecution.executeAndDeliver({
+          executionId,
+          managedSessionId: session.managedSessionId,
+          workerId: session.workerId,
+          taskId: session.taskId,
+          inputId: event.inputId,
+          callId: event.callId,
+          name: event.name,
+          arguments: event.arguments,
+        }, webWorkerSessions);
+      }
       return { events, session: webWorkerSessions.getSession(input.managedSessionId) };
     }),
     vscode.commands.registerCommand("_shuncode.worker.web.interrupt", async (managedSessionId: unknown) => {
