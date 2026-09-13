@@ -159,6 +159,8 @@ Phase 7.2 已建立 UI-independent Task Center read model：`src/task-center-pro
 
 `TaskRuntime` 现在还提供 live-state change notification：event 应用到 live snapshot 后通知 cloned snapshot；listener 失败不会反向破坏 Task commit。strict owner write 如果 persistence 失败，会在 apply 前终止，因此没有 live-state change，也没有 notification；普通 fail-open shadow write 仍可能在 persistence 失败时更新内存 projection 并通知。extension 借此刷新 Work Sessions list。命令 `shuncode.taskCenter.open` 复用原生 `workbench.action.chat.history`。旧 Core Bridge Session View 尚未删除，因此当前是“新 native Work Sessions + 旧 Bridge compatibility projection”并存阶段，不应描述成 Phase 7 UI migration 已全部完成。
 
+Phase 7.4 已在两个旧 Bridge surface 增加显式 Work Sessions handoff：Chat 内的 Bridge Session footer 与 AI Customization 中的 Bridge 配置/诊断页都可直接执行 `shuncode.taskCenter.open`。Bridge Session 文案同时明确 Task progress 属于 Work Sessions，Bridge 页面保留的是 output-only compatibility、连接状态和尚未迁出的 rich tool presentation。`shuncode.bridge.openSession` 目前仍保留，等待 generic Artifact/diff/terminal surface 完成后再移除。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

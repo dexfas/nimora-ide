@@ -133,6 +133,7 @@ const BRIDGE_CLEAR_ACTIVITY_LOG = 'shuncode.bridge.clearActivityLog';
 const BRIDGE_OPEN_RESOURCE = 'shuncode.bridge.openResource';
 const BRIDGE_OPEN_DIFF = 'shuncode.bridge.openDiff';
 const BRIDGE_OPEN_TERMINAL = 'shuncode.bridge.openTerminal';
+const TASK_CENTER_OPEN = 'shuncode.taskCenter.open';
 
 function formatDuration(durationMs: number | undefined): string {
 	if (durationMs === undefined) {
@@ -194,6 +195,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 	private readonly startStopButton: Button;
 	private readonly healthButton: Button;
 	private readonly clearLogButton: Button;
+	private readonly workSessionsButton: Button;
 	private readonly collapseButton: Button;
 	private visible = false;
 	private refreshing = false;
@@ -257,6 +259,13 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		this.healthButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
 		this.healthButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-health-button');
 		this._register(this.healthButton.onDidClick(() => void this.checkHealth()));
+		this.workSessionsButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
+		this.workSessionsButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-work-sessions-button');
+		this.workSessionsButton.label = `$(${Codicon.tasklist.id}) ${localize('shuncodeBridgeSession.workSessionsShort', "Work Sessions")}`;
+		const workSessionsTitle = localize('shuncodeBridgeSession.workSessions', "Open Task-owned Work Sessions");
+		this.workSessionsButton.setTitle(workSessionsTitle);
+		this.workSessionsButton.element.setAttribute('aria-label', workSessionsTitle);
+		this._register(this.workSessionsButton.onDidClick(() => void this.commandService.executeCommand(TASK_CENTER_OPEN)));
 		this.clearLogButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
 		this.clearLogButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-clear-button');
 		this._register(this.clearLogButton.onDidClick(() => void this.clearActivityLog()));
@@ -759,8 +768,8 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		}
 		this.footerMeta.textContent = pieces.join(' · ');
 		this.footerHint.textContent = status.connected
-			? localize('shuncodeBridgeSession.outputOnlyHint', "Bridge mode is output-only in ShunCode. Continue the conversation in the external client.")
-			: localize('shuncodeBridgeSession.connectHint', "Start the Bridge here, then connect the configured MCP URL from the external client.");
+			? localize('shuncodeBridgeSession.outputOnlyHint', "Task progress is tracked in Work Sessions. Bridge remains output-only here; continue the conversation in the external client.")
+			: localize('shuncodeBridgeSession.connectHint', "Start the Bridge here, then connect the configured MCP URL from the external client. Task progress appears in Work Sessions.");
 	}
 
 	private appendStat(label: string, value: string): void {

@@ -102,6 +102,7 @@ const BRIDGE_CHECK_TUNNEL = 'shuncode.bridge.checkTunnel';
 const BRIDGE_INSTALL_CLOUDFLARED = 'shuncode.bridge.installCloudflared';
 const BRIDGE_ROTATE_ENDPOINT = 'shuncode.bridge.rotateEndpoint';
 const BRIDGE_OPEN_SESSION = 'shuncode.bridge.openSession';
+const TASK_CENTER_OPEN = 'shuncode.taskCenter.open';
 const BRIDGE_PERSISTENT_MODE = 'shuncode.bridge.persistentMode';
 const BRIDGE_ACCESS_GET_STATUS = 'shuncode.bridge.access.getStatus';
 const BRIDGE_LICENSE_SIGN_IN = 'shuncode.bridge.license.signIn';
@@ -606,6 +607,9 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 		const openSessionButton = this._register(new Button(diagnosticControls, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
 		openSessionButton.label = `$(${Codicon.openPreview.id}) ${localizeBridge('shuncodeBridge.openSession', "Open Bridge Session")}`;
 		this._register(openSessionButton.onDidClick(() => this.commandService.executeCommand(BRIDGE_OPEN_SESSION)));
+		const openWorkSessionsButton = this._register(new Button(diagnosticControls, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
+		openWorkSessionsButton.label = `$(${Codicon.tasklist.id}) ${localizeBridge('shuncodeBridge.openWorkSessions', "Open Work Sessions")}`;
+		this._register(openWorkSessionsButton.onDidClick(() => this.commandService.executeCommand(TASK_CENTER_OPEN)));
 
 		const securitySection = dom.append(advancedBody, dom.$('.shuncode-bridge-advanced-section.shuncode-bridge-security-section'));
 		dom.append(securitySection, dom.$('h4', undefined, localizeBridge('shuncodeBridge.securityAccess', "Security & access")));

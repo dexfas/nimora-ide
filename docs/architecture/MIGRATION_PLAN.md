@@ -428,6 +428,12 @@ Task Center read model 已开始接入现有 Sessions/Agents Window，而不是�
 
 命令 `shuncode.taskCenter.open` 复用现有 `workbench.action.chat.history` 入口打开原生 Sessions picker；旧 Bridge Session View 仍保留作为兼容 projection，尚未删除。`test-shuncode-task-center-sessions` 保护 native provider wiring、只读 content、Task-owned presentation、execution/result-delivery 分离和 package/proposal wiring；`test-shuncode-task-runtime` 额外保护 change notification 的 clone、listener fail-open 与 strict-write no-notify contract。
 
+### Phase 7.4 — Bridge → Work Sessions Handoff
+
+旧 Bridge Session View 暂时不能直接删除：它仍承载 rich file/diff/terminal tool cards、Bridge start/stop/health 等尚未迁到 generic Artifact/Connections surface 的能力。但它不应继续看起来像最终 Task Center。因此 Bridge Session footer 与 Bridge 配置/诊断页现在都提供 `Work Sessions` 入口，统一执行 `shuncode.taskCenter.open`；Bridge footer copy 明确说明 Task progress 在 Work Sessions，当前 Bridge view 只是 output-only compatibility/connection surface。
+
+这一步只迁入口与产品语义，不改变 `shuncode.bridge.openSession`、Bridge execution 或 tunnel contract；旧 Bridge Session 入口继续保留，直到 rich artifact/terminal presentation 有替代方案后再切读/删除。`test-shuncode-work-sessions-handoff` 保护两个 compatibility surface 的 handoff wiring，并同时保护旧 Bridge Session 仍可访问。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。
