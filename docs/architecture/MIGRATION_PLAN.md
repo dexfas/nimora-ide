@@ -257,7 +257,7 @@ Native Chat 仍可直连旧 Runtime 直到 adapter parity 完成。
 
 ## 7. Phase 5 — WebMCP Core + Site Adapters
 
-**Status: In progress — Phase 5.1 canonical v25 Core/Site/page-agent extraction + HTTP/binding parity and Phase 5.2 real WebWorkerTransport/WorkerSession binding landed (2026-09-13); execution-ledger unification, dynamic discovery, live DeepSeek release gate and upper orchestrator selection remain**
+**Status: In progress — Phase 5.1 canonical v25 Core/Site/page-agent extraction + HTTP/binding parity, Phase 5.2 real WebWorkerTransport/WorkerSession binding, and Phase 5.3 Worker capability-event → Task execution projection landed (2026-09-13); execution ownership transfer, dynamic discovery, live DeepSeek release gate and upper orchestrator selection remain**
 
 ### 目标
 
@@ -269,13 +269,15 @@ Native Chat 仍可直连旧 Runtime 直到 adapter parity 完成。
 - DeepSeekAdapter 首先迁移已有 v24 兼容；✅ auth/composer/line protocol prompt/send policy 已进入 Site Adapter，page agent 升级为 v25
 - GenericAdapter；✅ generic composer/assistant selection + JSON transport prompt 已进入 Site Adapter
 - Arena/Claude/Gemini 后续按真实测试增加；
-- page token/session/ledger 与 Gateway WorkerSession 绑定；🟡 page token 继续封装在 WebMCP extension 内，page session 已成为 `WorkerSessionManager` adapter session 并可 attach/detach/replay Task journal；WebMCP tool execution ledger 尚未由 Task Execution Service 接管
+- page token/session/ledger 与 Gateway WorkerSession 绑定；🟡 page token 继续封装在 WebMCP extension 内，page session 已成为 `WorkerSessionManager` adapter session 并可 attach/detach/replay Task journal；Worker capability call/result/delivery 已 shadow-project 到 Task execution ledger，但 page Core 仍是当前 dispatch/dedupe/delivery-retry owner
 - 固定端口改为可配置/动态 discovery；🟡 env override 已落地，dynamic discovery/handshake 待完成
 - auth page / streaming / delivery contract tests。🟡 auth/parser/delivery/dedupe + worker plain/tool/interrupt synthetic browser 已覆盖，live provider streaming/release gate 待完成
 
 Phase 5.1 同时让 v25 page agent 支持两种 transport：Integrated Browser 使用 localhost HTTP；Gateway-managed Edge 使用 Playwright binding。Extension 启动 Gateway 时传入 canonical Core/Site/Agent 源码路径，因此正常产品路径不再由 `generic-chat-agent.js` 维护第二份逻辑；legacy generic agent 暂时只作为 standalone Gateway fallback。
 
 Phase 5.2 在同一 v25 page runtime 上增加 `workerSession / workerSend / workerPoll / workerInterrupt` control surface。WebMCP Extension 将其封装为内部 command contract；第一方扩展中的 `WebMcpCommandTransport` 只消费这些 command，不读取 DOM。`WebWorkerAdapter` 已注册进 `WorkerSessionManager`，真实 page session id 作为 adapter-native session identity，managed session 可严格写入现有 TaskRuntime 的 `TaskWorkerAttached/Detached` journal。当前内部 control commands 已能 create/run/health/interrupt/dispose Web worker session，但上层 orchestrator 尚未自动选择/调度 Web worker。
+
+Phase 5.3 在 `WorkerSessionManager.send()` 增加 provider-neutral execution projection。绑定 Task 的 Worker 发出 `capability_call` 时生成 Nimora execution id 并写入 `TaskExecutionRequested/Started`；`capability_result` 推进到 `succeeded|failed + result prepared`；WebMCP 的 `capability_result_delivered` provider event 再推进到 `TaskExecutionDelivered`。如果 turn 终止前没有看到 capability result，execution 以 `unknown + pending` 收口。每条 Worker-origin execution 结构化保存 `managedSessionId / workerId / inputId / callId`，不要求调用方解析 execution id。**这仍是 shadow projection，不代表 Task Execution Service 已接管 WebMCP dispatch/dedupe。**
 
 ### 风险
 
@@ -291,7 +293,7 @@ web model → request → Nimora tool → result delivery → final model respon
 
 必须至少覆盖 nested args 和一次 side-effect-safe failure simulation。
 
-当前自动验证已经覆盖：Core JSON/DeepSeek line parser、nested args/heredoc、incomplete-stream guard、bounded JSON repair、dedupe replay、pending-delivery state；真实 Edge synthetic DeepSeek 页面同时覆盖 HTTP 与 binding transport、plain worker completion、tool call/result/delivery 后继续回答、interrupt/cancel 与 repeated-scan no-reexecution；command transport smoke 覆盖 event cursor/terminal/health/disconnect；完整 stack smoke 覆盖 `WebMcpCommandTransport → WebWorkerAdapter → WorkerSessionManager → TaskRuntime attach/detach/restart replay`；真实 Gateway process + managed Edge 验证 canonical v25 source 通过 binding transport 注入；隔离源码 Extension Host 已实际加载第一方 Web Worker 注册与 0.4.12 WebMCP control bridge。**这些 synthetic/integration smoke 不等于 live DeepSeek service release gate**。
+当前自动验证已经覆盖：Core JSON/DeepSeek line parser、nested args/heredoc、incomplete-stream guard、bounded JSON repair、dedupe replay、pending-delivery state；真实 Edge synthetic DeepSeek 页面同时覆盖 HTTP 与 binding transport、plain worker completion、tool call/result/delivery 后继续回答、interrupt/cancel 与 repeated-scan no-reexecution；command transport smoke 覆盖 event cursor/terminal/health/disconnect；完整 stack smoke 覆盖 `WebMcpCommandTransport → WebWorkerAdapter → WorkerSessionManager → TaskRuntime` 的 attach/detach、`succeeded/delivered`、`succeeded/pending`、`unknown/pending` execution projection 与 restart replay；真实 Gateway process + managed Edge 验证 canonical v25 source 通过 binding transport 注入；隔离源码 Extension Host 已实际加载第一方 Web Worker 注册与 0.4.12 WebMCP control bridge。**这些 synthetic/integration smoke 不等于 live DeepSeek service release gate**。
 
 ### 回滚
 

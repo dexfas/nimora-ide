@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("ShunCode");
   const ideToolBroker = new IdeToolBroker();
   const taskShadow = new TaskShadowRecorder(context, output);
-  const webWorkerSessions = new WorkerSessionManager({ taskBindings: taskShadow });
+  const webWorkerSessions = new WorkerSessionManager({ taskBindings: taskShadow, executionProjection: taskShadow });
   const webWorkerTransport = new WebMcpCommandTransport({
     executeCommand: <T>(command: string, ...args: unknown[]) => vscode.commands.executeCommand<T>(command, ...args),
   });

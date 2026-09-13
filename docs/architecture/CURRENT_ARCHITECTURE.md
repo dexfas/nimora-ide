@@ -207,6 +207,8 @@ Phase 5.2 在 page agent 上新增 Worker control surface：`workerSession()` �
 
 WebMCP Extension 把上述 surface 封装为 `_shuncode.webMcp.worker*` 内部 command contract，并始终校验 `pageId + pageSessionId`，防止页面刷新/换页后继续控制陈旧 session。第一方扩展通过 `WebMcpCommandTransport` 消费 command contract，再进入 `WebWorkerAdapter → WorkerSessionManager`；page session id 是 adapter-native session id，managed session id 与 Task binding 仍由 `WorkerSessionManager/TaskRuntime` 拥有。WebMCP page token 不向 Worker/Task 层暴露。
 
+Phase 5.3 又让 `WorkerSessionManager` 对绑定 Task 的 capability events 做通用 execution projection：call/result/delivery ack 会进入 TaskRuntime，Worker-origin metadata 会保存 managed session / worker / input / provider call identity。当前这是 durable shadow ledger；WebMCP Core 仍然拥有实际 page execution occurrence dedupe 与 delivery retry，因此尚未发生执行 ownership 切换。
+
 ### Gateway
 
 `tools/webmcp-gateway/server.mjs` 默认监听 `127.0.0.1:48321`，同时是：

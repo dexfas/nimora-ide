@@ -30,9 +30,29 @@ export interface WorkerTaskBindingStore {
   detachWorkerSession(taskId: string, managedSessionId: string): Promise<void>;
 }
 
+export interface WorkerExecutionProjectionStore {
+  beginWorkerExecution(taskId: string, input: {
+    executionId: string;
+    managedSessionId: string;
+    workerId: string;
+    inputId: string;
+    callId?: string;
+    toolName: string;
+    arguments?: unknown;
+  }): Promise<void>;
+  completeWorkerExecution(taskId: string, executionId: string, input: {
+    status: "succeeded" | "failed" | "unknown";
+    durationMs?: number;
+    error?: string;
+    resultSummary?: string;
+  }): Promise<void>;
+  markWorkerExecutionDelivered(taskId: string, executionId: string): Promise<void>;
+}
+
 export interface WorkerSessionManagerOptions {
   newId?: () => string;
   taskBindings?: WorkerTaskBindingStore;
+  executionProjection?: WorkerExecutionProjectionStore;
 }
 
 export interface ManagedWorkerSession {
@@ -213,7 +233,9 @@ export class WorkerSessionManager {
 
   send<TInput extends WorkerInput>(managedSessionId: string, input: TInput): AsyncIterable<WorkerEvent> {
     const record = this.requireSession(managedSessionId);
-    return this.requireWorker(record.workerId).adapter.send(record.handle, input);
+    const events = this.requireWorker(record.workerId).adapter.send(record.handle, input);
+    if (!record.taskId || !this.options.executionProjection) return events;
+    return this.projectExecutionEvents(record, input, events);
   }
 
   async interrupt(managedSessionId: string): Promise<void> {
@@ -261,6 +283,99 @@ export class WorkerSessionManager {
 
   private adapterSessionKey(workerId: string, adapterSessionId: string): string {
     return `${workerId}\u0000${adapterSessionId}`;
+  }
+
+  private async *projectExecutionEvents(
+    record: ManagedWorkerSessionRecord,
+    input: WorkerInput,
+    events: AsyncIterable<WorkerEvent>,
+  ): AsyncIterable<WorkerEvent> {
+    const taskId = record.taskId;
+    const projection = this.options.executionProjection;
+    if (!taskId || !projection) {
+      yield* events;
+      return;
+    }
+
+    let occurrence = 0;
+    const executions: Array<{
+      executionId: string;
+      callId?: string;
+      name: string;
+      resultSeen: boolean;
+      delivered: boolean;
+    }> = [];
+
+    const findResultTarget = (event: Extract<WorkerEvent, { type: "capability_result" }>) =>
+      executions.find(item => !item.resultSeen && (event.callId ? item.callId === event.callId : item.name === event.name));
+    const findDeliveryTarget = (callId: string | undefined, name: string | undefined) =>
+      executions.find(item => item.resultSeen && !item.delivered && (callId ? item.callId === callId : !!name && item.name === name));
+
+    for await (const event of events) {
+      if (event.type === "capability_call") {
+        occurrence += 1;
+        const executionId = `worker:${record.managedSessionId}:${input.inputId}:${occurrence}`;
+        executions.push({ executionId, callId: event.callId, name: event.name, resultSeen: false, delivered: false });
+        await projection.beginWorkerExecution(taskId, {
+          executionId,
+          managedSessionId: record.managedSessionId,
+          workerId: record.workerId,
+          inputId: input.inputId,
+          callId: event.callId,
+          toolName: event.name,
+          arguments: event.arguments,
+        });
+      } else if (event.type === "capability_result") {
+        let target = findResultTarget(event);
+        if (!target) {
+          occurrence += 1;
+          target = {
+            executionId: `worker:${record.managedSessionId}:${input.inputId}:${occurrence}`,
+            callId: event.callId,
+            name: event.name,
+            resultSeen: false,
+            delivered: false,
+          };
+          executions.push(target);
+          await projection.beginWorkerExecution(taskId, {
+            executionId: target.executionId,
+            managedSessionId: record.managedSessionId,
+            workerId: record.workerId,
+            inputId: input.inputId,
+            callId: event.callId,
+            toolName: event.name,
+          });
+        }
+        target.resultSeen = true;
+        await projection.completeWorkerExecution(taskId, target.executionId, {
+          status: event.isError ? "failed" : "succeeded",
+          durationMs: event.durationMs,
+          error: event.isError ? event.text : undefined,
+          resultSummary: event.text,
+        });
+      } else if (event.type === "provider_event" && event.name === "capability_result_delivered") {
+        const data = event.data && typeof event.data === "object" && !Array.isArray(event.data)
+          ? event.data as Record<string, unknown>
+          : {};
+        const callId = typeof data.callId === "string" && data.callId ? data.callId : undefined;
+        const name = typeof data.capability === "string" && data.capability ? data.capability : undefined;
+        const target = findDeliveryTarget(callId, name);
+        if (target) {
+          target.delivered = true;
+          await projection.markWorkerExecutionDelivered(taskId, target.executionId);
+        }
+      } else if (event.type === "terminal") {
+        for (const target of executions) {
+          if (target.resultSeen) continue;
+          target.resultSeen = true;
+          await projection.completeWorkerExecution(taskId, target.executionId, {
+            status: "unknown",
+            error: `Worker turn ended with ${event.status} before a capability result was observed.`,
+          });
+        }
+      }
+      yield event;
+    }
   }
 
   private newId(): string {

@@ -115,7 +115,9 @@ TaskSnapshot.workerSessions
 
 每条引用保存 `managedSessionId / workerId / adapterSessionId / model / attachedAt / detachedAt`。同一 managed id 不能在 replay/lifecycle 中悄悄变成另一个 Worker 或 provider-native session；已经 detached 的同一身份可以被显式 reattach，用于 WorkerSessionManager 的绑定回滚或恢复。
 
-当前 Bridge execution identity 使用 MCP `sessionId + requestId`。这足以建立第一版 execution ledger，但不是最终跨 transport/tool-call identity；Worker Contract / Execution Service 后续需要提供更高层 stable invocation id。
+当前 Bridge execution identity 使用 MCP `sessionId + requestId`。Worker 路径在 Phase 5.3 增加了另一套 Nimora-owned identity：`WorkerSessionManager` 按 managed session + Worker input 内 capability occurrence 生成 execution id，provider/model `callId` 只作为 origin metadata/配对线索，不作为全局主键。Worker-origin execution 结构化保存 `managedSessionId / workerId / inputId / callId`。
+
+Worker capability projection 当前遵循：`capability_call → requested/executing`，`capability_result → succeeded|failed + result prepared(pending)`，显式 delivery ack → delivered；若 terminal 到达但没有 capability result，则写 `unknown/pending`。这已经提供跨 Worker 的 durable execution audit/replay，但仍是 shadow ownership：WebMCP page Core 继续负责真正 dispatch/dedupe/retry，后续 Execution Service 接管必须有明确 ownership handoff。
 
 ## 5. Context Engine
 

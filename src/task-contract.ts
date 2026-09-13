@@ -52,6 +52,13 @@ export interface TaskExecution {
   capabilityId?: string;
   risk?: string;
   argumentsDigest?: string;
+  origin?: {
+    kind: "worker";
+    managedSessionId: string;
+    workerId: string;
+    inputId: string;
+    callId?: string;
+  };
   status: TaskExecutionStatus;
   deliveryStatus: TaskDeliveryStatus;
   requestedAt: string;

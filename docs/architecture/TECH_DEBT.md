@@ -12,7 +12,7 @@
 | 优先级 | 债务 | 事实依据 | 风险 | 处理方向 |
 | --- | --- | --- | --- | --- |
 | P0 | Personal Edge 使用开发 pairing token | MV3/Gateway hard-coded local-development token | 发布环境本地恶意进程冒充/劫持 | per-install/session pairing secret + origin binding |
-| P0 | execution ledger 尚未全链路统一 | Phase 5.2 已让 WebMCP capability call/result 进入 Worker event stream，page session 也已绑定 Task WorkerSession；但 page Core 仍拥有 execution/delivery ledger，尚未自动投影为 Task Execution Service record | side-effect 重放/状态不一致 | 让 Task Execution Service 接管 dispatch/dedupe；把 Worker capability events 与 execution id/ack 绑定；继续保留 metadata-driven retry |
+| P0 | execution ownership 尚未全链路统一 | Phase 5.3 已把 Worker capability call/result/delivery shadow-project 成 durable Task execution record，并保留 Worker origin；但 WebMCP page Core 仍拥有实际 dispatch/dedupe/delivery retry，TaskRuntime 目前不是执行 owner | 双 owner 迁移期若处理错误可能造成 side-effect 重放/状态漂移 | 设计显式 dispatch ownership handoff；Task Execution Service 接管前继续保留 page at-most-once ledger，不做 big-bang 删除 |
 | P1 | 两套 Agent runtime 无统一 domain | Core AgentHost + first-party Runtime | session/task/worker 重复建模 | Worker Contract + Task Runtime |
 | P1 | Nimora product logic 进入 Chat Core | Bridge/branch/model/tool renderer patches | 上游升级成本、AI 误改 | Thin Core migration |
 | P1 | Bridge 职责过宽 | `bridge-server.ts` 同时 MCP/tunnel/state/UI | 修改牵连大、难测试 | split exposure/tunnel/task state |

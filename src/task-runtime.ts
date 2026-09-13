@@ -55,6 +55,7 @@ export interface BeginExecutionInput {
   capabilityId?: string;
   risk?: string;
   arguments?: unknown;
+  origin?: TaskExecution["origin"];
 }
 
 function boundText(value: string | undefined, maxChars: number): string | undefined {
@@ -244,6 +245,7 @@ export class TaskRuntime {
           capabilityId: input.capabilityId,
           risk: input.risk,
           argumentsDigest: input.arguments === undefined ? undefined : taskArgumentsDigest(input.arguments),
+          origin: input.origin ? { ...input.origin } : undefined,
           status: "requested",
           deliveryStatus: "not-prepared",
           requestedAt,

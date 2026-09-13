@@ -277,7 +277,9 @@ Site Adapter / WebMCP Core / real webpage
 
 Page Agent 的 worker turn 输出 sequence-numbered `status / assistant_text / capability_call / capability_result / completed|cancelled|error` events。`WebMcpCommandTransport` 用 event cursor 消除轮询重放，再映射为 `WebWorkerTransportEvent`；`WebWorkerAdapter` 最终映射到统一 `WorkerEvent`。page token 始终停留在 WebMCP Extension/Page Agent 边界，WorkerSession 只保存 page id、page session id 与非敏感状态。
 
-第一方扩展启动时已注册 `nimora.web-worker`，并通过 `WorkerSessionManager({ taskBindings: taskShadow })` 使用现有 TaskRuntime journal。自动 stack smoke 已证明 Task worker attach/detach 可在重启后 replay。**仍未完成的部分**是：WebMCP capability call/result 还没有自动投影成 Task Execution Service 的统一 execution ledger；Native Chat/未来 Work orchestrator 也尚未自动选择 Web worker。
+第一方扩展启动时已注册 `nimora.web-worker`，并通过 `WorkerSessionManager({ taskBindings: taskShadow, executionProjection: taskShadow })` 使用现有 TaskRuntime journal。除了 Worker attach/detach 之外，Manager 现在还会把绑定 Task 的 `capability_call / capability_result` 投影为 Task execution，并在 WebMCP `capability_result_delivered` provider event 到达时推进 delivery。Worker-origin execution 记录结构化 `managedSessionId / workerId / inputId / callId`；完整 stack smoke 已验证 delivered/pending/unknown 三类状态与重启 replay。
+
+这一步仍然没有迁移 WebMCP 的执行 ownership：page Core 继续负责当前网页调用的 occurrence dedupe、实际 dispatch、pending delivery 与 delivery retry；TaskRuntime 当前是跨 Worker 的 durable projection/审计视图。下一阶段若要让 Task Execution Service 成为真正 owner，必须先设计 dispatch handoff/at-most-once 兼容迁移，不能简单删除 page-local ledger。Native Chat/未来 Work orchestrator 也尚未自动选择 Web worker。
 
 ### 正式 Adapter Layer
 

@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { getCapabilityMetadata } from "../../../src/capability-registry.js";
 import { TaskRuntime } from "../../../src/task-runtime.js";
 import type { TaskArtifactRef, TaskInteractionOutcome, TaskProgress, TaskTodo } from "../../../src/task-contract.js";
-import type { WorkerTaskBindingStore } from "../../../src/worker-session-manager.js";
+import type { WorkerExecutionProjectionStore, WorkerTaskBindingStore } from "../../../src/worker-session-manager.js";
 
 export interface ShadowExecutionHandle {
   taskId: string;
@@ -15,7 +15,7 @@ export interface ShadowExecutionHandle {
  * Fail-open compatibility layer for Phase 3 shadow mode. Task journaling must
  * never break the established Chat, Bridge, tool execution, or UI path.
  */
-export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingStore {
+export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingStore, WorkerExecutionProjectionStore {
   private readonly runtime: TaskRuntime;
   private readonly ready: Promise<void>;
   private initializationError: Error | undefined;
@@ -134,6 +134,53 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
     await this.ready;
     if (this.initializationError) throw this.initializationError;
     await this.runtime.detachWorkerSession(taskId, managedSessionId);
+  }
+
+  async beginWorkerExecution(taskId: string, input: {
+    executionId: string;
+    managedSessionId: string;
+    workerId: string;
+    inputId: string;
+    callId?: string;
+    toolName: string;
+    arguments?: unknown;
+  }): Promise<void> {
+    await this.safe("begin worker execution", async () => {
+      const capability = getCapabilityMetadata(input.toolName);
+      const result = await this.runtime.beginExecution(taskId, {
+        executionId: input.executionId,
+        toolName: input.toolName,
+        capabilityId: capability?.id,
+        risk: capability?.risk,
+        arguments: input.arguments,
+        origin: {
+          kind: "worker",
+          managedSessionId: input.managedSessionId,
+          workerId: input.workerId,
+          inputId: input.inputId,
+          callId: input.callId,
+        },
+      });
+      if (result.duplicate) {
+        this.output.appendLine(`[task-shadow] duplicate worker execution observed task=${taskId} execution=${input.executionId} worker=${input.workerId}`);
+      }
+    });
+  }
+
+  async completeWorkerExecution(taskId: string, executionId: string, input: {
+    status: "succeeded" | "failed" | "unknown";
+    durationMs?: number;
+    error?: string;
+    resultSummary?: string;
+  }): Promise<void> {
+    await this.safe("complete worker execution", async () => {
+      await this.runtime.finishExecution(taskId, executionId, input.status, input);
+      await this.runtime.markResultPrepared(taskId, executionId);
+    });
+  }
+
+  async markWorkerExecutionDelivered(taskId: string, executionId: string): Promise<void> {
+    await this.safe("deliver worker execution result", () => this.runtime.markDelivered(taskId, executionId));
   }
 
   dispose(): void {
