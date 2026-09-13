@@ -3,14 +3,13 @@ import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { chromium } from 'playwright-core';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import { defineGatewayCapability, retryPolicyForTool } from './capability-contract.mjs';
+import { defineGatewayCapability } from './capability-contract.mjs';
 import { createIntegratedBrowserProvider } from './integrated-browser-provider.mjs';
 import { defineGatewayProvider, GatewayProviderRegistry } from './provider-registry.mjs';
+import { createUpstreamMcpProvider } from './upstream-mcp-provider.mjs';
 
 const PORT = Number(process.env.PORT || 48321);
 const UPSTREAM_URL = process.env.SHUNCODE_MCP_URL || '';
@@ -24,11 +23,7 @@ const SHARED_SITE_ADAPTERS_PATH = process.env.SHUNCODE_WEBMCP_SITE_ADAPTERS_PATH
 const SHARED_PAGE_AGENT_PATH = process.env.SHUNCODE_WEBMCP_PAGE_AGENT_PATH || '';
 const PERSONAL_EDGE_BRIDGE_TOKEN = process.env.SHUNCODE_PERSONAL_EDGE_TOKEN || 'shuncode-local-development';
 const integratedBrowserProvider = createIntegratedBrowserProvider({ bridgeUrl: INTEGRATED_BROWSER_BRIDGE });
-
-let upstreamClient;
-let upstreamConnectPromise;
-let upstreamToolsCache = [];
-let upstreamToolsCacheAt = 0;
+const upstreamMcpProvider = createUpstreamMcpProvider({ url: UPSTREAM_URL });
 let browserContext;
 let browserConnectPromise;
 const pageAgentSessions = new WeakMap();
@@ -240,115 +235,12 @@ async function callShunCodeTool(name, args = {}) {
   return await gatewayProviders().callTool(name, args);
 }
 
-// Compatibility only for an older upstream Bridge that predates capability
-// metadata. Current Nimora Bridge tools carry `nimora/capability` metadata and
-// use that as the source of truth for retry policy.
-const legacyRetryableReadOnlyUpstreamTools = new Set([
-  'find_files', 'read_files', 'search_files', 'list_directory', 'get_diagnostics', 'lsp', 'get_command_output',
-]);
-
-async function upstreamToolDefinition(name) {
-  let found = upstreamToolsCache.find(tool => tool.name === name);
-  if (found) return found;
-  try {
-    const tools = await listUpstreamToolsStable();
-    found = tools.find(tool => tool.name === name);
-  } catch {}
-  return found;
-}
-
-function isUpstreamTransportError(error) {
-  const message = error instanceof Error ? error.message : String(error);
-  return /fetch failed|ECONNRESET|ECONNREFUSED|EPIPE|socket|network|terminated|aborted/i.test(message);
-}
-
-async function callUpstreamToolStable(name, args = {}) {
-  const toolDefinition = await upstreamToolDefinition(name);
-  try {
-    return await (await getUpstream()).callTool({ name, arguments: args });
-  } catch (error) {
-    if (!isUpstreamTransportError(error)) throw error;
-    await resetUpstream();
-    const retryPolicy = toolDefinition ? retryPolicyForTool(toolDefinition) : undefined;
-    if (retryPolicy === 'automatic' || (retryPolicy === undefined && legacyRetryableReadOnlyUpstreamTools.has(name))) {
-      await new Promise(resolve => setTimeout(resolve, 180));
-      return await (await getUpstream()).callTool({ name, arguments: args });
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Upstream MCP transport failed and was reset: ${message}. This side-effect-capable tool was NOT automatically retried; verify state before retrying to avoid duplicate effects.`);
-  }
-}
-
-async function getUpstream() {
-  if (!UPSTREAM_URL) {
-    throw new Error('SHUNCODE_MCP_URL is not configured. Set it to the ShunCode Bridge MCP endpoint before using upstream tools.');
-  }
-  if (upstreamClient) return upstreamClient;
-  if (!upstreamConnectPromise) {
-    upstreamConnectPromise = (async () => {
-      const client = new Client({ name: 'shuncode-browser-gateway', version: '0.1.0' }, { capabilities: {} });
-      const transport = new StreamableHTTPClientTransport(new URL(UPSTREAM_URL), {
-        requestInit: { headers: { 'ngrok-skip-browser-warning': '1' } },
-      });
-      await client.connect(transport);
-      upstreamClient = client;
-      return client;
-    })().finally(() => { upstreamConnectPromise = undefined; });
-  }
-  return upstreamConnectPromise;
-}
-
-async function resetUpstream() {
-  const client = upstreamClient;
-  upstreamClient = undefined;
-  upstreamConnectPromise = undefined;
-  try { await client?.close?.(); } catch {}
-}
-
-async function listUpstreamToolsStable() {
-  const load = async () => {
-    const response = await (await getUpstream()).listTools();
-    const tools = Array.isArray(response?.tools) ? response.tools : [];
-    if (tools.length) {
-      upstreamToolsCache = tools;
-      upstreamToolsCacheAt = Date.now();
-    }
-    return tools;
-  };
-
-  const retryDelays = [0, 250, 700, 1500];
-  let lastError;
-  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
-    if (attempt > 0) {
-      await resetUpstream();
-      await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
-    }
-    try {
-      return await load();
-    } catch (error) {
-      lastError = error;
-      console.warn(`[web-mcp] upstream listTools attempt ${attempt + 1}/${retryDelays.length} failed:`, error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  if (upstreamToolsCache.length) {
-    console.warn(`[web-mcp] using cached upstream tool list (${upstreamToolsCache.length} tools, age=${Date.now() - upstreamToolsCacheAt}ms)`);
-    return upstreamToolsCache;
-  }
-  throw lastError || new Error('upstream listTools failed');
-}
-
 let providerRegistry;
 
 function gatewayProviders() {
   if (providerRegistry) return providerRegistry;
   providerRegistry = new GatewayProviderRegistry([
-    defineGatewayProvider({
-      id: 'upstream-mcp',
-      fallback: true,
-      listTools: () => listUpstreamToolsStable(),
-      callTool: (name, args) => callUpstreamToolStable(name, args),
-    }),
+    upstreamMcpProvider,
     integratedBrowserProvider,
     defineGatewayProvider({
       id: 'managed-browser',
@@ -740,9 +632,9 @@ app.post('/control/stop-browser', async (_req, res) => {
 
 app.get('/healthz', async (_req, res) => {
   try {
-    const tools = await (await getUpstream()).listTools();
+    const tools = await upstreamMcpProvider.probeTools();
     const integratedTools = await integratedBrowserProvider.refreshTools();
-    res.json({ ok: true, upstream: UPSTREAM_URL, upstream_tools: tools.tools.length, integrated_browser_tools: integratedTools.length, browser_tools: browserTools.length });
+    res.json({ ok: true, upstream: UPSTREAM_URL, upstream_tools: tools.length, integrated_browser_tools: integratedTools.length, browser_tools: browserTools.length });
   } catch (error) {
     res.status(503).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }

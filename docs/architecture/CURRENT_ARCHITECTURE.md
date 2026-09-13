@@ -224,7 +224,9 @@ Phase 6.1 已把 Gateway 的 tool federation 路由从 `server.mjs` 内硬编码
 
 Phase 6.2 已进一步把 Integrated Browser provider 的 HTTP bridge 实现物理拆到 `integrated-browser-provider.mjs`：`/tools` 短缓存、强制 refresh、`/invoke`、binary result normalization 都不再由 `server.mjs` 直接实现。`server.mjs` 只创建 provider 实例并在 `/healthz` 需要时调用 `refreshTools()`。
 
-Managed Browser、Personal Edge、upstream MCP client 等具体实现目前仍物理位于 `server.mjs`，Gateway monolith 尚未完成拆分。
+Phase 6.3 又把 upstream MCP client 物理拆到 `upstream-mcp-provider.mjs`：MCP Client/transport lifecycle、connect/reset、tool-list cache/retry、capability metadata retry policy 与旧 Bridge read-only compatibility fallback 都由 upstream provider 自治。`server.mjs` 不再 import MCP Client SDK，只在 composition root 注册 fallback provider，并由 `/healthz` 调用其 `probeTools()`。
+
+Managed Browser、Personal Edge、WebMCP browser control 等实现目前仍物理位于 `server.mjs`，Gateway monolith 尚未完成拆分。
 
 默认 WebMCP control/gateway 端口仍保持 48322/48321 以兼容现有安装版；源码/测试实例可通过 `SHUNCODE_WEBMCP_CONTROL_PORT` / `SHUNCODE_WEBMCP_GATEWAY_PORT` 隔离运行。动态 discovery/多 workspace handshake 尚未完成。
 

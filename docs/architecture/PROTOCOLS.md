@@ -163,6 +163,8 @@ Phase 6.1 起，Gateway federation 由 ordered `GatewayProviderRegistry` 负责�
 
 Phase 6.2 起，Integrated Browser provider transport 自身也成为独立模块。它对 `127.0.0.1` bridge 的 `/tools` 使用 2 秒短缓存，health probe 可显式 bypass cache；`/invoke` 返回的 VS Code LM parts 在 provider 边界归一化成 MCP text content，binary data 只保留长度提示而不穿过 Gateway。以上 transport 细节不再属于 Gateway server composition root。
 
+Phase 6.3 起，Gateway → Bridge 的 MCP client 也成为独立 `upstream-mcp` provider。Provider 是 federation 的 fallback owner，并独立持有 MCP session lifecycle 与 reconnect state。Transport failure 时先 reset stale client；只有 canonical metadata `retry=automatic`（或旧 Bridge 的有限只读 compatibility allowlist）才允许自动发起第二次 tool call。副作用 capability 即使 transport 已断开也只 reset connection，不重发 tool request。`/healthz` 的 upstream probe 同样通过 provider，不再绕过其 connection lifecycle。
+
 重要安全语义：只有明确的 read-only upstream tools 可以在 transport failure 后自动 retry；side-effecting tools 不自动 retry，而是要求 caller 核实状态。
 
 这条语义与 WebMCP execution ledger 是同一个更高层问题，未来应统一到 Tool metadata + execution policy。

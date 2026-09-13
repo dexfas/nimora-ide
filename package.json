@@ -30,6 +30,7 @@
 		"test-shuncode-webmcp-gateway-shared-agent": "node scripts/shuncode-webmcp-gateway-shared-agent-smoke.mjs",
 		"test-shuncode-gateway-providers": "node scripts/shuncode-gateway-provider-registry-smoke.mjs",
 		"test-shuncode-gateway-federation": "node scripts/shuncode-gateway-federation-smoke.mjs",
+		"test-shuncode-gateway-upstream-provider": "node scripts/shuncode-gateway-upstream-provider-smoke.mjs",
 		"test-shuncode-webmcp-command-transport": "node scripts/shuncode-webmcp-command-transport-smoke.mts",
 		"test-shuncode-web-worker-stack": "node scripts/shuncode-web-worker-stack-smoke.mts",
 		"test-shuncode-web-worker-release-gate": "node scripts/shuncode-web-worker-release-gate-smoke.mts",

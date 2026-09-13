@@ -350,6 +350,10 @@ web model → request → Nimora tool → result delivery → final model respon
 
 第一块 provider implementation 已物理拆出：`integrated-browser-provider.mjs` 现在独立拥有 Integrated Browser localhost bridge 的 tool cache、`/tools` refresh、`/invoke` transport 与 MCP result normalization；Gateway composition root 只注入 bridge URL 并注册 provider。`test-shuncode-gateway-providers` 同时验证 cache TTL、强制 refresh、invoke payload 与 binary omission，真实 `test-shuncode-gateway-federation` / shared-agent smoke 继续保护外部行为。这个阶段仍不改 control endpoint，也不改变 Integrated Browser Extension 本身。
 
+### Phase 6.3 — Upstream MCP Provider Extraction
+
+`upstream-mcp-provider.mjs` 现在独立拥有 Gateway → Bridge MCP client：连接/关闭/reset、稳定 listTools cache、4-step list reconnect、tool metadata lookup 与 call retry 都已从 `server.mjs` 移出。安全语义保持不变：`retry=automatic` 可以在 transport failure 后重连并调用一次；`retry=never/verify-before-retry` 的副作用 capability reset transport 后直接报错，不自动重跑；旧 Bridge 没 metadata 时仅历史 read-only allowlist 保留一次 compatibility retry。`test-shuncode-gateway-upstream-provider` 用注入 fake clients 明确保护这三条分支，真实 Gateway federation smoke 继续保护标准 `/mcp` compatibility。
+
 ### 风险
 
 公网 endpoint、MCP session、external clients compatibility。
