@@ -158,6 +158,34 @@ Adapter 使用 chat subscription 的 `onDidApplyAction` 作为 streaming event s
 
 当前 descriptor 只声明已经实现的语义。AHP protocol 本身支持更多能力，但 Worker adapter 尚未完成 image input、checkpoint resume 与 per-send `allowedCapabilities` policy mapping，因此这些不会因为“底层理论上支持”就被虚报成 adapter capability。
 
+## 6.1 Worker Session Manager
+
+Phase 4.3 已新增 `src/worker-session-manager.ts`，它是 Worker domain 的 lifecycle/router 层，而不是新的 model runtime：
+
+```text
+Task Runtime
+    ↕ TaskWorkerAttached / TaskWorkerDetached
+WorkerSessionManager
+    ├─ ApiWorkerAdapter
+    ├─ AgentHostWorkerAdapter
+    └─ future WebWorkerAdapter
+```
+
+Manager 负责：
+
+- Worker adapter registry / descriptor refresh；
+- Nimora-managed session identity；
+- provider-native session handle 保存；
+- Task bind / unbind；
+- send / interrupt / resume / health / dispose routing；
+- 按 worker / task / state 查询 session。
+
+`managedSessionId` 与 adapter-native `sessionId` 明确分离。前者属于 Nimora Task domain，后者属于具体 provider/transport。这样两个不同 provider 即使恰好使用相同 native session id，也不会产生碰撞。
+
+Manager 不拥有 transcript、Task goal、capability policy 或 context packing。它只持有 active lifecycle state；Task binding 的 durable Source of Truth 是 Task Runtime journal。Task Snapshot 现在会保存 worker id、managed session id、adapter session id、model、attached/detached timestamp。
+
+运行中的 WorkerSession 不允许 rebind/unbind。这个限制不是 UI 偏好，而是 ownership invariant：一次 turn 尚未结束时，不能把同一执行 session 从 Task A 静默改挂到 Task B。
+
 ## 7. Web Worker / WebMCP
 
 ### 正式 Adapter Layer

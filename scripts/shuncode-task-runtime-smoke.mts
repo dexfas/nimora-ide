@@ -37,6 +37,17 @@ try {
     { id: 'code', title: 'Implement', status: 'in_progress' },
   ]);
   await runtime.reportProgress(task.taskId, { message: 'Provider split started', phase: 'Coding', percent: 35, todoId: 'code' });
+  await runtime.attachWorkerSession(task.taskId, {
+    managedSessionId: 'worker-session-1',
+    workerId: 'nimora.api-runtime',
+    adapterSessionId: 'api-session-1',
+    model: 'fake-model',
+  });
+  await assert.rejects(async () => runtime.attachWorkerSession(task.taskId, {
+    managedSessionId: 'worker-session-1',
+    workerId: 'nimora.agent-host',
+    adapterSessionId: 'other-session',
+  }), /identity mismatch/);
 
   const first = await runtime.beginExecution(task.taskId, {
     executionId: 'mcp:session-a:7',
@@ -73,6 +84,7 @@ try {
   const beforeRestart = runtime.getTask(task.taskId)!;
   assert.equal(beforeRestart.todos[1]?.status, 'in_progress');
   assert.equal(beforeRestart.progress?.percent, 35);
+  assert.equal(beforeRestart.workerSessions['worker-session-1']?.workerId, 'nimora.api-runtime');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.status, 'succeeded');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.deliveryStatus, 'pending');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.duplicateObservations, 1);
@@ -90,6 +102,7 @@ try {
   assert.equal(afterRestart.taskId, beforeRestart.taskId);
   assert.deepEqual(afterRestart.todos, beforeRestart.todos);
   assert.deepEqual(afterRestart.progress, beforeRestart.progress);
+  assert.deepEqual(afterRestart.workerSessions, beforeRestart.workerSessions);
   assert.deepEqual(afterRestart.executions, beforeRestart.executions);
   assert.deepEqual(afterRestart.artifacts, beforeRestart.artifacts);
 

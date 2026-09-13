@@ -104,6 +104,17 @@ Bridge MCP sessionId ───────┘        ↓
 
 当前持久化对象覆盖 goal、todos、progress、interactions、executions、artifact refs。journal commit 会先 canonicalize 成真实 JSON 表示，再同时用于写盘和内存 projection，保证 live/replay snapshot 语义一致；最后一条 torn/corrupt JSONL 可被忽略而保留此前完整事件。
 
+Phase 4.3 已把 Worker assignment 加入 durable Task state：
+
+```text
+TaskWorkerAttached
+TaskWorkerDetached
+        ↓
+TaskSnapshot.workerSessions
+```
+
+每条引用保存 `managedSessionId / workerId / adapterSessionId / model / attachedAt / detachedAt`。同一 managed id 不能在 replay/lifecycle 中悄悄变成另一个 Worker 或 provider-native session；已经 detached 的同一身份可以被显式 reattach，用于 WorkerSessionManager 的绑定回滚或恢复。
+
 当前 Bridge execution identity 使用 MCP `sessionId + requestId`。这足以建立第一版 execution ledger，但不是最终跨 transport/tool-call identity；Worker Contract / Execution Service 后续需要提供更高层 stable invocation id。
 
 ## 5. Context Engine

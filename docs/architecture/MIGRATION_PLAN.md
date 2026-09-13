@@ -193,7 +193,7 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 
 ## 6. Phase 4 — Worker Contract
 
-**Status: In progress — Phase 4.1 ApiWorkerAdapter + Phase 4.2 AgentHostWorkerAdapter semantic layer completed (2026-09-13)**
+**Status: In progress — Phase 4.1 ApiWorkerAdapter + Phase 4.2 AgentHostWorkerAdapter + Phase 4.3 WorkerSessionManager completed (2026-09-13)**
 
 ### 目标
 
@@ -203,7 +203,7 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 
 1. `ApiWorkerAdapter` 包装现有 first-party Runtime；✅ contract/adapter 已落地，Native Chat 尚未切换 caller
 2. `AgentHostWorkerAdapter` 包装现有 IAgentConnection/AHP；✅ semantic adapter 已落地，现有 Sessions/UI caller 尚未切换
-3. Worker Session Manager；
+3. Worker Session Manager；✅ registry / managed session identity / Task binding 已落地
 4. Context handoff package；
 5. Web Worker adapter 最后接入。
 
@@ -227,6 +227,10 @@ Phase 4.2 已将 `AgentHostWorkerAdapter` 放在 Nimora-owned `src/agent-host-wo
 
 当前 AgentHost adapter 已实现 session create/attach ownership、AHP `ChatTurnStarted` send、`ChatTurnCancelled` interrupt、text/reasoning streaming、tool ready/result、usage、terminal/error 与 health 映射。它只在自己创建 backend session 时调用 `disposeSession`；attach 到已有 session 时只释放 subscription。尚未映射 Worker image input、checkpoint resume 和 `allowedCapabilities` policy input，因此 descriptor 明确不宣称这三项已完成。
 
+Phase 4.3 已新增 `src/worker-session-manager.ts`。Manager 为 heterogeneous adapters 提供统一 registry、descriptor refresh、managed session id、send/interrupt/resume/health/dispose routing 和 Task binding。Manager 使用自己的 `managedSessionId`，同时保留 adapter-native `sessionId`，因此两个不同 Worker 即使返回相同 provider-native id 也不会在 Task domain 冲突。
+
+Task Runtime 同步新增 `TaskWorkerAttached` / `TaskWorkerDetached` 事件以及 `TaskSnapshot.workerSessions`。绑定关系进入 append-only journal，重启后可以 replay；同一 managed session id 若突然指向不同 worker/native session 会被拒绝，防止 identity 被静默篡改。运行中的 WorkerSession 也不能被 rebind/unbind 到另一个 Task，避免 Task ownership 在一次正在执行的 turn 中途漂移。
+
 ### 测试
 
 - API adapter fake-runtime parity（streaming/reasoning/capability/checkpoint/cancel/health/tool invocation context/legacy trace projection）；✅
@@ -234,7 +238,8 @@ Phase 4.2 已将 `AgentHostWorkerAdapter` 放在 Nimora-owned `src/agent-host-wo
 - AgentHost fake-AHP semantic parity（create/attach ownership、streaming/reasoning/tool/usage/cancel/health）；✅
 - AgentHost real local/remote provider session；⏳ 现有 Sessions/UI caller 尚未切换
 - cancel/resume/health；API cancel/resume/health ✅，AgentHost cancel/health ✅，AgentHost resume ⏳
-- worker switch with same Task context。
+- WorkerSessionManager registry/routing/Task attach-detach/replay；✅
+- worker switch with same Task context；⏳ 等待 Phase 4.4 Context Handoff
 
 ### 回滚
 

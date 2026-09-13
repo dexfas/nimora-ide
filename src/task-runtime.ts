@@ -13,6 +13,7 @@ import {
   type TaskSnapshot,
   type TaskSource,
   type TaskTodo,
+  type TaskWorkerSessionRef,
 } from "./task-contract.js";
 
 const MAX_GOAL_CHARS = 8_000;
@@ -25,6 +26,8 @@ const TASK_EVENT_TYPES = new Set<TaskEvent["type"]>([
   "TaskProgressUpdated",
   "TaskInteractionStarted",
   "TaskInteractionFinished",
+  "TaskWorkerAttached",
+  "TaskWorkerDetached",
   "TaskExecutionRequested",
   "TaskExecutionStarted",
   "TaskExecutionDuplicateObserved",
@@ -168,6 +171,27 @@ export class TaskRuntime {
       finishedAt: this.now(),
       durationMs: options.durationMs,
       error: boundText(options.error, MAX_RESULT_SUMMARY_CHARS),
+    });
+  }
+
+  async attachWorkerSession(taskId: string, input: Omit<TaskWorkerSessionRef, "attachedAt" | "detachedAt">): Promise<{ duplicate: boolean; workerSession: TaskWorkerSessionRef }> {
+    return this.exclusive(taskId, async () => {
+      const existing = this.tasks.get(taskId)?.workerSessions[input.managedSessionId];
+      if (existing && (existing.workerId !== input.workerId || existing.adapterSessionId !== input.adapterSessionId)) {
+        throw new Error(`Worker session identity mismatch for ${input.managedSessionId}.`);
+      }
+      if (existing && !existing.detachedAt) return { duplicate: true, workerSession: structuredClone(existing) };
+      const workerSession: TaskWorkerSessionRef = { ...input, attachedAt: this.now() };
+      await this.append(taskId, "TaskWorkerAttached", { workerSession });
+      return { duplicate: false, workerSession: structuredClone(this.tasks.get(taskId)!.workerSessions[input.managedSessionId]) };
+    });
+  }
+
+  async detachWorkerSession(taskId: string, managedSessionId: string): Promise<void> {
+    await this.exclusive(taskId, async () => {
+      const current = this.tasks.get(taskId)?.workerSessions[managedSessionId];
+      if (!current || current.detachedAt) return;
+      await this.append(taskId, "TaskWorkerDetached", { managedSessionId, detachedAt: this.now() });
     });
   }
 

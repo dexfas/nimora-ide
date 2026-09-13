@@ -170,6 +170,9 @@ export class AgentHostWorkerAdapter implements WorkerAdapter<AgentHostWorkerSess
 			model: options.model ? { id: options.model } : undefined,
 			workingDirectories,
 		});
+		if (this.sessions.has(backendSession.toString())) {
+			throw new Error(`AgentHost session is already managed by this adapter: ${backendSession.toString()}`);
+		}
 		const sessionState = await this.waitForSessionState(backendSession);
 		const chatUri = URI.parse(sessionState.defaultChat?.toString() ?? buildDefaultChatUri(backendSession));
 		const subscriptionRef = this.connection.getSubscription(StateComponents.Chat, chatUri, 'AgentHostWorkerAdapter');

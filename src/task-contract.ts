@@ -65,6 +65,15 @@ export interface TaskArtifactRef {
   metadata?: Record<string, unknown>;
 }
 
+export interface TaskWorkerSessionRef {
+  managedSessionId: string;
+  workerId: string;
+  adapterSessionId: string;
+  model?: string;
+  attachedAt: string;
+  detachedAt?: string;
+}
+
 export interface TaskSnapshot {
   version: 1;
   taskId: string;
@@ -76,6 +85,7 @@ export interface TaskSnapshot {
   todos: TaskTodo[];
   progress?: TaskProgress;
   interactions: Record<string, TaskInteraction>;
+  workerSessions: Record<string, TaskWorkerSessionRef>;
   executions: Record<string, TaskExecution>;
   artifacts: TaskArtifactRef[];
   eventCount: number;
@@ -99,6 +109,8 @@ export type TaskEvent =
   | TaskEventBase<"TaskProgressUpdated", { progress: TaskProgress }>
   | TaskEventBase<"TaskInteractionStarted", { interaction: TaskInteraction }>
   | TaskEventBase<"TaskInteractionFinished", { interactionId: string; outcome: TaskInteractionOutcome; finishedAt: string; durationMs?: number; error?: string }>
+  | TaskEventBase<"TaskWorkerAttached", { workerSession: TaskWorkerSessionRef }>
+  | TaskEventBase<"TaskWorkerDetached", { managedSessionId: string; detachedAt: string }>
   | TaskEventBase<"TaskExecutionRequested", { execution: TaskExecution }>
   | TaskEventBase<"TaskExecutionStarted", { executionId: string; startedAt: string }>
   | TaskEventBase<"TaskExecutionDuplicateObserved", { executionId: string }>
@@ -138,6 +150,7 @@ export function applyTaskEvent(snapshot: TaskSnapshot | undefined, event: TaskEv
       updatedAt: event.at,
       todos: [],
       interactions: {},
+      workerSessions: {},
       executions: {},
       artifacts: [],
       eventCount: 1,
@@ -180,6 +193,25 @@ export function applyTaskEvent(snapshot: TaskSnapshot | undefined, event: TaskEv
         ...base,
         status: hasRunningWork(interactions, base.executions) ? "running" : "ready",
         interactions,
+      };
+    }
+    case "TaskWorkerAttached":
+      return {
+        ...base,
+        workerSessions: {
+          ...base.workerSessions,
+          [event.payload.workerSession.managedSessionId]: { ...event.payload.workerSession },
+        },
+      };
+    case "TaskWorkerDetached": {
+      const current = base.workerSessions[event.payload.managedSessionId];
+      if (!current) return base;
+      return {
+        ...base,
+        workerSessions: {
+          ...base.workerSessions,
+          [event.payload.managedSessionId]: { ...current, detachedAt: event.payload.detachedAt },
+        },
       };
     }
     case "TaskExecutionRequested":
