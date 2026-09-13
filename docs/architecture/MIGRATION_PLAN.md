@@ -139,18 +139,33 @@ Facade 可切回旧 implementation。
 
 ## 5. Phase 3 — Task Runtime Shadow Mode
 
+**Status: Completed first shadow integration (2026-09-13)**
+
 ### 目标
 
 建立 Task Store/Event/Progress/Artifact/Execution Ledger，但先不成为 UI 唯一 Source of Truth。
 
 ### 工作
 
-- Task contract + store；
-- execution ledger；
-- artifact refs；
-- Bridge `set_todos/report_progress` 双写 Task projection；
-- Native Chat request shadow-linked to Task；
-- 不改变现有 Chat history/branch state。
+- Task contract + append-only event store；✅
+- execution ledger；✅
+- artifact refs；✅
+- Bridge `set_todos/report_progress` 双写 Task projection；✅
+- Native Chat request shadow-linked to Task；✅
+- 不改变现有 Chat history/branch state。✅
+
+### 当前实现
+
+- `src/task-contract.ts` 定义 Task / Interaction / Execution / Artifact / Event contract；
+- `src/task-runtime.ts` 以每 Task 一份 JSONL journal 持久化 append-only event，并通过 replay 恢复 snapshot；
+- `extensions/shuncode/src/task-shadow.ts` 是 fail-open compatibility recorder：shadow 失败只写日志，不得中断现有 Chat / Bridge / tool execution；
+- Native Chat 使用 `request.sessionResource` 作为稳定 source identity；旧 API 才回退到 `sessionId/request.id`；
+- Bridge 使用 MCP `sessionId` 映射 Task，并使用 `sessionId + requestId` 形成当前 shadow execution identity；
+- Bridge `set_todos` / `report_progress` 继续维护原 UI state，同时双写 Task journal；
+- `apply_patch` 成功后记录轻量 changeset artifact metadata，不把完整 diff 复制进 Task journal；
+- execution result 与 delivery 独立：handler 返回 `CallToolResult` 后只记录 `TaskExecutionResultPrepared`，在没有远端 transport acknowledgement 前不写 `TaskExecutionDelivered`。
+
+Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate observation，但旧执行路径仍继续运行；真正 at-most-once enforcement 必须等 Execution Service 成为 Source of Truth 后再开启，避免 Phase 3 改变现有行为。
 
 ### 为什么这样做
 
@@ -162,10 +177,15 @@ Facade 可切回旧 implementation。
 
 ### 测试
 
-- event replay；
-- crash/restart；
-- task projection vs existing UI state consistency；
-- tool execution at-most-once ledger tests。
+- event replay；✅
+- crash/restart / torn final JSONL line；✅
+- live snapshot 与 replay snapshot canonical parity；✅
+- concurrent duplicate execution identity serialization；✅
+- Bridge task projection vs existing UI state consistency；✅（真实本地 MCP `set_todos/report_progress` E2E）
+- execution/result-prepared ledger；✅
+- remote result-delivery acknowledgement；⏳ 尚无可观察 ack，因此正确保持 `pending`。
+
+真实 Extension Host 验证使用源码扩展 development path 启动本地 Bridge，并通过 MCP client 执行 `set_todos → report_progress → list_directory`。结果 journal 为 14 events，其中 execution requested/finished/prepared 各 3，todo/progress 各 1，delivered 为 0。endpoint/token 未写入仓库或验证输出。
 
 ### 回滚
 

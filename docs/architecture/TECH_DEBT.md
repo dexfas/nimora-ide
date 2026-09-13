@@ -12,7 +12,7 @@
 | 优先级 | 债务 | 事实依据 | 风险 | 处理方向 |
 | --- | --- | --- | --- | --- |
 | P0 | Personal Edge 使用开发 pairing token | MV3/Gateway hard-coded local-development token | 发布环境本地恶意进程冒充/劫持 | per-install/session pairing secret + origin binding |
-| P0 | execution ledger 尚未统一 | Capability retry metadata 已统一第一版，但 WebMCP/Gateway 仍各自维护 execution/delivery state | side-effect 重放/状态不一致 | central Execution Ledger；继续保留 metadata-driven retry |
+| P0 | execution ledger 尚未全链路统一 | Phase 3 已有 Task shadow ledger，Bridge 可记录 execution/result-prepared，但 WebMCP/Gateway 仍各自维护状态且远端 delivery ack 尚不可观察 | side-effect 重放/状态不一致 | 让 Task Execution Service 接管 dispatch/dedupe；继续保留 metadata-driven retry；补 transport delivery ack |
 | P1 | 两套 Agent runtime 无统一 domain | Core AgentHost + first-party Runtime | session/task/worker 重复建模 | Worker Contract + Task Runtime |
 | P1 | Nimora product logic 进入 Chat Core | Bridge/branch/model/tool renderer patches | 上游升级成本、AI 误改 | Thin Core migration |
 | P1 | Bridge 职责过宽 | `bridge-server.ts` 同时 MCP/tunnel/state/UI | 修改牵连大、难测试 | split exposure/tunnel/task state |
@@ -21,7 +21,7 @@
 | P1 | 固定 localhost ports | 48321/48322 与安装版真实冲突 | 并行开发/多 workspace 失败 | dynamic port + discovery/handshake |
 | P1 | Context/tool 全量暴露趋势 | Capability metadata 已存在，但 WebMCP prime 仍可发送大量 tools | token/attention/attack surface | Capability Router / Context Budget / dynamic loading |
 | P1 | Multi-model state 绑定 Chat | Core branch + extension globalState | 无法服务 Task/Web worker | migrate to Task WorkerAttempt |
-| P1 | Bridge todo/progress 是 transport-owned | Bridge adds state tools | Task continuity 差 | Task progress store |
+| P1 | Bridge todo/progress 仍是 UI Source of Truth | Phase 3 已双写 Task journal，但现有 `BridgeManager.todos/activities` 仍驱动 UI | Task continuity/多 session ownership 仍不完整 | 验证 projection consistency 后切 Task progress store 为 owner |
 | P1 | upstream baseline diff 不可离线复核 | repo 缺 1.132.0 commit object | Core audit 难重复 | baseline fetch/cache/audit script |
 | P2 | Terminal backend 仍较大 | `IdeToolBroker` 已在 Phase 2 收缩为薄 facade，但 PTY/ConPTY/direct execution 本身约 1500 行且状态复杂 | Terminal 修改仍需高强度回归 | 保持独立 backend；只在有明确收益时继续内部模块化，不为 LOC 强拆 |
 | P2 | `model-provider.ts` 过大 | catalog/auth/protocol/config mixed | provider change 高风险 | split catalog/auth/worker adapters |

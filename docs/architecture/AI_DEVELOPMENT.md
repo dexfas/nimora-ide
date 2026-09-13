@@ -68,6 +68,7 @@ Read facts
 npm run typecheck-shuncode
 npm run compile-shuncode
 npm run test-shuncode-capabilities
+npm run test-shuncode-task-runtime
 npm run test-shuncode-runtime
 ```
 
@@ -80,6 +81,28 @@ $env:SHUNCODE_LSP_SMOKE = "1"
 ```
 
 确认 Extension Host output 中对应 smoke 为 `PASS`。只允许结束路径精确属于仓库 `.build/electron/ShunCode.exe` 的源码进程。
+
+### Task Runtime / shadow integration changes
+
+至少运行：
+
+```powershell
+npm run test-shuncode-task-runtime
+npm run typecheck-shuncode
+npm run compile-shuncode
+```
+
+`test-shuncode-task-runtime` 必须覆盖 event replay、torn journal recovery、live/replay parity 和 concurrent duplicate execution identity。
+
+如果改动 Bridge shadow wiring，还要在隔离源码实例中做真实 local MCP roundtrip。由于第一方扩展在普通 source carrier 中仍可能被当作 builtin/Production mode，Bridge local smoke 应显式使用 extension development path：
+
+```powershell
+$env:SHUNCODE_BRIDGE_SMOKE_LOCAL = "1"
+$devExt = (Resolve-Path "extensions/shuncode").Path
+.\scripts\shuncode-dev.bat --new-window --extensionDevelopmentPath "$devExt" .
+```
+
+验证 `set_todos → report_progress → read-only tool` 后，Task journal 应出现对应 todo/progress/execution events。没有 transport-level remote acknowledgement 时，`TaskExecutionDelivered` 必须保持缺失；不要为了“测试变绿”伪造 delivered。任何 smoke 输出必须遮蔽 Bridge route token / MCP endpoint。
 
 ### WebMCP/Gateway changes
 

@@ -151,7 +151,9 @@ Bridge 还增加：
 - `set_todos`
 - `report_progress`
 
-当前这些状态属于 Bridge UI，而不是独立 Task domain，这正是未来 Task Runtime 需要接管的部分。
+当前这些状态仍由 Bridge UI state 驱动，但 Phase 3 已通过 `TaskShadowRecorder` 双写独立 Task domain。Task journal 已记录 todos/progress/executions/artifacts；在 shadow consistency 验证完成前，Bridge state 仍是现有 UI Source of Truth，不做大爆炸式切换。
+
+Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge
 
@@ -166,6 +168,8 @@ Bridge 还增加：
 - Cloudflare Quick / Named Tunnel、ngrok 生命周期；
 - endpoint rotation；
 - 部分状态给 Workbench UI。
+
+Phase 3 新增的 Task Runtime 不改变以上部署：Task domain 当前也是 Extension bundle 内模块，但领域 contract 位于仓库根 `src/`，不依赖 VS Code API；未来如需进程隔离，可以迁移 deployment 而不重写 Task contract。
 
 “把 Nimora tools 暴露给外部 AI”这一能力必须保留；但当前单文件/单 manager 的职责明显过宽。
 

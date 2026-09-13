@@ -19,6 +19,7 @@ import { createToolPresentation, type StoredToolInvocation } from "./tool-presen
 import { BranchStateStore, SHUNCODE_BRANCH_GROUP_METADATA_KEY, branchGroupMetadata, type ShunCodeBranchGroupMetadata } from "./branch-state.js";
 import { buildMergePrompt, type MergeVariantInput } from "./merge-contract.js";
 import { resolveMergeReasoningOverride } from "./model-reasoning.mjs";
+import type { TaskShadowRecorder } from "./task-shadow.js";
 
 export const SHUNCODE_PARTICIPANT_ID = "shuncode.agent";
 const SHUNCODE_PRODUCT_LOGO_PATH = ["media", "shuncode.svg"] as const;
@@ -589,12 +590,21 @@ export function registerShunCodeNativeChat(
   output: vscode.OutputChannel,
   modelProviders: Readonly<Record<string, ShunCodeLanguageModelProvider>>,
   branchStore: BranchStateStore,
+  taskShadow: TaskShadowRecorder,
 ): vscode.ChatParticipant {
   const checkpointStore = new AgentCheckpointStore(context, output);
   const handler: vscode.ChatRequestHandler = async (request: any, chatContext: any, stream: any, token: vscode.CancellationToken) => {
     const prompt = String(request?.prompt ?? "");
     const modeName = resolveShunCodeMode(request?.modeInstructions2?.name);
     const folder = vscode.workspace.workspaceFolders?.[0];
+    const shadowSourceKey = request?.sessionResource instanceof vscode.Uri
+      ? request.sessionResource.toString(true)
+      : typeof request?.sessionId === "string" && request.sessionId
+        ? `legacy:${request.sessionId}`
+        : typeof request?.id === "string" && request.id
+          ? `request:${request.id}`
+          : `request:${randomUUID()}`;
+    const shadowTaskId = await taskShadow.ensureNativeChatTask(shadowSourceKey, folder?.uri.fsPath, prompt);
     const branchIntent = normalizeBranchIntent(request);
     const branchPlan = branchIntent && multiModelEnabled()
       ? await planBranchRound(branchIntent, chatContext, branchStore, output)
@@ -742,6 +752,21 @@ export function registerShunCodeNativeChat(
     };
     output.appendLine(`[native-chat] request tools total=${requestTools.total} enabled=${requestTools.enabled} mcp=${requestTools.tools.length} names=${requestTools.tools.map((tool) => tool.name).join(",") || "none"}`);
     const startedAt = Date.now();
+    const shadowInteractionId = `native:${typeof request?.id === "string" && request.id ? request.id : checkpointId}`;
+    let shadowInteractionFinished = false;
+    const finishShadowInteraction = async (outcome: "completed" | "cancelled" | "interrupted" | "blocked" | "error", error?: string): Promise<void> => {
+      if (shadowInteractionFinished) return;
+      shadowInteractionFinished = true;
+      await taskShadow.finishInteraction(shadowTaskId, shadowInteractionId, outcome, {
+        durationMs: Date.now() - startedAt,
+        error,
+      });
+    };
+    await taskShadow.startInteraction(shadowTaskId, shadowInteractionId, {
+      surface: "native-chat",
+      mode: modeName,
+      model: effectiveModel,
+    });
     output.appendLine(`[native-chat] model=${selectedModel} thinking=${runtimeModel.thinking ?? "provider-default"} reasoningEffort=${runtimeModel.reasoningEffort ?? "provider-default"} pastedImages=${pastedImages.length}`);
 
     try {
@@ -834,6 +859,7 @@ export function registerShunCodeNativeChat(
 
       if (token.isCancellationRequested) {
         await checkpointStore.delete(checkpointId);
+        await finishShadowInteraction("cancelled");
         return {
           metadata: {
             shuncode: true,
@@ -862,6 +888,7 @@ export function registerShunCodeNativeChat(
           : "本轮工具结果仍保留在当前会话中，但检查点写入失败；发送“继续”时将从会话历史重新整理上下文。";
         stream.markdown(`\n\n> 等待${label}时超时，当前生成已暂停。${recovery}`);
         output.appendLine(`[native-chat] interrupted model=${selectedModel} timeout=${String(interruption.timeoutKind)} checkpoint=${checkpointPersisted ? checkpointId : "unavailable"}`);
+        await finishShadowInteraction("interrupted", `model_timeout:${String(interruption.timeoutKind ?? "unknown")}`);
         return {
           metadata: {
             shuncode: true,
@@ -891,6 +918,7 @@ export function registerShunCodeNativeChat(
         // Persist the first answer as the default canonical variant.
         branchStore.setCanonical(autoBranchGroupId, requestVariantId());
       }
+      await finishShadowInteraction("completed");
       return {
         metadata: {
           shuncode: true,
@@ -908,6 +936,7 @@ export function registerShunCodeNativeChat(
       if (token.isCancellationRequested) {
         await checkpointStore.delete(checkpointId);
         output.appendLine("[native-chat] canceled by user");
+        await finishShadowInteraction("cancelled");
         return {
           metadata: {
             shuncode: true,
@@ -922,6 +951,7 @@ export function registerShunCodeNativeChat(
       await checkpointStore.delete(checkpointId);
       output.appendLine(`[native-chat] failed: ${message}`);
       stream.markdown(`**ShunCode failed**\n\n${message}`);
+      await finishShadowInteraction("error", message);
       return {
         errorDetails: { message },
         metadata: {

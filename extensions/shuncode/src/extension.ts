@@ -10,6 +10,7 @@ import { IdeToolBroker } from "./ide-tool-broker.js";
 import { ShunCodeLanguageModelProvider } from "./model-provider.js";
 import { registerShunCodeNativeChat } from "./native-chat.js";
 import { RuntimeClient } from "./runtime-client.js";
+import { TaskShadowRecorder } from "./task-shadow.js";
 
 let activeBridge: BridgeManager | undefined;
 
@@ -50,6 +51,7 @@ function bridgeDiffSnippet(diff: string, filePath?: string): { before: string; a
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("ShunCode");
   const ideToolBroker = new IdeToolBroker();
+  const taskShadow = new TaskShadowRecorder(context, output);
   const bridgeLicense = new BridgeLicenseService(context, output);
   const authorizeBridgeStart = async () => {
     output.appendLine("[bridge] free access enabled");
@@ -62,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     await bridgeLicense.requireFeature("bridge");
   };
-  const bridge = new BridgeManager(context, output, ideToolBroker, authorizeBridgeStart);
+  const bridge = new BridgeManager(context, output, ideToolBroker, taskShadow, authorizeBridgeStart);
   const bridgeAccess = new BridgeAccessController(bridgeLicense, bridge, output);
   activeBridge = bridge;
   const bridgeReady = bridge.initialize();
@@ -74,13 +76,14 @@ export function activate(context: vscode.ExtensionContext): void {
   const participant = registerShunCodeNativeChat(context, runtime, output, {
     shuncode: apiModelProvider,
     "shuncode-codex": codexModelProvider,
-  }, branchStore);
+  }, branchStore, taskShadow);
   const customAgents = registerShunCodeCustomAgents(context);
   const customAgentDiscoveryCts = new vscode.CancellationTokenSource();
 
   context.subscriptions.push(
     output,
     ideToolBroker,
+    taskShadow,
     bridgeLicense,
     bridgeAccess,
     bridge,

@@ -87,6 +87,25 @@ TaskCompleted
 
 UI、Chat、Bridge timeline 都可以投影相同事件，而不是各自维护一套活动状态。
 
+### Phase 3 shadow implementation
+
+第一版 Task domain 已在 Extension Host 路径旁路运行，但**尚未成为 UI 唯一 Source of Truth**：
+
+```text
+Native Chat sessionResource ─┐
+                            ├─ TaskShadowRecorder
+Bridge MCP sessionId ───────┘        ↓
+                              TaskRuntime
+                                  ↓
+                         append-only JSONL journal
+                                  ↓
+                           replay → TaskSnapshot
+```
+
+当前持久化对象覆盖 goal、todos、progress、interactions、executions、artifact refs。journal commit 会先 canonicalize 成真实 JSON 表示，再同时用于写盘和内存 projection，保证 live/replay snapshot 语义一致；最后一条 torn/corrupt JSONL 可被忽略而保留此前完整事件。
+
+当前 Bridge execution identity 使用 MCP `sessionId + requestId`。这足以建立第一版 execution ledger，但不是最终跨 transport/tool-call identity；Worker Contract / Execution Service 后续需要提供更高层 stable invocation id。
+
 ## 5. Context Engine
 
 Context Engine 属于 Task Runtime，负责：
@@ -141,6 +160,8 @@ Task Runtime progress state
 
 外部 Worker 仍可以调用相同 capability，但它不直接“拥有 Bridge todos”。
 
+Phase 3 已开始双写：Bridge 现有 `todos/activities` 仍驱动当前 UI，Task Runtime 同时记录 `TaskTodosUpdated` / `TaskProgressUpdated`。在 consistency 验证完成并建立 Task projection UI 前，不反转 ownership。
+
 ## 8. Artifact
 
 Artifact 是 Task 的一等结果引用：
@@ -155,6 +176,8 @@ Artifact 是 Task 的一等结果引用：
 - checkpoints。
 
 Artifact contract 让 UI 不需要通过 tool id/name 猜“这是不是文件 diff”。这也是移除 Core `shuncode_` tool renderer 特判的前提。
+
+Phase 3 已为 Bridge `apply_patch` 建立 changeset artifact ref：journal 只保存文件路径、files changed、additions/deletions、diff truncated 等 metadata，不复制完整 patch/diff 内容。
 
 ## 9. Execution
 
@@ -172,6 +195,15 @@ Worker requests capability
 ```
 
 发生 transport uncertainty 时，按 capability retry metadata 处理，而不是统一 retry。
+
+当前 shadow ledger 已明确拆开：
+
+```text
+execution: requested → executing → succeeded / failed / unknown
+delivery:  not-prepared → pending → delivered
+```
+
+Bridge handler 能证明 tool execution 完成、`CallToolResult` 已准备，因此写到 `pending`；它不能证明远端 Worker 已收到结果，所以当前不会写 `delivered`。此外 shadow ledger 只观察 duplicate execution id，不抑制旧路径的重复执行；at-most-once enforcement 要等 Task Execution Service 正式接管 dispatch。
 
 ## 10. Multi-model 映射
 

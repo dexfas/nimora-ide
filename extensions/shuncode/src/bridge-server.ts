@@ -13,6 +13,7 @@ import { FILE_TOOL_DEFINITIONS, invokeFileTool, isFileToolName } from "../../../
 import { BRIDGE_EXCLUDED_TOOL_NAMES, getIdeToolDefinition, IDE_TOOL_DEFINITIONS } from "../../../src/ide-tool-definitions.js";
 import type { IdeToolBroker } from "./ide-tool-broker.js";
 import { fetchWithExtensionHostFallbacks, resolveExtensionHostProxy } from "./extension-host-proxy.mjs";
+import type { TaskShadowRecorder } from "./task-shadow.js";
 
 const execFileAsync = promisify(execFile);
 const ROUTE_TOKEN_SECRET = "shuncode.bridge.routeToken";
@@ -825,6 +826,7 @@ export class BridgeManager implements vscode.Disposable {
     private readonly context: vscode.ExtensionContext,
     private readonly output: vscode.OutputChannel,
     private readonly ideToolBroker: IdeToolBroker,
+    private readonly taskShadow: TaskShadowRecorder,
     private readonly authorizeStart: () => Promise<void>,
   ) {}
 
@@ -2004,13 +2006,40 @@ export class BridgeManager implements vscode.Disposable {
 
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const toolName = request.params.name;
+      const args = request.params.arguments ?? {};
       this.toolCallsSinceLastReport += 1;
-      const result = await this.handleToolCall(toolName, request.params.arguments ?? {}, { signal: extra.signal });
-      return {
-        content: result.content,
-        isError: result.isError,
-        structuredContent: result.structuredContent as Record<string, unknown> | undefined,
-      } as CallToolResult;
+      const sessionKey = extra.sessionId?.trim() || "unscoped";
+      const taskId = await this.taskShadow.ensureBridgeTask(sessionKey, vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
+      const executionId = `mcp:${sessionKey}:${String(extra.requestId)}`;
+      const execution = await this.taskShadow.beginExecution(taskId, executionId, toolName, args);
+      const shadowStartedAt = Date.now();
+      try {
+        const result = await this.handleToolCall(toolName, args, { signal: extra.signal, taskId });
+        const resultText = result.content.map(item => item.text).join("\n");
+        await this.taskShadow.finishExecution(execution, result.isError ? "failed" : "succeeded", {
+          durationMs: Date.now() - shadowStartedAt,
+          error: result.isError ? resultText : undefined,
+          resultSummary: resultText,
+        });
+        if (toolName === "apply_patch" && !result.isError) {
+          await this.taskShadow.recordChangeset(execution, result.structuredContent);
+        }
+        // At this layer we know a CallToolResult exists, but not whether the
+        // remote client actually received it. Delivery intentionally remains
+        // pending until a transport-observable acknowledgement exists.
+        await this.taskShadow.markResultPrepared(execution);
+        return {
+          content: result.content,
+          isError: result.isError,
+          structuredContent: result.structuredContent as Record<string, unknown> | undefined,
+        } as CallToolResult;
+      } catch (error) {
+        await this.taskShadow.finishExecution(execution, "failed", {
+          durationMs: Date.now() - shadowStartedAt,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
     });
 
     transport.onclose = () => {
@@ -2036,13 +2065,25 @@ export class BridgeManager implements vscode.Disposable {
   private async handleToolCall(
     toolName: string,
     args: Record<string, unknown>,
-    extra: { signal?: AbortSignal },
+    extra: { signal?: AbortSignal; taskId?: string },
   ): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean; structuredContent?: Record<string, unknown> }> {
     if (toolName === SET_TODOS_TOOL.name) {
-      return this.handleSetTodos(args);
+      const result = this.handleSetTodos(args);
+      await this.taskShadow.setTodos(extra.taskId, this.todos);
+      return result;
     }
     if (toolName === REPORT_PROGRESS_TOOL.name) {
-      return this.handleReportProgress(args);
+      const result = this.handleReportProgress(args);
+      const latest = this.activities[this.activities.length - 1];
+      if (latest?.status === "progress" && latest.message) {
+        await this.taskShadow.reportProgress(extra.taskId, {
+          message: latest.message,
+          phase: latest.phase,
+          percent: latest.percent,
+          todoId: latest.todoId,
+        });
+      }
+      return result;
     }
 
     const activityId = this.pushActivity({
