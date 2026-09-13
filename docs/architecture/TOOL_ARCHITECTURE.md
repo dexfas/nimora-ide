@@ -72,6 +72,8 @@ Phase 5.4.7 已落地第一版 Host Capability Router，而不是把所有执行
 
 Phase 5.4.8 已给 metadata approval 接上真实 durable grant resolver。Task/session grant 都按 capability id/version 存储且可 revoke；session grant 不仅绑定 managed session id，还绑定该 session 的 attach generation。`approval=none` 不需要 grant，`task-grant` / `session` 必须命中正确 scope，`always` 当前拒绝。授权记录与 provider routing 是两条独立轴：有 route 没 grant不能执行，有 grant 没唯一 provider owner也不能执行。
 
+Phase 5.4.9 增加交互式 approval boundary。`PromptingTaskCapabilityGrantResolver` 只在 durable resolver miss 时请求用户确认，并对同一 task/session/capability 去重并发 prompt；UI 不能直接修改一份独立 permission state，批准最终仍调用 TaskRuntime strict grant API。`Nimora: Manage AI Permissions` 只做 active grant 列表与 revoke。拒绝在 `dispatchHostCapabilityRequest` 被送回 Worker 为 error result，不会调用 executor，也不会创建 execution claim。
+
 Terminal subsystem 没有为了“拆文件”而重写：原有 persistent PTY、ConPTY、echo gate、direct execution、output capture、interactive input 和 terminal reuse 逻辑整体迁入 `terminal-command-manager.ts`，并已通过真实 Extension Host terminal smoke。
 
 ## 3. 目标 Capability Definition

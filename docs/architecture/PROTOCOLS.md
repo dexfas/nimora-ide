@@ -147,6 +147,8 @@ Phase 5.4.7 明确 Host execution 的 provider routing contract：`HostCapabilit
 
 Phase 5.4.8 建立 durable grant protocol。Task journal 新增 `TaskCapabilityGranted` / `TaskCapabilityRevoked`；grant identity 使用 canonical capability id + version，而不是 UI tool name。Session scope 还记录 Worker session 的 attach generation，防止 detached session ID 被复用后继承旧权限。Grant/revoke 都必须 strict append 成功后才改变 live authorization。Task journal 目前只承载 task/session scope；metadata `approval=always` 不会被它满足，必须等待独立全局 trust store。
 
+Phase 5.4.9 增加 approval request/delivery contract。缺 grant 的 `session` / `task-grant` capability 先进入 UI prompt；批准只有在 strict grant append 成功后才返回 authorized。拒绝由 `HostCapabilityAuthorizationError` 表示，并在 Worker dispatch 边界转换成正常的 error capability result，而不是 execution failure：这条路径发生在 durable claim 之前，因此拒绝不会生成 execution ledger，也不会触发 executor。并发相同 scope/capability approval 共享一个 pending prompt，避免多弹窗造成竞态授权。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

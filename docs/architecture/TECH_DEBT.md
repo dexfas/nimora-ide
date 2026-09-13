@@ -12,7 +12,7 @@
 | 优先级 | 债务 | 事实依据 | 风险 | 处理方向 |
 | --- | --- | --- | --- | --- |
 | P0 | Personal Edge 使用开发 pairing token | MV3/Gateway hard-coded local-development token | 发布环境本地恶意进程冒充/劫持 | per-install/session pairing secret + origin binding |
-| P0 | execution ownership 尚未全链路统一 | Phase 5.3–5.4.8 已有 durable owner、opt-in host-requested E2E、provider Router 与 durable task/session grants；但 live/default WebMCP 仍由 page Core 执行，用户审批 surface 与 live release gate 尚未完成 | live 切换时若 approval UX、恢复或 provider route 漂移仍可能造成副作用重放/越权/任务卡死 | 下一步实现明确的 approval request/UI + grant/revoke surface，再做登录 provider 的 opt-in release gate；通过前保持默认 observed，不删除 page at-most-once ledger |
+| P0 | execution ownership 尚未全链路统一 | Phase 5.3–5.4.9 已有 durable owner、opt-in host-requested E2E、provider Router、durable grants、modal approval 与 revoke UI；但 live/default WebMCP 仍由 page Core 执行，登录 provider 的 live release gate 尚未完成 | live 切换时若 provider DOM/transport、恢复或真实审批交互出现偏差仍可能造成任务卡死或错误 ownership | 下一步只做用户已登录 provider 的 opt-in read-only → approval-required live roundtrip；通过前保持默认 observed，不删除 page at-most-once ledger |
 | P1 | 两套 Agent runtime 无统一 domain | Core AgentHost + first-party Runtime | session/task/worker 重复建模 | Worker Contract + Task Runtime |
 | P1 | Nimora product logic 进入 Chat Core | Bridge/branch/model/tool renderer patches | 上游升级成本、AI 误改 | Thin Core migration |
 | P1 | Bridge 职责过宽 | `bridge-server.ts` 同时 MCP/tunnel/state/UI | 修改牵连大、难测试 | split exposure/tunnel/task state |

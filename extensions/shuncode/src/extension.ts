@@ -6,6 +6,7 @@ import { configureShunCodeModel, setShunCodeApiKey } from "./config.js";
 import { codexAuthManager, onCodexAuthChange } from "./codex-auth.js";
 import { BranchStateStore } from "./branch-state.js";
 import { registerShunCodeCustomAgents } from "./custom-agents.js";
+import { createInteractiveCapabilityGrantResolver, registerCapabilityGrantManagement } from "./host-capability-approval.js";
 import { HostCapabilityExecutionService } from "./host-capability-execution-service.js";
 import { IdeToolBroker } from "./ide-tool-broker.js";
 import { ShunCodeLanguageModelProvider } from "./model-provider.js";
@@ -15,6 +16,7 @@ import { TaskShadowRecorder } from "./task-shadow.js";
 import { WebMcpCommandTransport } from "./webmcp-worker-transport.js";
 import { WebWorkerAdapter, type WebWorkerSessionOptions } from "../../../src/web-worker-adapter.js";
 import { WorkerSessionManager } from "../../../src/worker-session-manager.js";
+import { dispatchHostCapabilityRequest } from "../../../src/host-capability-request-dispatcher.js";
 import type { WorkerCapabilityResultInput, WorkerInput } from "../../../src/worker-contract.js";
 
 let activeBridge: BridgeManager | undefined;
@@ -57,10 +59,12 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("ShunCode");
   const ideToolBroker = new IdeToolBroker();
   const taskShadow = new TaskShadowRecorder(context, output);
+  const capabilityGrants = createInteractiveCapabilityGrantResolver(taskShadow.executionRuntime(), output);
+  registerCapabilityGrantManagement(context, taskShadow.executionRuntime());
   const hostCapabilityExecution = new HostCapabilityExecutionService(
     taskShadow.executionRuntime(),
     ideToolBroker,
-    undefined,
+    capabilityGrants,
     () => vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath) ?? [],
   );
   output.appendLine("[extension] host capability execution service staged; automatic dispatch is opt-in only via hostManagedCapabilities");
@@ -481,7 +485,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const session = webWorkerSessions.getSession(input.managedSessionId);
         if (!session) throw new Error("Host-managed Web worker session disappeared during execution.");
         if (!session.taskId) throw new Error("Host-managed Web worker execution requires a bound Task.");
-        await hostCapabilityExecution.executeAndDeliver({
+        await dispatchHostCapabilityRequest(hostCapabilityExecution, {
           executionId,
           managedSessionId: session.managedSessionId,
           workerId: session.workerId,

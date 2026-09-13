@@ -295,6 +295,8 @@ Phase 5.4.7 把 Host execution 从单一 `IdeToolBroker` 提升为 provider-awar
 
 Phase 5.4.8 已把 capability approval grant 纳入 TaskRuntime durable state。`TaskCapabilityGranted/Revoked` 使用 strict persistence；支持 `task` 与 `worker-session` 两种 scope，session grant 同时绑定 `managedSessionId + attachedAt generation`，因此 detach 或同 ID re-attach 都不会复活旧授权。`TaskCapabilityGrantResolver` 按 capability id/version 与 metadata approval 精确解析：`task-grant` 只接受 task scope，`session` 只接受当前 active WorkerSession 的 session scope，`always` 明确 fail-closed 等待独立 trusted global store。第一方 Host execution service 默认使用该 resolver；没有 grant 时不会执行 `run_command/apply_patch`。当前**没有自动 grant，也还没有用户审批 UI**。
 
+Phase 5.4.9 已把 durable grant 接到明确的用户审批 surface。第一方 Extension 使用 `PromptingTaskCapabilityGrantResolver`：只有缺少匹配 task/session grant 时才弹 modal approval；同一 Task/Session/Capability 的并发请求共享一个 pending prompt，批准后必须先 strict 写入 TaskRuntime 才算授权，拒绝/关闭不写 grant。`dispatchHostCapabilityRequest` 把 authorization denial 转成 `isError=true` 的 Worker capability result，使网页 AI 可以继续当前 turn，同时保证 denied request 不 claim execution、不调用 provider executor。Command Palette 新增 `Nimora: Manage AI Permissions`，只允许查看并撤销 active grants，不提供脱离具体 capability request 的“直接授权”入口。`approval=always` 仍 fail-closed。**默认/live WebMCP ownership 仍未切换；下一 gate 是用户已登录 provider 的 opt-in live roundtrip。**
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

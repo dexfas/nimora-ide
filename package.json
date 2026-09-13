@@ -34,6 +34,7 @@
 		"test-shuncode-host-capability-durable": "node scripts/shuncode-host-capability-durable-smoke.mts",
 		"test-shuncode-host-capability-policy": "node scripts/shuncode-host-capability-policy-smoke.mts",
 		"test-shuncode-capability-grants": "node scripts/shuncode-capability-grant-smoke.mts",
+		"test-shuncode-capability-approval": "node scripts/shuncode-capability-approval-smoke.mts",
 		"check-cyclic-dependencies": "node build/lib/checkCyclicDependencies.ts out",
 		"preinstall": "node build/npm/preinstall.ts",
 		"postinstall": "node build/npm/postinstall.ts",

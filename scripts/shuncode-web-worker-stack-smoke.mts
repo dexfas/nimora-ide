@@ -19,6 +19,7 @@ await esbuild.build({
       export { WorkerSessionManager } from ${JSON.stringify(path.join(root, 'src', 'worker-session-manager.ts'))};
       export { TaskRuntime } from ${JSON.stringify(path.join(root, 'src', 'task-runtime.ts'))};
       export { getCapabilityMetadata } from ${JSON.stringify(path.join(root, 'src', 'capability-registry.ts'))};
+      export { dispatchHostCapabilityRequest } from ${JSON.stringify(path.join(root, 'src', 'host-capability-request-dispatcher.ts'))};
       export { HostCapabilityExecutionService } from ${JSON.stringify(path.join(root, 'extensions', 'shuncode', 'src', 'host-capability-execution-service.ts'))};
     `,
     resolveDir: root,
@@ -33,7 +34,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { WebMcpCommandTransport, WebWorkerAdapter, WorkerSessionManager, TaskRuntime, getCapabilityMetadata, HostCapabilityExecutionService } = require(bundlePath);
+const { WebMcpCommandTransport, WebWorkerAdapter, WorkerSessionManager, TaskRuntime, getCapabilityMetadata, dispatchHostCapabilityRequest, HostCapabilityExecutionService } = require(bundlePath);
 
 class FakeCommands {
   mode = 'delivered';
@@ -264,7 +265,17 @@ try {
     name: 'run_command',
     arguments: { command: 'echo not-actually-run-by-fake-broker', background: false },
   };
-  await assert.rejects(() => hostExecution.executeOnce(terminalRequest), /was not granted/);
+  const deniedResults = [];
+  const deniedDispatch = await dispatchHostCapabilityRequest(hostExecution, terminalRequest, {
+    async submitCapabilityResult(managedSessionId, result) {
+      deniedResults.push({ managedSessionId, result });
+    },
+  });
+  assert.equal(deniedDispatch.status, 'denied');
+  assert.equal(deniedDispatch.result.isError, true);
+  assert.match(deniedDispatch.result.text, /Permission was not granted/);
+  assert.deepEqual(deniedResults, [{ managedSessionId: hostSession.managedSessionId, result: deniedDispatch.result }]);
+  assert.equal(tasks.getTask(task.taskId).executions[terminalRequest.executionId], undefined, 'denied capability must not claim an execution');
   assert.deepEqual(brokerCalls, [], 'Host service must reject session approval before invoking Broker');
   await tasks.grantCapabilityStrict(task.taskId, {
     capabilityId: runCommand.id,
