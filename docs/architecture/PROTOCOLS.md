@@ -159,6 +159,8 @@ Gateway 同时：
 - 作为 MCP server 暴露聚合后的 tools；
 - 通过 localhost control API 管理 browser/page/personal-edge。
 
+Phase 6.1 起，Gateway federation 由 ordered `GatewayProviderRegistry` 负责。Provider contract 为 `id / listTools / callTool`，可选 `owns()`，并允许一个 compatibility `fallback` provider。当前 provider 顺序是 upstream MCP、Integrated Browser、Managed Browser、Personal Edge；**顺序只决定 tools/list 展示顺序，不决定同名调用归属**。调用解析会先检查所有非 fallback provider 的显式 ownership，再回落 upstream MCP，因此本地同名 capability 不会因为 upstream 也声明同名 tool 而发生重复/错误执行。WebMCP 隐藏 Integrated Browser tool 的过滤仍发生在 provider list projection 层，不改变 provider ownership。
+
 重要安全语义：只有明确的 read-only upstream tools 可以在 transport failure 后自动 retry；side-effecting tools 不自动 retry，而是要求 caller 核实状态。
 
 这条语义与 WebMCP execution ledger 是同一个更高层问题，未来应统一到 Tool metadata + execution policy。

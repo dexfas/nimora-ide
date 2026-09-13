@@ -335,6 +335,17 @@ web model → request → Nimora tool → result delivery → final model respon
 - external native MCP 仍使用标准 MCP endpoint；
 - Bridge compatibility commands/status 映射新 service。
 
+### Phase 6.1 实现结果
+
+- 新增 `tools/webmcp-gateway/provider-registry.mjs`，定义 ordered Gateway Provider contract：`id / listTools / owns / callTool / fallback`；
+- Gateway 当前注册 `upstream-mcp`、`integrated-browser`、`managed-browser`、`personal-edge` 四个 provider；
+- tool list 继续保持历史顺序 `upstream → integrated → managed → personal`，避免外部 MCP client 出现无意义排序漂移；
+- tool call resolution 改为“本地显式 owner 优先，upstream 仅 fallback”，保持此前行为并显式阻止同名 tool 同时落到 upstream；
+- `/mcp`、`/control/*`、WebMCP browser control 与 upstream retry policy 本阶段没有改协议；
+- `test-shuncode-gateway-providers` 保护 registry contract，`test-shuncode-gateway-federation` 使用真实 Gateway `/mcp` + fake upstream/integrated provider 验证 list/call federation。
+
+当前仍只是路由模块化；provider implementation 尚未从 `server.mjs` 物理拆出，Bridge reposition 也未开始切换 endpoint owner。
+
 ### 风险
 
 公网 endpoint、MCP session、external clients compatibility。

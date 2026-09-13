@@ -9,6 +9,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { defineGatewayCapability, retryPolicyForTool } from './capability-contract.mjs';
+import { defineGatewayProvider, GatewayProviderRegistry } from './provider-registry.mjs';
 
 const PORT = Number(process.env.PORT || 48321);
 const UPSTREAM_URL = process.env.SHUNCODE_MCP_URL || '';
@@ -253,34 +254,24 @@ async function callIntegratedBrowserTool(name, args) {
 }
 
 async function listAllTools() {
-  const upstreamTools = await listUpstreamToolsStable();
-  const integratedTools = await getIntegratedBrowserTools();
-  return [...upstreamTools, ...integratedTools, ...browserTools, ...personalEdgeTools];
+  return await gatewayProviders().listTools();
 }
 
 async function listShunCodeTools() {
-  const upstreamTools = await listUpstreamToolsStable();
-  const integratedTools = await getIntegratedBrowserTools();
-  return [...upstreamTools, ...integratedTools.filter(tool => !webMcpHiddenIntegratedTools.has(tool.name)), ...browserTools, ...personalEdgeTools];
+  return await gatewayProviders().listTools({
+    filter: (tool, provider) => provider.id !== 'integrated-browser' || !webMcpHiddenIntegratedTools.has(tool.name),
+  });
 }
 
 async function callAnyTool(name, args = {}) {
-  const integratedTools = await getIntegratedBrowserTools();
-  if (integratedTools.some(tool => tool.name === name)) return await callIntegratedBrowserTool(name, args);
-  if (browserTools.some(tool => tool.name === name)) return await callBrowserTool(name, args);
-  if (personalEdgeTools.some(tool => tool.name === name)) return await callPersonalEdgeTool(name, args);
-  return await callUpstreamToolStable(name, args);
+  return await gatewayProviders().callTool(name, args);
 }
 
 async function callShunCodeTool(name, args = {}) {
   if (webMcpHiddenIntegratedTools.has(name)) {
     throw new Error(`WebMCP tool '${name}' is intentionally disabled to avoid repeated ShunCode browser confirmation dialogs. Do not retry it. Ask the user to open/preview the local file manually if visual verification is actually needed.`);
   }
-  const integratedTools = await getIntegratedBrowserTools();
-  if (integratedTools.some(tool => tool.name === name)) return await callIntegratedBrowserTool(name, args);
-  if (browserTools.some(tool => tool.name === name)) return await callBrowserTool(name, args);
-  if (personalEdgeTools.some(tool => tool.name === name)) return await callPersonalEdgeTool(name, args);
-  return await callUpstreamToolStable(name, args);
+  return await gatewayProviders().callTool(name, args);
 }
 
 // Compatibility only for an older upstream Bridge that predates capability
@@ -379,6 +370,39 @@ async function listUpstreamToolsStable() {
     return upstreamToolsCache;
   }
   throw lastError || new Error('upstream listTools failed');
+}
+
+let providerRegistry;
+
+function gatewayProviders() {
+  if (providerRegistry) return providerRegistry;
+  providerRegistry = new GatewayProviderRegistry([
+    defineGatewayProvider({
+      id: 'upstream-mcp',
+      fallback: true,
+      listTools: () => listUpstreamToolsStable(),
+      callTool: (name, args) => callUpstreamToolStable(name, args),
+    }),
+    defineGatewayProvider({
+      id: 'integrated-browser',
+      listTools: () => getIntegratedBrowserTools(),
+      owns: async name => (await getIntegratedBrowserTools()).some(tool => tool.name === name),
+      callTool: (name, args) => callIntegratedBrowserTool(name, args),
+    }),
+    defineGatewayProvider({
+      id: 'managed-browser',
+      listTools: async () => browserTools,
+      owns: name => browserTools.some(tool => tool.name === name),
+      callTool: (name, args) => callBrowserTool(name, args),
+    }),
+    defineGatewayProvider({
+      id: 'personal-edge',
+      listTools: async () => personalEdgeTools,
+      owns: name => personalEdgeTools.some(tool => tool.name === name),
+      callTool: (name, args) => callPersonalEdgeTool(name, args),
+    }),
+  ]);
+  return providerRegistry;
 }
 
 async function getBrowser() {

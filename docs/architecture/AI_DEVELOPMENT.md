@@ -140,6 +140,8 @@ node --check tools/webmcp-gateway/server.mjs
 npm run test-shuncode-webmcp-core
 npm run test-shuncode-webmcp-browser
 npm run test-shuncode-webmcp-gateway-shared-agent
+npm run test-shuncode-gateway-providers
+npm run test-shuncode-gateway-federation
 npm run test-shuncode-webmcp-command-transport
 npm run test-shuncode-web-worker-stack
 npm run test-shuncode-host-capability-execution
@@ -151,6 +153,8 @@ npm run test-shuncode-web-worker-release-gate
 ```
 
 `test-shuncode-webmcp-core` 必须保护 JSON/DeepSeek line protocol、nested args/heredoc、streaming incomplete-call guard、bounded repair、dedupe persistence/migration 与 pending-delivery bookkeeping。`test-shuncode-webmcp-browser` 使用真实 Edge 和 synthetic DeepSeek DOM 验证 HTTP/binding transport、result delivery、worker plain/tool/host-managed/host-result/interrupt lifecycle、host-managed 不调用 page-local invoke、host-result idempotency 与 repeated-scan no-reexecution；`test-shuncode-webmcp-gateway-shared-agent` 启动真实 Gateway process/managed Edge，确认 Gateway 使用 canonical v25 Core/Site/Agent；`test-shuncode-webmcp-command-transport` 保护 command bridge event cursor/terminal/host-result/interrupt/health/disconnect；`test-shuncode-web-worker-stack` 保护 command transport → adapter → manager → TaskRuntime，并额外验证 opt-in host-requested → strict Host execution service → Broker → result-return → terminal 闭环。以上都是自动 integration baseline，**不能写成 live DeepSeek 服务 E2E**；涉及发布级 DeepSeek 兼容时仍需要用户已登录网页上的真实 roundtrip。
+
+`test-shuncode-gateway-providers` 保护 Gateway Provider Registry 的 ordered listing、local-owner precedence、upstream fallback、filter 与 provider identity contract；`test-shuncode-gateway-federation` 必须启动真实 Gateway `/mcp` 并连接 fake upstream MCP + fake Integrated Browser bridge，证明同名 local tool 只执行本地 provider、upstream-only tool 仍正常 fallback。修改 federation/router/provider registration 时两者都必须运行，不能只做 `node --check`。
 
 `test-shuncode-host-capability-execution` 保护未来 host-managed execution 的 execute-once/identity guard/mandatory authorization/result-delivery retry/ambiguous executor failure 语义。这个 smoke 通过不代表 host-managed production dispatch 已启用；在 TaskRuntime durable claim/recovery 完成前，禁止把该 coordinator 直接接到 `run_command` / `apply_patch` 等副作用 capability 的生产自动执行路径。
 

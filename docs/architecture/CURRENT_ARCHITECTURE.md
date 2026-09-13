@@ -220,7 +220,9 @@ Phase 5.3 又让 `WorkerSessionManager` 对绑定 Task 的 capability events 做
 - Personal Edge broker；
 - managed browser WebMCP host/control API。
 
-它已经接近“Gateway”的长期方向，但当前内部职责仍需模块化。
+Phase 6.1 已把 Gateway 的 tool federation 路由从 `server.mjs` 内硬编码 if/else 提取为 `provider-registry.mjs`。当前显式 provider 是 `upstream-mcp`（fallback）、`integrated-browser`、`managed-browser`、`personal-edge`：tool list 保持原有 provider 顺序，调用时先解析本地显式 owner，只有没有本地 owner 才回落 upstream。标准 `/mcp` endpoint 与 `/control/*` routes 没有改变；真实 Gateway MCP smoke 已验证本地同名 tool 不会重复落到 upstream。
+
+这一步只建立了**模块边界和 ownership contract**；Managed Browser、Personal Edge、upstream MCP client 等具体实现目前仍物理位于 `server.mjs`，Gateway monolith 尚未完成拆分。
 
 默认 WebMCP control/gateway 端口仍保持 48322/48321 以兼容现有安装版；源码/测试实例可通过 `SHUNCODE_WEBMCP_CONTROL_PORT` / `SHUNCODE_WEBMCP_GATEWAY_PORT` 隔离运行。动态 discovery/多 workspace handshake 尚未完成。
 
