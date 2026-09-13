@@ -4,6 +4,7 @@ import { getCapabilityMetadata } from "../../../src/capability-registry.js";
 import { TaskRuntime } from "../../../src/task-runtime.js";
 import type { TaskArtifactRef, TaskInteractionOutcome, TaskProgress, TaskSnapshot, TaskTodo } from "../../../src/task-contract.js";
 import type { WorkerExecutionProjectionStore, WorkerTaskBindingStore } from "../../../src/worker-session-manager.js";
+import { taskFileNavigationArtifact } from "./task-file-artifacts.js";
 
 export interface ShadowExecutionHandle {
   taskId: string;
@@ -152,6 +153,16 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
         deletions: typeof summary.deletions === "number" ? summary.deletions : undefined,
         diffTruncated: row.diff_truncated === true,
       },
+    }));
+  }
+
+  async recordFileNavigationArtifact(handle: ShadowExecutionHandle | undefined, toolName: string, structuredContent: unknown): Promise<TaskArtifactRef | undefined> {
+    if (!handle) return undefined;
+    const artifact = taskFileNavigationArtifact(toolName, structuredContent);
+    if (!artifact) return undefined;
+    return this.safe("record file navigation artifact", () => this.runtime.recordArtifact(handle.taskId, {
+      ...artifact,
+      executionId: handle.executionId,
     }));
   }
 

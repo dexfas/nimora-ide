@@ -470,6 +470,12 @@ Bridge 的 end-to-end `checkHealth()` contract 本来就探测 local HTTP、publ
 
 旧 Chat Bridge Session 已删除 health command、health report 类型、按钮、renderer 与专用 CSS。它现在只保留 connection/activity summary、clear activity log、Work Sessions/Bridge Settings handoff，以及尚未迁出的 rich file/diff/terminal tool cards。`test-shuncode-work-sessions-handoff` 保护 health wiring 只存在于 Bridge Settings，不再回流 Chat Core。
 
+### Phase 7.11 — Durable File Navigation Artifacts
+
+Bridge 的 `read_files` / `find_files` 结果开始脱离 manager-global rich presentation：成功调用会通过 `TaskShadowRecorder.recordFileNavigationArtifact()` 写入 Task `file` artifact，记录可安全导航的 workspace-relative file set、来源 tool 和结果是否截断。`read_files` 只持久化实际成功读取的文件；失败/跳过的 path 不会伪装成可打开 artifact。
+
+Work Sessions 现在把 `file` artifact 与 `changeset` artifact 一起投影成原生 `ChatResponseFileTreePart`，并继续走同一条路径清洗边界。对应的 `bridgePresentation()` 中 `read_files` / `find_files` 专用分支已经删除；旧 Bridge Session 对这两类调用只剩 generic compatibility output。`search_files` 暂时不迁，因为它的行号、列号和 snippet 语义还没有被 native Work Sessions 无损承接，不能为了删旧 UI 丢定位信息。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

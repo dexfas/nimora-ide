@@ -173,6 +173,8 @@ Phase 7.9 进一步把 Bridge mutation control 移出 Chat Core。extension 暴�
 
 Phase 7.10 又把 end-to-end MCP health diagnostics 收敛到同一个 Bridge settings surface。Connection Settings 直接执行现有 `shuncode.bridge.checkHealth`，展示 local/public probe、tunnel process、MCP session/active-request summary 和最近检查时间；旧 Chat Bridge Session 已删除 health 类型、command、button、renderer/CSS。当前 legacy Session 只剩 activity summary/log control 与 rich file/diff/terminal cards，离彻底移除又少了一层连接诊断职责。
 
+Phase 7.11 开始迁最后一组 rich tool presentation，但只迁能无损落到原生 surface 的部分。成功的 `read_files` / `find_files` 现在产出 durable Task `file` artifact，Work Sessions 将这些文件与 changeset 文件统一显示为 native file tree；Bridge-only 的 read/find presentation 分支已删除。`search_files` 仍保留旧 rich location/snippet card，因为 native Task projection 还没有等价的 line-level search location 表达；terminal、diff、diagnostics/LSP 也仍属于后续迁移边界。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

@@ -12,7 +12,10 @@ const bundlePath = path.join(bundleDirectory, 'task-center-session-presentation.
 
 await esbuild.build({
   stdin: {
-    contents: `export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';`,
+    contents: `
+      export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';
+      export { taskFileNavigationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
+    `,
     resolveDir: root,
     sourcefile: 'task-center-session-presentation-entry.ts',
     loader: 'ts',
@@ -25,7 +28,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } = require(bundlePath);
+const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskFileNavigationArtifact } = require(bundlePath);
 
 const summary = {
   version: 1,
@@ -40,7 +43,7 @@ const summary = {
   workerCount: 2,
   activeWorkerCount: 1,
   executionCounts: { total: 4, running: 0, succeeded: 3, failed: 1, unknown: 0, pendingDelivery: 1 },
-  artifactCount: 3,
+  artifactCount: 4,
 };
 
 const detail = {
@@ -62,6 +65,7 @@ const detail = {
   ],
   artifacts: [
     { artifactId: 'changes', kind: 'changeset', title: 'Workspace patch', createdAt: '2026-09-13T08:04:00.000Z', metadata: { files: ['src/b.ts', 'src/a.ts', '../escape.txt', '/absolute.txt'], additions: 10, deletions: 2, diffTruncated: true } },
+    { artifactId: 'read', kind: 'file', title: 'Read source files', createdAt: '2026-09-13T08:04:10.000Z', metadata: { files: ['src/c.ts', '../outside.ts'], sourceTool: 'read_files', resultTruncated: true } },
     { artifactId: 'report', kind: 'report', title: 'Review report', uri: 'https://example.com/report', createdAt: '2026-09-13T08:04:30.000Z' },
     { artifactId: 'unsafe', kind: 'other', title: 'Unsafe command URI', uri: 'command:do-not-run', createdAt: '2026-09-13T08:04:40.000Z' },
   ],
@@ -70,7 +74,7 @@ const detail = {
 try {
   const presentation = presentTaskSession(summary);
   assert.equal(presentation.label, 'Ship Task-owned Work Sessions', 'session labels must stay single-line');
-  assert.equal(presentation.description, '1/3 todos · 1 active AI · 4 actions · 3 artifacts');
+  assert.equal(presentation.description, '1/3 todos · 1 active AI · 4 actions · 4 artifacts');
   assert.equal(presentation.badge, '60%');
   assert.equal(presentation.status, 'in_progress');
   assert.equal(presentation.terminal, false);
@@ -84,6 +88,25 @@ try {
   const artifacts = presentTaskSessionArtifacts(detail);
   assert.deepEqual(artifacts[0].files, ['src/b.ts', 'src/a.ts'], 'artifact presentation must drop absolute/traversal paths');
   assert.deepEqual(buildTaskSessionFileTree(artifacts[0].files), [{ name: 'src', children: [{ name: 'a.ts' }, { name: 'b.ts' }] }]);
+  assert.deepEqual(artifacts[1].files, ['src/c.ts'], 'file-navigation artifacts use the same workspace-relative path safety boundary');
+  assert.equal(artifacts[1].resultTruncated, true);
+
+  const readArtifact = taskFileNavigationArtifact('read_files', {
+    files: [
+      { path: 'src/read-a.ts', status: 'success' },
+      { path: 'src/missing.ts', status: 'error' },
+      { path: 'src/read-b.ts', status: 'success' },
+    ],
+    summary: { truncated: 1 },
+  });
+  assert.deepEqual(readArtifact?.metadata?.files, ['src/read-a.ts', 'src/read-b.ts'], 'read artifacts must only persist successfully navigable files');
+  assert.equal(readArtifact?.metadata?.resultTruncated, true);
+  const findArtifact = taskFileNavigationArtifact('find_files', {
+    files: [{ path: 'src/found.ts' }, { path: 'src/found.ts' }, { path: 'test/found.test.ts' }],
+    summary: { truncated: true },
+  });
+  assert.deepEqual(findArtifact?.metadata?.files, ['src/found.ts', 'test/found.test.ts']);
+  assert.equal(taskFileNavigationArtifact('search_files', { matches: [{ path: 'src/search.ts' }] }), undefined, 'search results retain their richer line-level presentation until a native replacement exists');
 
   const markdown = formatTaskSessionMarkdown(detail);
   assert.match(markdown, /### Todos/);
@@ -91,6 +114,7 @@ try {
   assert.match(markdown, /### Timeline/);
   assert.match(markdown, /### Artifacts/);
   assert.match(markdown, /Workspace patch\*\* · changeset · 2 files · \+10 · -2 · diff summary truncated/);
+  assert.match(markdown, /Read source files\*\* · file · 1 file · results truncated/);
   assert.match(markdown, /`src\/a\.ts`/);
   assert.doesNotMatch(markdown, /escape\.txt|absolute\.txt/, 'unsafe artifact paths must not reach Work Sessions markdown');
   assert.match(markdown, /read_files:\*\* succeeded · result pending delivery/, 'execution and result delivery state must remain separate in presentation');
@@ -99,7 +123,8 @@ try {
   const sessionsSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-center-sessions.ts'), 'utf8');
   assert.match(sessionsSource, /createChatSessionItemController\(NIMORA_TASK_SESSION_TYPE/);
   assert.match(sessionsSource, /registerChatSessionContentProvider\(/);
-  assert.match(sessionsSource, /new vscode\.ChatResponseFileTreePart\(/, 'changeset artifacts must use the native file-tree presentation');
+  assert.match(sessionsSource, /artifact\.kind === "changeset" \|\| artifact\.kind === "file"/, 'changeset and durable file-navigation artifacts must share native file-tree presentation');
+  assert.match(sessionsSource, /new vscode\.ChatResponseFileTreePart\(/, 'workspace file artifacts must use the native file-tree presentation');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(/, 'URI artifacts must use native anchors');
   assert.match(sessionsSource, /uri\.scheme === "http" \|\| uri\.scheme === "https"/);
   assert.match(sessionsSource, /uri\.scheme !== "file" \|\| !workspace/, 'file anchors require a workspace containment check');
@@ -109,6 +134,14 @@ try {
   const extensionSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'extension.ts'), 'utf8');
   assert.match(extensionSource, /registerTaskCenterSessions\(context, taskShadow, participant, SHUNCODE_PARTICIPANT_ID, output\)/);
   assert.match(extensionSource, /registerCommand\("shuncode\.taskCenter\.open"[\s\S]{0,200}workbench\.action\.chat\.history/);
+
+  const taskShadowSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-shadow.ts'), 'utf8');
+  assert.match(taskShadowSource, /recordFileNavigationArtifact[\s\S]{0,500}taskFileNavigationArtifact\(toolName, structuredContent\)[\s\S]{0,500}recordArtifact/);
+  const bridgeSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'bridge-server.ts'), 'utf8');
+  assert.match(bridgeSource, /recordFileNavigationArtifact\(execution, toolName, result\.structuredContent\)/, 'successful Bridge file navigation must be durably projected into Task artifacts');
+  assert.doesNotMatch(bridgeSource, /if \(toolName === "read_files"\)/, 'read_files must no longer have a Bridge-only rich presentation branch');
+  assert.doesNotMatch(bridgeSource, /if \(toolName === "find_files"\)/, 'find_files must no longer have a Bridge-only rich presentation branch');
+  assert.match(bridgeSource, /if \(toolName === "search_files"\)/, 'line-level search presentation stays in Bridge until Work Sessions can preserve locations/snippets');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));

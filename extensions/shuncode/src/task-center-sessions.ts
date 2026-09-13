@@ -53,9 +53,11 @@ function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatRes
     new vscode.ChatResponseMarkdownPart(new vscode.MarkdownString(formatTaskSessionMarkdown(detail))),
   ];
   const artifacts = presentTaskSessionArtifacts(detail);
-  const changedFiles = [...new Set(artifacts.filter(artifact => artifact.kind === "changeset").flatMap(artifact => artifact.files))];
-  if (detail.summary.workspace && changedFiles.length) {
-    const tree = buildTaskSessionFileTree(changedFiles);
+  const workspaceFiles = [...new Set(artifacts
+    .filter(artifact => artifact.kind === "changeset" || artifact.kind === "file")
+    .flatMap(artifact => artifact.files))];
+  if (detail.summary.workspace && workspaceFiles.length) {
+    const tree = buildTaskSessionFileTree(workspaceFiles);
     if (tree.length) parts.push(new vscode.ChatResponseFileTreePart(tree, vscode.Uri.file(detail.summary.workspace)));
   }
   for (const artifact of artifacts) {

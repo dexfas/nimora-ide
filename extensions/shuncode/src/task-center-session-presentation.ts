@@ -22,6 +22,7 @@ export interface TaskSessionArtifactPresentation {
   additions?: number;
   deletions?: number;
   diffTruncated: boolean;
+  resultTruncated: boolean;
 }
 
 export interface TaskSessionFileTreeNode {
@@ -111,6 +112,7 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       additions: metadataNumber(metadata, "additions"),
       deletions: metadataNumber(metadata, "deletions"),
       diffTruncated: metadata?.diffTruncated === true,
+      resultTruncated: metadata?.resultTruncated === true,
     };
   });
 }
@@ -178,6 +180,7 @@ export function formatTaskSessionMarkdown(detail: TaskCenterTaskDetail): string 
         artifact.additions !== undefined ? `+${artifact.additions}` : undefined,
         artifact.deletions !== undefined ? `-${artifact.deletions}` : undefined,
         artifact.diffTruncated ? "diff summary truncated" : undefined,
+        artifact.resultTruncated ? "results truncated" : undefined,
       ].filter((value): value is string => Boolean(value));
       lines.push(`- **${artifact.title}** · ${artifact.kind}${stats.length ? ` · ${stats.join(" · ")}` : ""}`);
       for (const file of artifact.files.slice(0, 12)) lines.push(`  - \`${file}\``);

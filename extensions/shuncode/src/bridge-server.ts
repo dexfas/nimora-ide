@@ -500,35 +500,6 @@ function bridgePresentation(
   const output = boundedText(resultText, 24_000);
   const structured = structuredContent ?? {};
 
-  if (toolName === "read_files") {
-    const requested = recordArray(args.files).map((file) => typeof file.path === "string" ? file.path : undefined);
-    const returned = recordArray(structured.files).map((file) => typeof file.path === "string" ? file.path : undefined);
-    const files = uniqueStrings([...requested, ...returned]);
-    return {
-      kind: "files",
-      title: files.length === 1 ? `Read ${files[0]}` : `Read ${files.length || "workspace"} files`,
-      subtitle: isError ? "File read failed" : files.length ? `${files.length} file${files.length === 1 ? "" : "s"}` : undefined,
-      files,
-      items: files.map((file) => ({ kind: "file", path: file })),
-      input: undefined,
-      output: isError ? output : undefined,
-    };
-  }
-
-  if (toolName === "find_files") {
-    const files = uniqueStrings(recordArray(structured.files).map((file) => typeof file.path === "string" ? file.path : undefined));
-    const patterns = Array.isArray(args.patterns) ? args.patterns.filter((value): value is string => typeof value === "string") : [];
-    return {
-      kind: "files",
-      title: files.length ? `Found ${files.length} file${files.length === 1 ? "" : "s"}` : "Find files",
-      subtitle: patterns.length ? patterns.join(", ") : undefined,
-      files,
-      items: files.map((file) => ({ kind: "file", path: file })),
-      input: undefined,
-      output: isError ? output : undefined,
-    };
-  }
-
   if (toolName === "search_files") {
     const matches = recordArray(structured.matches);
     const files = uniqueStrings(matches.map((match) => typeof match.path === "string" ? match.path : undefined));
@@ -2025,6 +1996,8 @@ export class BridgeManager implements vscode.Disposable {
         });
         if (toolName === "apply_patch" && !result.isError) {
           await this.taskShadow.recordChangeset(execution, result.structuredContent);
+        } else if (!result.isError) {
+          await this.taskShadow.recordFileNavigationArtifact(execution, toolName, result.structuredContent);
         }
         // At this layer we know a CallToolResult exists, but not whether the
         // remote client actually received it. Delivery intentionally remains
