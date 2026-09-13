@@ -284,6 +284,28 @@ try {
   assert.equal(toolDone.text, 'TOOL_WORKER_FINAL');
   assert.ok(!toolDone.events.some(event => event.type === 'assistant_text' && event.text.includes('[SHUNCODE_TOOL]')));
 
+  const hostResultStart = await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerSend({ inputId: 'worker-host-result-1', prompt: 'Wait for a host-managed capability result, then continue.' }));
+  assert.equal(hostResultStart.state, 'running');
+  const hostResolveInput = { inputId: 'worker-host-result-1', callId: 'host-call-1', name: 'read_files', text: 'HOST_RESULT_OK', isError: false };
+  const firstResolve = await workerPage.evaluate(async input => await window.__shuncodeWebMcp.workerResolveCapability(input), hostResolveInput);
+  assert.equal(firstResolve.state, 'running');
+  const secondResolve = await workerPage.evaluate(async input => await window.__shuncodeWebMcp.workerResolveCapability(input), hostResolveInput);
+  assert.equal(secondResolve.state, 'running');
+  await workerPage.waitForFunction(() => window.__submittedMessages.some(text => text.includes('[SHUNCODE_TOOL_RESULT]') && text.includes('HOST_RESULT_OK')), null, { timeout: 10000 });
+  const hostResultMessages = await workerPage.evaluate(() => window.__submittedMessages.filter(text => text.includes('[SHUNCODE_TOOL_RESULT]') && text.includes('HOST_RESULT_OK')));
+  assert.equal(hostResultMessages.length, 1, 'retrying the same host result must not inject it twice after confirmed delivery');
+  const hostResolvedTurn = await workerPage.evaluate(() => window.__shuncodeWebMcp.workerPoll('worker-host-result-1'));
+  assert.equal(hostResolvedTurn.events.filter(event => event.type === 'capability_result' && event.callId === 'host-call-1').length, 1);
+  assert.equal(hostResolvedTurn.events.filter(event => event.type === 'status' && event.name === 'capability_result_delivered' && event.callId === 'host-call-1').length, 1);
+  await workerPage.evaluate(() => {
+    const response = document.createElement('div');
+    response.className = 'ds-assistant-message-main-content';
+    response.innerText = 'HOST_RESULT_WORKER_FINAL';
+    document.getElementById('messages').appendChild(response);
+  });
+  const hostResultDone = await pollWorkerUntil(workerPage, 'worker-host-result-1', 'completed');
+  assert.equal(hostResultDone.text, 'HOST_RESULT_WORKER_FINAL');
+
   const interruptStart = await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerSend({ inputId: 'worker-cancel-1', prompt: 'Start a long response.' }));
   assert.equal(interruptStart.state, 'running');
   await workerPage.evaluate(() => {
@@ -302,7 +324,7 @@ try {
   assert.ok(cancelled.events.some(event => event.type === 'cancelled'));
   await workerContext.close();
 
-  console.log('[smoke] WebMCP v25 synthetic DeepSeek HTTP+binding roundtrip + worker plain/tool/interrupt lifecycle ok');
+  console.log('[smoke] WebMCP v25 synthetic DeepSeek HTTP+binding + worker plain/tool/host-result/interrupt lifecycle ok');
 } finally {
   await browser.close();
 }

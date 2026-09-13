@@ -25,6 +25,7 @@ const { WebWorkerAdapter } = await import(`${pathToFileURL(bundlePath).href}?v=$
 class FakeWebTransport {
   disconnected = [];
   interrupted = [];
+  submittedResults = [];
   lastInput = null;
 
   async describe() {
@@ -64,6 +65,10 @@ class FakeWebTransport {
 
   async interrupt(session) {
     this.interrupted.push(session.sessionId);
+  }
+
+  async submitCapabilityResult(session, result) {
+    this.submittedResults.push({ sessionId: session.sessionId, result });
   }
 
   async health() {
@@ -118,6 +123,15 @@ try {
   const cancelling = adapter.send(session, { inputId: 'turn-2', prompt: 'cancel me' });
   const iterator = cancelling[Symbol.asyncIterator]();
   assert.equal((await iterator.next()).value.type, 'text_delta');
+  await assert.rejects(
+    () => adapter.submitCapabilityResult(session, { inputId: 'wrong-turn', callId: 'host-call-1', name: 'read_files', text: 'wrong' }),
+    /does not match the active input/,
+  );
+  await adapter.submitCapabilityResult(session, { inputId: 'turn-2', callId: 'host-call-1', name: 'read_files', text: 'HOST_RESULT_OK' });
+  assert.deepEqual(transport.submittedResults, [{
+    sessionId: 'page-session-1',
+    result: { inputId: 'turn-2', callId: 'host-call-1', name: 'read_files', text: 'HOST_RESULT_OK' },
+  }]);
   await adapter.interrupt(session);
   assert.deepEqual(transport.interrupted, ['page-session-1']);
   assert.equal((await iterator.next()).value.status, 'cancelled');

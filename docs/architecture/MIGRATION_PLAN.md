@@ -281,6 +281,8 @@ Phase 5.3 在 `WorkerSessionManager.send()` 增加 provider-neutral execution pr
 
 Phase 5.4.1 已先建立 execution ownership handoff 的语义前提：`capability_call.dispatch` 必须显式为 `observed | host-requested`。现有 API/AgentHost/WebMCP page-local 全部是 `observed`，因此 Manager/Task ledger 只能记录，绝不能重复执行；后续只有 WebMCP host-managed 路径明确发出 `host-requested` 时，Task Execution Service 才有资格接管 dispatch。下一步仍需 capability executor + result-return contract，当前没有启用 host-managed production path。
 
+Phase 5.4.2 已补齐 dormant result-return contract：Worker/Transport 可选 `submitCapabilityResult()`，`WorkerSessionManager` 只允许向当前真实 outstanding 的 `host-requested + callId` 回传结果；早到、晚到、call 名不匹配都会拒绝，adapter 提交失败时 pending request 保留以便只重试结果投递。WebMCP v25 page runtime 新增 `workerResolveCapability()`，同一 `callId + capability` 已确认投递后再次提交不会重复注入。Extension command bridge 已贯通到 page runtime。**现有生产 WebMCP 仍只发 `observed`，所以该通道目前不会触发 Host 执行。**
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

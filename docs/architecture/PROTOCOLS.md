@@ -133,6 +133,8 @@ Phase 5.3 的 projection 规则是：Manager 为每个 managed session/input 内
 
 Phase 5.4.1 开始显式区分 capability dispatch ownership。`WorkerEvent.capability_call.dispatch` 是必填字段：`observed` 表示该 Worker/runtime/page 已经拥有并执行这次调用，Host **禁止再次 dispatch**；`host-requested` 表示 Worker 只提出调用请求，必须由 Nimora host/Execution Service 执行并显式把结果送回 Worker。当前 API Runtime、AgentHost 与 WebMCP page-local 三条生产链全部标记为 `observed`。未来 host-managed WebMCP 只能通过显式切换到 `host-requested` 进入，不允许用“有没有 capability_result”之类启发式猜 ownership。
 
+Phase 5.4.2 建立反向 result-return contract：`WorkerAdapter/WebWorkerTransport.submitCapabilityResult()` 把 Host 执行结果返回原 Worker。`WorkerSessionManager` 维护当前 input 的 outstanding host-requested calls，要求 stable `callId`，并且只在 adapter 确认提交成功后移除 pending；这使 transport failure 可以安全重试**结果回传**而不是工具执行。WebMCP page 的 `workerResolveCapability()` 对已确认投递的 `callId + capability` 幂等，重复调用不会再次写入 `[SHUNCODE_TOOL_RESULT]`。当前该通道是 dormant control surface，因为 WebMCP page-local call 仍声明 `dispatch=observed`。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

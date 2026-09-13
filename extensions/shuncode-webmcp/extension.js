@@ -751,6 +751,7 @@ async function controlWebMcpWorkerPage(request) {
     action,
     input: request?.input,
     inputId: request?.inputId,
+    result: request?.result,
   };
   const code = `
     const request = ${JSON.stringify(payload)};
@@ -762,6 +763,7 @@ async function controlWebMcpWorkerPage(request) {
       if (request.action === 'send') return await api.workerSend(request.input);
       if (request.action === 'poll') return api.workerPoll(request.inputId);
       if (request.action === 'interrupt') return { interrupted: await api.workerInterrupt(request.inputId), turn: api.workerPoll(request.inputId) };
+      if (request.action === 'resolve') return await api.workerResolveCapability(request.result);
       if (request.action === 'health') return { session, status: api.status() };
       if (request.action === 'disconnect') {
         const status = api.status();
@@ -993,6 +995,7 @@ function activate(context) {
     vscode.commands.registerCommand('_shuncode.webMcp.workerSend', request => controlWebMcpWorkerPage({ ...request, action: 'send' })),
     vscode.commands.registerCommand('_shuncode.webMcp.workerPoll', request => controlWebMcpWorkerPage({ ...request, action: 'poll' })),
     vscode.commands.registerCommand('_shuncode.webMcp.workerInterrupt', request => controlWebMcpWorkerPage({ ...request, action: 'interrupt' })),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerResolve', request => controlWebMcpWorkerPage({ ...request, action: 'resolve' })),
     vscode.commands.registerCommand('_shuncode.webMcp.workerHealth', request => controlWebMcpWorkerPage({ ...request, action: 'health' })),
     vscode.commands.registerCommand('_shuncode.webMcp.workerDisconnect', request => controlWebMcpWorkerPage({ ...request, action: 'disconnect' })),
   );

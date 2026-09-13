@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type {
   WorkerAdapter,
+  WorkerCapabilityResultInput,
   WorkerDescriptor,
   WorkerEvent,
   WorkerHealth,
@@ -14,6 +15,7 @@ interface ErasedWorkerAdapter {
   describe(): Promise<WorkerDescriptor>;
   createSession(options: WorkerSessionOptions): Promise<WorkerSessionHandle>;
   send(session: WorkerSessionHandle, input: WorkerInput): AsyncIterable<WorkerEvent>;
+  submitCapabilityResult?(session: WorkerSessionHandle, result: WorkerCapabilityResultInput): Promise<void>;
   interrupt(session: WorkerSessionHandle): Promise<void>;
   resume?(session: WorkerSessionHandle, checkpoint: unknown): Promise<void>;
   dispose(session: WorkerSessionHandle): Promise<void>;
@@ -77,6 +79,7 @@ interface ManagedWorkerSessionRecord {
   workerId: string;
   taskId?: string;
   handle: WorkerSessionHandle;
+  hostCapabilityRequests: Map<string, { inputId: string; callId: string; name: string }>;
 }
 
 function cloneDescriptor(descriptor: WorkerDescriptor): WorkerDescriptor {
@@ -166,7 +169,7 @@ export class WorkerSessionManager {
       await worker.adapter.dispose(handle).catch(() => undefined);
       throw new Error(`Managed worker session id collision: ${managedSessionId}`);
     }
-    const record: ManagedWorkerSessionRecord = { managedSessionId, workerId, handle };
+    const record: ManagedWorkerSessionRecord = { managedSessionId, workerId, handle, hostCapabilityRequests: new Map() };
     this.sessions.set(managedSessionId, record);
     this.adapterSessionIds.set(adapterKey, managedSessionId);
     try {
@@ -233,9 +236,22 @@ export class WorkerSessionManager {
 
   send<TInput extends WorkerInput>(managedSessionId: string, input: TInput): AsyncIterable<WorkerEvent> {
     const record = this.requireSession(managedSessionId);
-    const events = this.requireWorker(record.workerId).adapter.send(record.handle, input);
+    const events = this.trackCapabilityDispatch(record, input, this.requireWorker(record.workerId).adapter.send(record.handle, input));
     if (!record.taskId || !this.options.executionProjection) return events;
     return this.projectExecutionEvents(record, input, events);
+  }
+
+  async submitCapabilityResult(managedSessionId: string, result: WorkerCapabilityResultInput): Promise<void> {
+    const record = this.requireSession(managedSessionId);
+    if (!result.callId) throw new Error("Host-managed capability result requires callId.");
+    const key = this.hostCapabilityRequestKey(result.inputId, result.callId);
+    const pending = record.hostCapabilityRequests.get(key);
+    if (!pending) throw new Error(`No outstanding host-requested capability call ${result.callId} for input ${result.inputId}.`);
+    if (pending.name !== result.name) throw new Error(`Host-managed capability result name mismatch for ${result.callId}: expected ${pending.name}, received ${result.name}.`);
+    const adapter = this.requireWorker(record.workerId).adapter;
+    if (!adapter.submitCapabilityResult) throw new Error(`Worker ${record.workerId} does not accept host-managed capability results.`);
+    await adapter.submitCapabilityResult(record.handle, result);
+    record.hostCapabilityRequests.delete(key);
   }
 
   async interrupt(managedSessionId: string): Promise<void> {
@@ -376,6 +392,35 @@ export class WorkerSessionManager {
       }
       yield event;
     }
+  }
+
+  private async *trackCapabilityDispatch(
+    record: ManagedWorkerSessionRecord,
+    input: WorkerInput,
+    events: AsyncIterable<WorkerEvent>,
+  ): AsyncIterable<WorkerEvent> {
+    try {
+      for await (const event of events) {
+        if (event.type === "capability_call" && event.dispatch === "host-requested") {
+          if (!event.callId) throw new Error(`Worker ${record.workerId} emitted host-requested capability ${event.name} without callId.`);
+          const key = this.hostCapabilityRequestKey(input.inputId, event.callId);
+          const existing = record.hostCapabilityRequests.get(key);
+          if (existing && existing.name !== event.name) {
+            throw new Error(`Worker ${record.workerId} reused host-requested callId ${event.callId} for a different capability.`);
+          }
+          if (!existing) record.hostCapabilityRequests.set(key, { inputId: input.inputId, callId: event.callId, name: event.name });
+        }
+        yield event;
+      }
+    } finally {
+      for (const [key, pending] of record.hostCapabilityRequests) {
+        if (pending.inputId === input.inputId) record.hostCapabilityRequests.delete(key);
+      }
+    }
+  }
+
+  private hostCapabilityRequestKey(inputId: string, callId: string): string {
+    return `${inputId}\u0000${callId}`;
   }
 
   private newId(): string {

@@ -14,7 +14,7 @@ import { TaskShadowRecorder } from "./task-shadow.js";
 import { WebMcpCommandTransport } from "./webmcp-worker-transport.js";
 import { WebWorkerAdapter, type WebWorkerSessionOptions } from "../../../src/web-worker-adapter.js";
 import { WorkerSessionManager } from "../../../src/worker-session-manager.js";
-import type { WorkerInput } from "../../../src/worker-contract.js";
+import type { WorkerCapabilityResultInput, WorkerInput } from "../../../src/worker-contract.js";
 
 let activeBridge: BridgeManager | undefined;
 
@@ -470,6 +470,17 @@ export function activate(context: vscode.ExtensionContext): void {
       if (typeof managedSessionId !== "string" || !managedSessionId) throw new Error("Web worker managedSessionId is required.");
       await webWorkerSessions.interrupt(managedSessionId);
       return webWorkerSessions.getSession(managedSessionId);
+    }),
+    vscode.commands.registerCommand("_shuncode.worker.web.submitCapabilityResult", async (value: unknown) => {
+      await webWorkerReady;
+      const input = value && typeof value === "object" ? value as { managedSessionId?: unknown; result?: unknown } : {};
+      if (typeof input.managedSessionId !== "string" || !input.managedSessionId) throw new Error("Web worker managedSessionId is required.");
+      if (!input.result || typeof input.result !== "object" || Array.isArray(input.result)) throw new Error("Web worker capability result is required.");
+      const result = input.result as Partial<WorkerCapabilityResultInput>;
+      if (typeof result.inputId !== "string" || !result.inputId) throw new Error("Web worker capability result inputId is required.");
+      if (typeof result.name !== "string" || !result.name) throw new Error("Web worker capability result name is required.");
+      await webWorkerSessions.submitCapabilityResult(input.managedSessionId, result as WorkerCapabilityResultInput);
+      return { submitted: true };
     }),
     vscode.commands.registerCommand("_shuncode.worker.web.health", async (managedSessionId: unknown) => {
       await webWorkerReady;

@@ -62,6 +62,16 @@ export interface WorkerCapabilityDefinition {
 
 export type WorkerCapabilityDispatch = "observed" | "host-requested";
 
+export interface WorkerCapabilityResultInput {
+  inputId: string;
+  callId?: string;
+  name: string;
+  text?: string;
+  isError?: boolean;
+  durationMs?: number;
+  data?: unknown;
+}
+
 export interface WorkerInput {
   /** Stable identity for one turn/send inside the logical WorkerSession. */
   inputId: string;
@@ -109,6 +119,7 @@ export interface WorkerAdapter<
   describe(): Promise<WorkerDescriptor>;
   createSession(options: TSessionOptions): Promise<WorkerSessionHandle>;
   send(session: WorkerSessionHandle, input: TInput): AsyncIterable<WorkerEvent>;
+  submitCapabilityResult?(session: WorkerSessionHandle, result: WorkerCapabilityResultInput): Promise<void>;
   interrupt(session: WorkerSessionHandle): Promise<void>;
   resume?(session: WorkerSessionHandle, checkpoint: unknown): Promise<void>;
   dispose(session: WorkerSessionHandle): Promise<void>;

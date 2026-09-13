@@ -2,7 +2,7 @@
   "name": "shuncode-integrated-browser-bridge",
   "displayName": "ShunCode Web MCP Bridge",
   "description": "Web MCP bridge for ShunCode's built-in Integrated Browser and generic AI chat pages.",
-  "version": "0.4.12",
+  "version": "0.4.13",
   "publisher": "shuncode",
   "private": false,
   "engines": { "vscode": "^1.132.0" },

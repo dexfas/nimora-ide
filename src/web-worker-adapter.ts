@@ -1,5 +1,6 @@
 import type {
   WorkerAdapter,
+  WorkerCapabilityResultInput,
   WorkerCapabilities,
   WorkerDescriptor,
   WorkerEvent,
@@ -65,6 +66,7 @@ export interface WebWorkerTransport {
   describe(): Promise<WebWorkerTransportDescriptor>;
   connect(options: WebWorkerTransportSessionOptions): Promise<WebWorkerTransportSession>;
   send(session: WebWorkerTransportSession, input: WebWorkerTransportInput): AsyncIterable<WebWorkerTransportEvent>;
+  submitCapabilityResult?(session: WebWorkerTransportSession, result: WorkerCapabilityResultInput): Promise<void>;
   interrupt?(session: WebWorkerTransportSession): Promise<void>;
   health(session?: WebWorkerTransportSession): Promise<WorkerHealth>;
   disconnect(session: WebWorkerTransportSession): Promise<void>;
@@ -165,6 +167,15 @@ export class WebWorkerAdapter implements WorkerAdapter<WebWorkerSessionOptions> 
     record.activeInputId = input.inputId;
     this.touch(record, "running");
     return this.mapEvents(record, input);
+  }
+
+  async submitCapabilityResult(session: WorkerSessionHandle, result: WorkerCapabilityResultInput): Promise<void> {
+    const record = this.requireSession(session);
+    if (!record.activeInputId || record.activeInputId !== result.inputId) {
+      throw new Error(`Web worker capability result does not match the active input for ${session.sessionId}.`);
+    }
+    if (!this.transport.submitCapabilityResult) throw new Error("This Web worker transport does not accept host-managed capability results.");
+    await this.transport.submitCapabilityResult(record.transportSession, result);
   }
 
   async interrupt(session: WorkerSessionHandle): Promise<void> {

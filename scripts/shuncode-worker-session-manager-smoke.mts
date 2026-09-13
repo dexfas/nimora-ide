@@ -35,6 +35,8 @@ class FakeAdapter {
   disposed = [];
   interrupted = [];
   checkpoints = [];
+  submittedResults = [];
+  hostResultResolvers = new Map();
 
   constructor(id, label) {
     this.id = id;
@@ -77,6 +79,18 @@ class FakeAdapter {
   async *send(session, input) {
     session.state = 'running';
     session.lastActiveAt = new Date().toISOString();
+    if (input.prompt === 'host-request') {
+      let resolveHostResult;
+      const hostResult = new Promise(resolve => { resolveHostResult = resolve; });
+      this.hostResultResolvers.set(input.inputId, resolveHostResult);
+      yield { type: 'capability_call', inputId: input.inputId, callId: 'call-host-result', name: 'read_files', arguments: { files: [{ path: 'README.md' }] }, dispatch: 'host-requested' };
+      await hostResult;
+      yield { type: 'capability_result', inputId: input.inputId, callId: 'call-host-result', name: 'read_files', text: 'HOST_RESULT_OK', isError: false };
+      session.state = 'idle';
+      session.lastActiveAt = new Date().toISOString();
+      yield { type: 'terminal', inputId: input.inputId, status: 'completed' };
+      return;
+    }
     yield { type: 'text_delta', inputId: input.inputId, text: `${this.id}:hello` };
     session.state = 'idle';
     session.lastActiveAt = new Date().toISOString();
@@ -86,6 +100,15 @@ class FakeAdapter {
   async interrupt(session) {
     this.interrupted.push(session.sessionId);
     session.state = 'interrupted';
+  }
+
+  async submitCapabilityResult(session, result) {
+    this.submittedResults.push({ sessionId: session.sessionId, result });
+    const resolve = this.hostResultResolvers.get(result.inputId);
+    if (resolve) {
+      this.hostResultResolvers.delete(result.inputId);
+      resolve();
+    }
   }
 
   async resume(session, checkpoint) {
@@ -126,6 +149,28 @@ try {
   assert.equal(apiSession.adapterSessionId, agentSession.adapterSessionId, 'smoke intentionally uses colliding provider-native ids');
   assert.equal(manager.listSessions({ taskId: taskA.taskId }).length, 2);
   assert.equal(tasks.getTask(taskA.taskId).workerSessions[apiSession.managedSessionId].adapterSessionId, 'provider-session');
+
+  await assert.rejects(
+    () => manager.submitCapabilityResult(apiSession.managedSessionId, { inputId: 'turn-host-result', callId: 'call-host-result', name: 'read_files', text: 'EARLY' }),
+    /No outstanding host-requested capability call/,
+  );
+  const hostStream = manager.send(apiSession.managedSessionId, { inputId: 'turn-host-result', prompt: 'host-request' })[Symbol.asyncIterator]();
+  const hostCall = await hostStream.next();
+  assert.equal(hostCall.value.type, 'capability_call');
+  assert.equal(hostCall.value.dispatch, 'host-requested');
+  await manager.submitCapabilityResult(apiSession.managedSessionId, {
+    inputId: 'turn-host-result', callId: 'call-host-result', name: 'read_files', text: 'HOST_RESULT_OK',
+  });
+  assert.deepEqual(api.submittedResults, [{
+    sessionId: 'provider-session',
+    result: { inputId: 'turn-host-result', callId: 'call-host-result', name: 'read_files', text: 'HOST_RESULT_OK' },
+  }]);
+  assert.equal((await hostStream.next()).value.type, 'capability_result');
+  assert.equal((await hostStream.next()).value.status, 'completed');
+  await assert.rejects(
+    () => manager.submitCapabilityResult(apiSession.managedSessionId, { inputId: 'turn-host-result', callId: 'call-host-result', name: 'read_files', text: 'LATE' }),
+    /No outstanding host-requested capability call/,
+  );
 
   const stream = manager.send(apiSession.managedSessionId, { inputId: 'turn-1', prompt: 'hello' })[Symbol.asyncIterator]();
   const first = await stream.next();

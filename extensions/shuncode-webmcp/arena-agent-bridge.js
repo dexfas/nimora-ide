@@ -388,6 +388,8 @@
       revision: 0,
       revisionAtLastDelivery: 0,
       toolCallCount: 0,
+      hostResultObserved: new Set(),
+      hostResultDelivered: new Set(),
       nextEventSeq: 1,
       events: [],
     };
@@ -422,6 +424,49 @@
     activeWorkerTurn.completedAt = Date.now();
     appendWorkerEvent(activeWorkerTurn, 'cancelled', { interrupted });
     return interrupted;
+  }
+
+  async function workerResolveCapability(input) {
+    const inputId = String(input?.inputId || '').trim();
+    const callId = String(input?.callId || '').trim();
+    const name = String(input?.name || '').trim();
+    if (!activeWorkerTurn || activeWorkerTurn.inputId !== inputId) throw new Error(`Unknown WebMCP worker turn: ${inputId}`);
+    if (activeWorkerTurn.state !== 'running') throw new Error(`WebMCP worker turn is not running: ${inputId}`);
+    if (!callId) throw new Error('WebMCP host-managed capability result requires callId');
+    if (!name) throw new Error('WebMCP host-managed capability result requires capability name');
+    const key = `${callId}\u0000${name}`;
+    if (activeWorkerTurn.hostResultDelivered.has(key)) return workerTurnSnapshot(activeWorkerTurn);
+
+    if (!activeWorkerTurn.hostResultObserved.has(key)) {
+      activeWorkerTurn.hostResultObserved.add(key);
+      appendWorkerEvent(activeWorkerTurn, 'status', { name: 'capability_result_received', callId, capability: name });
+      appendWorkerEvent(activeWorkerTurn, 'capability_result', {
+        callId,
+        name,
+        text: short(input?.text || '', 10000),
+        isError: input?.isError === true,
+        durationMs: Number.isFinite(input?.durationMs) ? Number(input.durationMs) : undefined,
+      });
+    }
+
+    const result = input?.data !== undefined
+      ? input.data
+      : { content: [{ type: 'text', text: String(input?.text || '') }] };
+    const error = input?.isError === true ? new Error(String(input?.text || 'Host capability execution failed')) : null;
+    try {
+      await sendToolResult({ id: callId, name }, result, error);
+      refreshWorkerTurn(activeWorkerTurn);
+      activeWorkerTurn.revisionAtLastDelivery = activeWorkerTurn.revision;
+      activeWorkerTurn.hostResultDelivered.add(key);
+      lastDeliveryError = '';
+      appendWorkerEvent(activeWorkerTurn, 'status', { name: 'capability_result_delivered', callId, capability: name, source: 'host' });
+      armResponseScanBurst();
+      return workerTurnSnapshot(activeWorkerTurn);
+    } catch (deliveryError) {
+      lastDeliveryError = short(deliveryError?.message || deliveryError, 1000);
+      appendWorkerEvent(activeWorkerTurn, 'status', { name: 'capability_result_delivery_failed', callId, capability: name, source: 'host', error: lastDeliveryError });
+      throw deliveryError;
+    }
   }
 
   async function deliverPending(key, delivery) {
@@ -594,6 +639,7 @@
     workerSend,
     workerPoll,
     workerInterrupt,
+    workerResolveCapability,
     workerSession: () => ({ sessionId: pageSessionId, site: site.id, origin: location.origin, href: location.href, transport: BINDING_TRANSPORT ? 'binding' : 'http' }),
     status: () => ({ version: 25, coreVersion: 1, siteAdapter: site.id, transport: BINDING_TRANSPORT ? 'binding' : 'http', pageSessionId, enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: core.seenCount(), pendingDeliveries: core.pendingDeliveryCount(), lockedLane, isDeepSeek: site.isDeepSeek, isDeepSeekAuthPage: site.isDeepSeekAuthPage, deepSeekPacing: site.pacingMode, dedupeMode: 'call-occurrence-v2', workerTurn: activeWorkerTurn ? { inputId: activeWorkerTurn.inputId, state: activeWorkerTurn.state } : null, lastScanAt, lastHandledCallKey, lastDeliveryError }),
     stop: () => {

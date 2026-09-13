@@ -97,6 +97,9 @@ class FakeCommands {
       this.interrupted = true;
       return { interrupted: true };
     }
+    if (command === '_shuncode.webMcp.workerResolve') {
+      return { inputId: arg.result.inputId, state: 'running', events: [] };
+    }
     if (command === '_shuncode.webMcp.workerHealth') {
       return { status: { enabled: true, composerFound: true, isDeepSeekAuthPage: false } };
     }
@@ -116,6 +119,22 @@ try {
   assert.equal(session.sessionId, 'page-session-1');
   assert.equal(session.extensions.pageId, 'page-1');
   assert.equal(session.createdAt, '2026-09-13T00:00:00.000Z');
+
+  await transport.submitCapabilityResult(session, {
+    inputId: 'host-turn-1',
+    callId: 'host-call-1',
+    name: 'read_files',
+    text: 'HOST_RESULT_OK',
+  });
+  const resolveCall = commands.calls.find(call => call.command === '_shuncode.webMcp.workerResolve');
+  assert.equal(resolveCall.arg.pageId, 'page-1');
+  assert.equal(resolveCall.arg.sessionId, 'page-session-1');
+  assert.deepEqual(resolveCall.arg.result, {
+    inputId: 'host-turn-1',
+    callId: 'host-call-1',
+    name: 'read_files',
+    text: 'HOST_RESULT_OK',
+  });
 
   const events = [];
   for await (const event of transport.send(session, { inputId: 'turn-1', prompt: 'do the task' })) events.push(event);

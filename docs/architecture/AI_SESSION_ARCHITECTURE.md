@@ -283,6 +283,8 @@ Page Agent 的 worker turn 输出 sequence-numbered `status / assistant_text / c
 
 Phase 5.4.1 已把这条 handoff 变成 Worker Contract 的显式字段：每个 `capability_call` 必须声明 `dispatch: observed | host-requested`。当前三种已接入 Worker 均声明 `observed`，代表 capability lifecycle 是“被统一 Worker 层观察到”，并不授权 Manager 再执行一次。只有未来实现 host-managed WebMCP 时，page runtime 才能发 `host-requested`，并要求 adapter/manager 有对应的 result-return channel 后才能启用。
 
+Phase 5.4.2 已实现这条 result-return channel：Worker Contract 增加可选 `submitCapabilityResult`，Web Worker adapter/transport、first-party WorkerSessionManager 和 WebMCP command/page control 已全链路接通。Manager 只接受已观察到的 outstanding `host-requested` call，并要求 callId/name/inputId 一致；页面端已确认 delivery 后同一个 result 再提交会直接返回当前 turn snapshot，不会重复注入。真实 Edge synthetic smoke 已验证 duplicate host-result submission 只产生一次 tool-result message，之后 Worker 仍可继续到最终回答。生产 dispatch ownership 仍未切换。
+
 ### 正式 Adapter Layer
 
 WebMCP 应建立明确分层：

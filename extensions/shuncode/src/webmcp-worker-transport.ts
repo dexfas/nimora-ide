@@ -7,6 +7,7 @@ import type {
   WebWorkerTransportSessionOptions,
 } from "../../../src/web-worker-adapter.js";
 import type { WorkerHealth } from "../../../src/worker-contract.js";
+import type { WorkerCapabilityResultInput } from "../../../src/worker-contract.js";
 
 export interface WebMcpCommandExecutor {
   executeCommand<T>(command: string, ...args: unknown[]): PromiseLike<T | undefined>;
@@ -156,6 +157,14 @@ export class WebMcpCommandTransport implements WebWorkerTransport {
       pageId: this.pageId(session),
       sessionId: session.sessionId,
       inputId,
+    });
+  }
+
+  async submitCapabilityResult(session: WebWorkerTransportSession, result: WorkerCapabilityResultInput): Promise<void> {
+    await this.execute("_shuncode.webMcp.workerResolve", {
+      pageId: this.pageId(session),
+      sessionId: session.sessionId,
+      result,
     });
   }
 
