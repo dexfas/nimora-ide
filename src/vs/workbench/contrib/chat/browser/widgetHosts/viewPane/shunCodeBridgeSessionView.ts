@@ -66,20 +66,10 @@ interface BridgeActivity {
 	readonly id: number;
 	readonly at: string;
 	readonly tool: string;
-	readonly status: 'running' | 'completed' | 'error' | 'progress';
+	readonly status: 'running' | 'completed' | 'error';
 	readonly durationMs?: number;
 	readonly message?: string;
-	readonly phase?: string;
-	readonly percent?: number;
-	readonly todoId?: string;
-	readonly todoTitle?: string;
 	readonly presentation?: BridgeActivityPresentation;
-}
-
-interface BridgeTodo {
-	readonly id: string;
-	readonly title: string;
-	readonly status: 'pending' | 'in_progress' | 'completed';
 }
 
 interface BridgeStatus {
@@ -90,7 +80,6 @@ interface BridgeStatus {
 	readonly activeRequests: number;
 	readonly connected: boolean;
 	readonly revision: number;
-	readonly todos: BridgeTodo[];
 	readonly stats: {
 		readonly toolCalls: number;
 		readonly completedToolCalls: number;
@@ -179,7 +168,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 	private static readonly USER_SCROLL_RENDER_COOLDOWN_MS = 500;
 
 	private readonly root: HTMLElement;
-	private readonly todosRegion: HTMLElement;
 	private readonly timelineScroll: HTMLElement;
 	private readonly timeline: HTMLElement;
 	private readonly connectionDot: HTMLElement;
@@ -203,7 +191,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 	private checkingHealth = false;
 	private healthError: string | undefined;
 	private footerCollapsed = false;
-	private todoExpanded = false;
 	private readonly expandedToolActivities = new Set<number>();
 	private lastRevision = -1;
 	private lastStatus: BridgeStatus | undefined;
@@ -220,7 +207,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		this.root = append(parent, $('.shuncode-bridge-session-view'));
 		this.root.style.display = 'none';
 
-		this.todosRegion = append(this.root, $('.shuncode-bridge-session-todos-region'));
 		this.timelineScroll = append(this.root, $('.shuncode-bridge-session-scroll'));
 		this.timeline = append(this.timelineScroll, $('.shuncode-bridge-session-timeline'));
 		this._register(addDisposableListener(this.timelineScroll, 'scroll', () => this.onTimelineScroll()));
@@ -405,17 +391,15 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		// native scrollbar drag in progress; defer it while the user is actively
 		// scrolling and let the next refresh cycle render once idle.
 		if (force || (status.revision !== this.lastRevision && Date.now() >= this.userScrollActiveUntil)) {
-			this.renderTimeline(status.activities, status.todos);
+			this.renderTimeline(status.activities);
 			this.lastRevision = status.revision;
 		}
 		this.renderStatus(status);
 		this.renderControls();
 	}
 
-	private renderTimeline(activities: readonly BridgeActivity[], todos: readonly BridgeTodo[]): void {
-		clearNode(this.todosRegion);
+	private renderTimeline(activities: readonly BridgeActivity[]): void {
 		clearNode(this.timeline);
-		this.renderTodos(todos, activities);
 
 		if (!activities.length) {
 			const empty = append(this.timeline, $('.shuncode-bridge-session-empty'));
@@ -427,11 +411,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		}
 
 		for (const activity of activities) {
-			if (activity.status === 'progress') {
-				this.renderProgress(activity);
-			} else {
-				this.renderToolCard(activity);
-			}
+			this.renderToolCard(activity);
 		}
 
 		// Pin to the latest activity only while the user has not scrolled away.
@@ -462,67 +442,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 				this.followTimeline = true;
 			}, 0);
 		});
-	}
-
-	private renderTodos(todos: readonly BridgeTodo[], activities: readonly BridgeActivity[]): void {
-		if (!todos.length) {
-			return;
-		}
-		const latestProgressByTodo = new Map<string, BridgeActivity>();
-		for (const activity of activities) {
-			if (activity.status === 'progress' && activity.todoId) {
-				latestProgressByTodo.set(activity.todoId, activity);
-			}
-		}
-		const completed = todos.filter(todo => todo.status === 'completed').length;
-		const card = append(this.todosRegion, $<HTMLDetailsElement>('details.shuncode-bridge-todos'));
-		card.open = this.todoExpanded;
-		const summary = append(card, $('summary.shuncode-bridge-todos-summary'));
-		this.bindDetailsToggle(card, summary, expanded => this.todoExpanded = expanded);
-		const icon = append(summary, $('span.shuncode-bridge-todos-icon'));
-		icon.classList.add(...ThemeIcon.asClassNameArray(Codicon.checklist));
-		append(summary, $('strong', undefined, localize('shuncodeBridgeSession.tasks', "Tasks")));
-		append(summary, $('span.shuncode-bridge-todos-count', undefined, `${completed}/${todos.length}`));
-		const body = append(card, $('.shuncode-bridge-todos-body'));
-		for (const todo of todos) {
-			const row = append(body, $(`div.shuncode-bridge-todo.${todo.status.replace('_', '-')}`));
-			const statusIcon = append(row, $('span.shuncode-bridge-todo-icon'));
-			const todoIcon = todo.status === 'completed'
-				? Codicon.check
-				: todo.status === 'in_progress'
-					? ThemeIcon.modify(Codicon.loading, 'spin')
-					: Codicon.circleLargeOutline;
-			statusIcon.classList.add(...ThemeIcon.asClassNameArray(todoIcon));
-			const labels = append(row, $('.shuncode-bridge-todo-labels'));
-			append(labels, $('span.shuncode-bridge-todo-title', undefined, todo.title));
-			const progress = latestProgressByTodo.get(todo.id);
-			if (todo.status === 'in_progress' && progress) {
-				const detail = [progress.phase, progress.message].filter(Boolean).join(' · ');
-				if (detail) {
-					append(labels, $('span.shuncode-bridge-todo-progress', undefined, detail));
-				}
-				if (progress.percent !== undefined) {
-					append(row, $('span.shuncode-bridge-todo-percent', undefined, `${progress.percent}%`));
-				}
-			}
-		}
-	}
-
-	private renderProgress(activity: BridgeActivity): void {
-		const row = append(this.timeline, $('.shuncode-bridge-progress-row'));
-		const icon = append(row, $('span.shuncode-bridge-progress-icon'));
-		icon.classList.add(...ThemeIcon.asClassNameArray(Codicon.info));
-		const body = append(row, $('.shuncode-bridge-progress-body'));
-		if (activity.todoTitle) {
-			append(body, $('span.shuncode-bridge-progress-task', undefined, localize('shuncodeBridgeSession.progressTask', "Task · {0}", activity.todoTitle)));
-		}
-		if (activity.phase) {
-			append(body, $('strong', undefined, activity.phase));
-		}
-		append(body, $('span', undefined, activity.message ?? localize('shuncodeBridgeSession.progress', "Working…")));
-		if (activity.percent !== undefined) {
-			append(row, $('span.shuncode-bridge-progress-percent', undefined, `${activity.percent}%`));
-		}
 	}
 
 	private renderToolCard(activity: BridgeActivity): void {

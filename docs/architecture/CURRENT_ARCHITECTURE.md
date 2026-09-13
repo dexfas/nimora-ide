@@ -167,6 +167,8 @@ Phase 7.6 已停止 Bridge coordination 双份 presentation：`set_todos/report_
 
 Phase 7.7 已把 Bridge 自动启动从 Chat Core 移回 first-party extension。`shuncode.bridge.persistentMode` 现在只是“后台自动启动 Bridge”的连接设置：extension 等待 Bridge/license 初始化后直接调用 `bridgeAccess.start()`，不会打开 Chat；手动 `shuncode.bridge.start` 也不再切换 UI。`ChatViewPane` 已没有 persistent Bridge startup 逻辑或配置依赖。旧 Bridge Session 仅在用户显式执行 `shuncode.bridge.openSession` 时打开，继续作为 rich tool/diagnostics 过渡面。
 
+Phase 7.8 又删除了旧 Bridge Session 中已经无数据来源的 todo/progress renderer 与 CSS。该 view 现在只保留 connection/health、Work Sessions handoff 和普通 rich tool cards；Core-side `BridgeActivity` 不再声明 `progress` variant。extension-level `BridgeStatus.todos: []` 仍短期保留作协议兼容，但 Chat Core 已完全不读取它。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

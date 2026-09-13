@@ -452,6 +452,12 @@ Work Sessions 已经能稳定展示 per-Task todos/progress 后，Bridge 不再�
 
 对应地，`ChatViewPane` 已删除 `persistentBridgeStartupScheduled`、`schedulePersistentBridgeStartup()` 和对 `shuncode.bridge.persistentMode` 的认知。Bridge settings 中的开关文案改为“后台自动启动，不打开 Chat”。`test-shuncode-bridge-startup-decoupling` 保护 extension-owned startup、start-command 无 Chat side effect、Chat Core 不依赖 Bridge startup config，以及显式 legacy diagnostics 入口仍在。
 
+### Phase 7.8 — Remove Dead Bridge Coordination Renderer
+
+Phase 7.6 已让 Bridge status 永远不再产生 todos/progress presentation，因此 Chat Core 中对应的 `BridgeTodo`、todo card、`renderProgress()` 分支和整段 todo/progress CSS 已成为死代码。Phase 7.8 删除这些 renderer，只保留 connection/health、Work Sessions handoff 与普通 rich tool cards。Core-side `BridgeActivity` 也收窄为 `running/completed/error`，不再声明 `progress` variant。
+
+协议兼容不受影响：extension 的 `BridgeStatus.todos` 仍可暂时返回空数组给其他旧调用方；只是 Chat Bridge Session 不再消费它。`test-shuncode-work-sessions-handoff` 现在同时保护 handoff、显式 diagnostics 入口，以及 Core/CSS 中没有 legacy coordination renderer。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。
