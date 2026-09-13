@@ -135,6 +135,8 @@ Phase 5.4.1 开始显式区分 capability dispatch ownership。`WorkerEvent.capa
 
 Phase 5.4.2 建立反向 result-return contract：`WorkerAdapter/WebWorkerTransport.submitCapabilityResult()` 把 Host 执行结果返回原 Worker。`WorkerSessionManager` 维护当前 input 的 outstanding host-requested calls，要求 stable `callId`，并且只在 adapter 确认提交成功后移除 pending；这使 transport failure 可以安全重试**结果回传**而不是工具执行。WebMCP page 的 `workerResolveCapability()` 对已确认投递的 `callId + capability` 幂等，重复调用不会再次写入 `[SHUNCODE_TOOL_RESULT]`。当前该通道是 dormant control surface，因为 WebMCP page-local call 仍声明 `dispatch=observed`。
 
+Phase 5.4.3 的 opt-in Host execution coordinator 进一步把 `execute once` 与 `deliver result` 分成两个状态。execution identity 重用但参数/Worker/call identity 不同会直接报错；同一 identity 并发共享同一个 execution promise；delivery failure 不会清除已经执行的 result。当前实现故意不自动订阅 WorkerEvent，也不接生产 Broker，因为内存态 coordinator 还不能提供 crash-restart at-most-once 保证。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

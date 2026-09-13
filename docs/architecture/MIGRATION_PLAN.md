@@ -283,6 +283,8 @@ Phase 5.4.1 已先建立 execution ownership handoff 的语义前提：`capabili
 
 Phase 5.4.2 已补齐 dormant result-return contract：Worker/Transport 可选 `submitCapabilityResult()`，`WorkerSessionManager` 只允许向当前真实 outstanding 的 `host-requested + callId` 回传结果；早到、晚到、call 名不匹配都会拒绝，adapter 提交失败时 pending request 保留以便只重试结果投递。WebMCP v25 page runtime 新增 `workerResolveCapability()`，同一 `callId + capability` 已确认投递后再次提交不会重复注入。Extension command bridge 已贯通到 page runtime。**现有生产 WebMCP 仍只发 `observed`，所以该通道目前不会触发 Host 执行。**
 
+Phase 5.4.3 新增未接生产 caller 的 `HostCapabilityExecutionCoordinator`。它要求 capability 已注册 metadata 且必须提供 authorizer；同一 execution identity 的并发请求只执行一次，executor 抛错会缓存为 error/ambiguous 结果而不会盲目重跑，result delivery 独立记账并可在失败后安全重试。该 coordinator 当前是内存态实验基础层，**尚不具备进程崩溃后的 durable execution claim/recovery，因此不能成为生产 execution owner**。下一步要先把 claim/result/delivery 状态落进 TaskRuntime，再考虑接真实 `IdeToolBroker` 和 host-requested WebMCP。
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。
