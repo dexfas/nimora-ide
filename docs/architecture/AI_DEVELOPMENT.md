@@ -145,6 +145,7 @@ npm run test-shuncode-web-worker-stack
 npm run test-shuncode-host-capability-execution
 npm run test-shuncode-host-capability-durable
 npm run test-shuncode-host-capability-policy
+npm run test-shuncode-capability-grants
 ```
 
 `test-shuncode-webmcp-core` 必须保护 JSON/DeepSeek line protocol、nested args/heredoc、streaming incomplete-call guard、bounded repair、dedupe persistence/migration 与 pending-delivery bookkeeping。`test-shuncode-webmcp-browser` 使用真实 Edge 和 synthetic DeepSeek DOM 验证 HTTP/binding transport、result delivery、worker plain/tool/host-managed/host-result/interrupt lifecycle、host-managed 不调用 page-local invoke、host-result idempotency 与 repeated-scan no-reexecution；`test-shuncode-webmcp-gateway-shared-agent` 启动真实 Gateway process/managed Edge，确认 Gateway 使用 canonical v25 Core/Site/Agent；`test-shuncode-webmcp-command-transport` 保护 command bridge event cursor/terminal/host-result/interrupt/health/disconnect；`test-shuncode-web-worker-stack` 保护 command transport → adapter → manager → TaskRuntime，并额外验证 opt-in host-requested → strict Host execution service → Broker → result-return → terminal 闭环。以上都是自动 integration baseline，**不能写成 live DeepSeek 服务 E2E**；涉及发布级 DeepSeek 兼容时仍需要用户已登录网页上的真实 roundtrip。
@@ -154,6 +155,8 @@ npm run test-shuncode-host-capability-policy
 `test-shuncode-host-capability-durable` 保护 strict Task journal、durable result envelope、进程重启后 result-only recovery、delivered 去重以及 ambiguous crash guard。它证明 Host execution 已具备 crash-safe at-most-once 基础，但仍不等于 WebMCP 已切到 host-managed dispatch；`IdeToolBroker` executor 与 approval/policy wiring 仍必须作为独立迁移阶段验证。
 
 `test-shuncode-host-capability-policy` 保护 metadata approval 的 fail-closed 语义和 Host Capability Router：`approval=none` 可以继续，`session` 等需要显式 grant；IDE capability 必须走 IdeToolBroker，Runtime/file capability 必须走 canonical file provider，0 owner/多 owner 都拒绝。`test-shuncode-web-worker-stack` 还必须证明 host-requested `read_files` 不调用 IdeToolBroker。以上仍不代表 live/default Worker dispatch 已切换。
+
+`test-shuncode-capability-grants` 保护 TaskRuntime strict grant/revoke、restart replay、task/session scope 隔离、session attach-generation binding、detach/re-attach 不复活旧授权、`always` fail-closed 以及 persistence failure 不产生内存授权。任何 approval UI/command 的后续实现都必须调用这些 strict APIs，禁止另建一份 UI-only permission state。
 
 修改 page Worker control / command transport / WorkerSession binding 后，还必须运行 `npm run typecheck-shuncode` 与 `npm run compile-shuncode`。真实源码载体验证应确认 Extension Host 同时激活第一方扩展与 `shuncode-integrated-browser-bridge`，隔离 control port 的 `/agent.js` 包含 worker control surface，并在 ShunCode output log 中出现 `Web worker registered: nimora.web-worker via webmcp.integrated-browser`。这只证明真实 Extension Host wiring，不等于 live provider E2E。
 

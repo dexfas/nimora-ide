@@ -18,6 +18,7 @@ await esbuild.build({
       export { WebWorkerAdapter } from ${JSON.stringify(path.join(root, 'src', 'web-worker-adapter.ts'))};
       export { WorkerSessionManager } from ${JSON.stringify(path.join(root, 'src', 'worker-session-manager.ts'))};
       export { TaskRuntime } from ${JSON.stringify(path.join(root, 'src', 'task-runtime.ts'))};
+      export { getCapabilityMetadata } from ${JSON.stringify(path.join(root, 'src', 'capability-registry.ts'))};
       export { HostCapabilityExecutionService } from ${JSON.stringify(path.join(root, 'extensions', 'shuncode', 'src', 'host-capability-execution-service.ts'))};
     `,
     resolveDir: root,
@@ -32,7 +33,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { WebMcpCommandTransport, WebWorkerAdapter, WorkerSessionManager, TaskRuntime, HostCapabilityExecutionService } = require(bundlePath);
+const { WebMcpCommandTransport, WebWorkerAdapter, WorkerSessionManager, TaskRuntime, getCapabilityMetadata, HostCapabilityExecutionService } = require(bundlePath);
 
 class FakeCommands {
   mode = 'delivered';
@@ -251,6 +252,29 @@ try {
   assert.equal(hostRemaining.at(-1).status, 'completed');
   assert.match(hostRemaining.find(event => event.type === 'capability_result')?.text ?? '', /README/);
   assert.equal(tasks.getTask(task.taskId).executions[hostCall.extensions.executionId].duplicateObservations, 0, 'Manager must not shadow-project host-owned execution after strict owner claim');
+
+  const runCommand = getCapabilityMetadata('run_command');
+  const terminalRequest = {
+    executionId: `worker:${hostSession.managedSessionId}:stack-turn-host:terminal-grant`,
+    managedSessionId: hostSession.managedSessionId,
+    workerId: hostSession.workerId,
+    taskId: task.taskId,
+    inputId: 'stack-turn-host-terminal',
+    callId: 'host-stack-terminal-call',
+    name: 'run_command',
+    arguments: { command: 'echo not-actually-run-by-fake-broker', background: false },
+  };
+  await assert.rejects(() => hostExecution.executeOnce(terminalRequest), /was not granted/);
+  assert.deepEqual(brokerCalls, [], 'Host service must reject session approval before invoking Broker');
+  await tasks.grantCapabilityStrict(task.taskId, {
+    capabilityId: runCommand.id,
+    capabilityVersion: runCommand.version,
+    scope: 'worker-session',
+    managedSessionId: hostSession.managedSessionId,
+  });
+  const terminalResult = await hostExecution.executeOnce(terminalRequest);
+  assert.equal(terminalResult.text, 'HOST_BROKER_LIST_OK');
+  assert.deepEqual(brokerCalls, [{ name: 'run_command', args: terminalRequest.arguments }]);
   await manager.dispose(hostSession.managedSessionId);
 
   assert.ok(tasks.getTask(task.taskId).workerSessions[session.managedSessionId].detachedAt);

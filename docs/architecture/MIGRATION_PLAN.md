@@ -293,6 +293,8 @@ Phase 5.4.6 已建立**显式实验**的 host-requested end-to-end lane。只有
 
 Phase 5.4.7 把 Host execution 从单一 `IdeToolBroker` 提升为 provider-aware `HostCapabilityExecutorRouter`。Extension Host IDE tools 继续走 `IdeToolBrokerHostCapabilityExecutor`；`read_files/find_files/search_files/apply_patch` 复用 canonical `file-tool-registry.ts`，由 `FileToolHostCapabilityExecutor` 执行。Router 要求恰好一个 provider owner，0 owner 或多 owner 都 fail-closed。自动 stack smoke 已把 host-requested 工具改成真实 `read_files`，证明 Runtime/file provider 不会误落到 IdeToolBroker。默认 authorizer 仍生效，因此 `apply_patch` 虽然已有 provider route，但没有显式 session grant 时仍不会执行。
 
+Phase 5.4.8 已把 capability approval grant 纳入 TaskRuntime durable state。`TaskCapabilityGranted/Revoked` 使用 strict persistence；支持 `task` 与 `worker-session` 两种 scope，session grant 同时绑定 `managedSessionId + attachedAt generation`，因此 detach 或同 ID re-attach 都不会复活旧授权。`TaskCapabilityGrantResolver` 按 capability id/version 与 metadata approval 精确解析：`task-grant` 只接受 task scope，`session` 只接受当前 active WorkerSession 的 session scope，`always` 明确 fail-closed 等待独立 trusted global store。第一方 Host execution service 默认使用该 resolver；没有 grant 时不会执行 `run_command/apply_patch`。当前**没有自动 grant，也还没有用户审批 UI**。
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

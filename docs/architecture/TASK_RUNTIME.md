@@ -121,6 +121,8 @@ Worker capability projection 当前遵循：`capability_call → requested/execu
 
 Phase 5.4.4 额外建立 future execution-owner 的 strict persistence contract。`TaskRuntime.beginExecution()` 等现有 shadow API 继续 fail-open，避免 Task journal 故障破坏 Chat/Bridge；Host-owned side effect 必须使用 strict API，journal append 失败即拒绝 claim/finish/result/delivery 状态推进。`TaskExecutionResultPrepared` 现在可保存 bounded `worker-capability` result payload（inputId/callId/name/text/error/duration），使重启后能恢复待投递结果。恢复时 `requested/executing` 或没有匹配 payload 的 finished execution 都是 ambiguous，禁止自动重新执行。
 
+Phase 5.4.8 把 authorization state 也纳入 Task Source of Truth：`TaskSnapshot.capabilityGrants` 保存 durable grant/revoke audit。`grantCapabilityStrict()` / `revokeCapabilityGrantStrict()` fail-closed；session grant 绑定当前 WorkerSession 的 attach generation，Task grant 则只在本 Task 内有效。Resolver 在每次 Host authorization 时读取当前 snapshot，因此 revoke/detach 立即生效。全局 `always` grant 故意不存进 Task journal。
+
 ## 5. Context Engine
 
 Context Engine 属于 Task Runtime，负责：

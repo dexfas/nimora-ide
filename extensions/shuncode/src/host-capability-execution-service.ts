@@ -2,6 +2,7 @@ import { FileToolHostCapabilityExecutor } from "../../../src/file-host-capabilit
 import { HostCapabilityExecutorRouter } from "../../../src/host-capability-executor-router.js";
 import type { HostCapabilityGrantResolver } from "../../../src/host-capability-policy-authorizer.js";
 import { CapabilityMetadataHostAuthorizer } from "../../../src/host-capability-policy-authorizer.js";
+import { TaskCapabilityGrantResolver } from "../../../src/task-capability-grant-resolver.js";
 import {
   HostCapabilityExecutionCoordinator,
   type HostCapabilityExecutionRequest,
@@ -27,7 +28,7 @@ export class HostCapabilityExecutionService {
   ) {
     this.coordinator = new HostCapabilityExecutionCoordinator({
       durableStore: new TaskHostCapabilityExecutionStore(tasks),
-      authorizer: new CapabilityMetadataHostAuthorizer(grants),
+      authorizer: new CapabilityMetadataHostAuthorizer(grants ?? new TaskCapabilityGrantResolver(tasks)),
       executor: new HostCapabilityExecutorRouter([
         new IdeToolBrokerHostCapabilityExecutor(broker),
         new FileToolHostCapabilityExecutor({ workspaceRoots }),

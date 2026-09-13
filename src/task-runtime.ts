@@ -6,6 +6,8 @@ import {
   replayTaskEvents,
   taskSourceIdentity,
   type TaskArtifactRef,
+  type TaskCapabilityGrant,
+  type TaskCapabilityGrantScope,
   type TaskContextState,
   type TaskEvent,
   type TaskExecution,
@@ -35,6 +37,8 @@ const TASK_EVENT_TYPES = new Set<TaskEvent["type"]>([
   "TaskInteractionFinished",
   "TaskWorkerAttached",
   "TaskWorkerDetached",
+  "TaskCapabilityGranted",
+  "TaskCapabilityRevoked",
   "TaskExecutionRequested",
   "TaskExecutionStarted",
   "TaskExecutionDuplicateObserved",
@@ -238,6 +242,64 @@ export class TaskRuntime {
       const current = this.tasks.get(taskId)?.workerSessions[managedSessionId];
       if (!current || current.detachedAt) return;
       await this.append(taskId, "TaskWorkerDetached", { managedSessionId, detachedAt: this.now() });
+    });
+  }
+
+  async grantCapabilityStrict(taskId: string, input: {
+    capabilityId: string;
+    capabilityVersion: 1;
+    scope: TaskCapabilityGrantScope;
+    managedSessionId?: string;
+  }): Promise<TaskCapabilityGrant> {
+    return this.exclusive(taskId, async () => {
+      await this.initialize();
+      const task = this.tasks.get(taskId);
+      if (!task) throw new Error(`Unknown task: ${taskId}`);
+      const capabilityId = input.capabilityId.trim();
+      if (!capabilityId) throw new Error("Capability grant requires capabilityId.");
+      if (input.capabilityVersion !== 1) throw new Error(`Unsupported capability grant version: ${input.capabilityVersion}`);
+      let workerSessionAttachedAt: string | undefined;
+      if (input.scope === "worker-session") {
+        if (!input.managedSessionId) throw new Error("Worker-session capability grant requires managedSessionId.");
+        const workerSession = task.workerSessions[input.managedSessionId];
+        if (!workerSession || workerSession.detachedAt) {
+          throw new Error(`Worker-session capability grant requires an active Worker session: ${input.managedSessionId}`);
+        }
+        workerSessionAttachedAt = workerSession.attachedAt;
+      } else if (input.managedSessionId !== undefined) {
+        throw new Error("Task-scoped capability grant must not include managedSessionId.");
+      }
+
+      const existing = Object.values(task.capabilityGrants).find(grant =>
+        !grant.revokedAt
+        && grant.capabilityId === capabilityId
+        && grant.capabilityVersion === input.capabilityVersion
+        && grant.scope === input.scope
+        && grant.managedSessionId === input.managedSessionId
+        && grant.workerSessionAttachedAt === workerSessionAttachedAt
+      );
+      if (existing) return structuredClone(existing);
+
+      const grant: TaskCapabilityGrant = {
+        grantId: this.newId(),
+        capabilityId,
+        capabilityVersion: input.capabilityVersion,
+        scope: input.scope,
+        managedSessionId: input.managedSessionId,
+        workerSessionAttachedAt,
+        grantedAt: this.now(),
+      };
+      await this.append(taskId, "TaskCapabilityGranted", { grant }, true);
+      return structuredClone(this.tasks.get(taskId)!.capabilityGrants[grant.grantId]);
+    });
+  }
+
+  async revokeCapabilityGrantStrict(taskId: string, grantId: string): Promise<void> {
+    await this.exclusive(taskId, async () => {
+      await this.initialize();
+      const grant = this.tasks.get(taskId)?.capabilityGrants[grantId];
+      if (!grant || grant.revokedAt) return;
+      await this.append(taskId, "TaskCapabilityRevoked", { grantId, revokedAt: this.now() }, true);
     });
   }
 

@@ -145,6 +145,8 @@ Phase 5.4.6 增加 opt-in ownership lane。Page Worker 只有收到 `extensions.
 
 Phase 5.4.7 明确 Host execution 的 provider routing contract：`HostCapabilityExecutorRouter` 根据 capability metadata + provider ownership 选择唯一 executor；没有匹配或多个匹配都拒绝执行。当前两条 route 是 Extension Host IDE provider 与 Runtime/file provider。Router 只负责“由谁执行”，approval authorizer 仍先于 executor 生效，所以 provider 可路由不等于 capability 已获授权。
 
+Phase 5.4.8 建立 durable grant protocol。Task journal 新增 `TaskCapabilityGranted` / `TaskCapabilityRevoked`；grant identity 使用 canonical capability id + version，而不是 UI tool name。Session scope 还记录 Worker session 的 attach generation，防止 detached session ID 被复用后继承旧权限。Grant/revoke 都必须 strict append 成功后才改变 live authorization。Task journal 目前只承载 task/session scope；metadata `approval=always` 不会被它满足，必须等待独立全局 trust store。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

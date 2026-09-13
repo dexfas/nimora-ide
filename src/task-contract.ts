@@ -100,6 +100,19 @@ export interface TaskWorkerSessionRef {
   detachedAt?: string;
 }
 
+export type TaskCapabilityGrantScope = "task" | "worker-session";
+
+export interface TaskCapabilityGrant {
+  grantId: string;
+  capabilityId: string;
+  capabilityVersion: 1;
+  scope: TaskCapabilityGrantScope;
+  managedSessionId?: string;
+  workerSessionAttachedAt?: string;
+  grantedAt: string;
+  revokedAt?: string;
+}
+
 export interface TaskSnapshot {
   version: 1;
   taskId: string;
@@ -113,6 +126,7 @@ export interface TaskSnapshot {
   progress?: TaskProgress;
   interactions: Record<string, TaskInteraction>;
   workerSessions: Record<string, TaskWorkerSessionRef>;
+  capabilityGrants: Record<string, TaskCapabilityGrant>;
   executions: Record<string, TaskExecution>;
   artifacts: TaskArtifactRef[];
   eventCount: number;
@@ -139,6 +153,8 @@ export type TaskEvent =
   | TaskEventBase<"TaskInteractionFinished", { interactionId: string; outcome: TaskInteractionOutcome; finishedAt: string; durationMs?: number; error?: string }>
   | TaskEventBase<"TaskWorkerAttached", { workerSession: TaskWorkerSessionRef }>
   | TaskEventBase<"TaskWorkerDetached", { managedSessionId: string; detachedAt: string }>
+  | TaskEventBase<"TaskCapabilityGranted", { grant: TaskCapabilityGrant }>
+  | TaskEventBase<"TaskCapabilityRevoked", { grantId: string; revokedAt: string }>
   | TaskEventBase<"TaskExecutionRequested", { execution: TaskExecution }>
   | TaskEventBase<"TaskExecutionStarted", { executionId: string; startedAt: string }>
   | TaskEventBase<"TaskExecutionDuplicateObserved", { executionId: string }>
@@ -180,6 +196,7 @@ export function applyTaskEvent(snapshot: TaskSnapshot | undefined, event: TaskEv
       todos: [],
       interactions: {},
       workerSessions: {},
+      capabilityGrants: {},
       executions: {},
       artifacts: [],
       eventCount: 1,
@@ -250,6 +267,25 @@ export function applyTaskEvent(snapshot: TaskSnapshot | undefined, event: TaskEv
         workerSessions: {
           ...base.workerSessions,
           [event.payload.managedSessionId]: { ...current, detachedAt: event.payload.detachedAt },
+        },
+      };
+    }
+    case "TaskCapabilityGranted":
+      return {
+        ...base,
+        capabilityGrants: {
+          ...base.capabilityGrants,
+          [event.payload.grant.grantId]: { ...event.payload.grant },
+        },
+      };
+    case "TaskCapabilityRevoked": {
+      const current = base.capabilityGrants[event.payload.grantId];
+      if (!current) return base;
+      return {
+        ...base,
+        capabilityGrants: {
+          ...base.capabilityGrants,
+          [event.payload.grantId]: { ...current, revokedAt: event.payload.revokedAt },
         },
       };
     }
