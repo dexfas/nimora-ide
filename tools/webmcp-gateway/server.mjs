@@ -1,5 +1,4 @@
 import path from 'node:path';
-import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -10,6 +9,7 @@ import { createManagedBrowserProvider } from './managed-browser-provider.mjs';
 import { createPersonalEdgeProvider, PersonalEdgeControlError, PersonalEdgePollAbortedError } from './personal-edge-provider.mjs';
 import { GatewayProviderRegistry } from './provider-registry.mjs';
 import { createUpstreamMcpProvider } from './upstream-mcp-provider.mjs';
+import { createWebMcpPageHost } from './webmcp-page-host.mjs';
 
 const PORT = Number(process.env.PORT || 48321);
 const UPSTREAM_URL = process.env.SHUNCODE_MCP_URL || '';
@@ -26,8 +26,6 @@ const integratedBrowserProvider = createIntegratedBrowserProvider({ bridgeUrl: I
 const upstreamMcpProvider = createUpstreamMcpProvider({ url: UPSTREAM_URL });
 const managedBrowserProvider = createManagedBrowserProvider({ edgePath: EDGE_PATH, profileDir: PROFILE_DIR, screenshotDir: SCREENSHOT_DIR });
 const personalEdgeProvider = createPersonalEdgeProvider({ token: PERSONAL_EDGE_BRIDGE_TOKEN });
-const pageAgentSessions = new WeakMap();
-let chatAgentFactorySource;
 
 // WebMCP is intended to let chat pages work on the ShunCode workspace, not to
 // repeatedly drive ShunCode's protected browser-opening UI.  The native
@@ -70,89 +68,15 @@ function gatewayProviders() {
   return providerRegistry;
 }
 
-async function getChatAgentFactorySource() {
-  if (!chatAgentFactorySource) {
-    if (SHARED_PAGE_CORE_PATH && SHARED_SITE_ADAPTERS_PATH && SHARED_PAGE_AGENT_PATH) {
-      const [coreSource, siteAdaptersSource, agentSource] = await Promise.all([
-        fs.readFile(SHARED_PAGE_CORE_PATH, 'utf8'),
-        fs.readFile(SHARED_SITE_ADAPTERS_PATH, 'utf8'),
-        fs.readFile(SHARED_PAGE_AGENT_PATH, 'utf8'),
-      ]);
-      chatAgentFactorySource = `(function shunCodeWebMcpComposedAgent(config) {\n`
-        + `  const createCore = (${coreSource.trim()});\n`
-        + `  const createSiteAdapter = (${siteAdaptersSource.trim()});\n`
-        + `  const agent = (${agentSource.trim()});\n`
-        + `  return agent(config, { createCore, createSiteAdapter });\n`
-        + `})`;
-    } else {
-      chatAgentFactorySource = await fs.readFile(CHAT_AGENT_PATH, 'utf8');
-    }
-  }
-  return chatAgentFactorySource;
-}
-
-function serializeForPage(value) {
-  return JSON.parse(JSON.stringify(value, (_key, item) => {
-    if (item instanceof Uint8Array) return `[Uint8Array ${item.byteLength} bytes]`;
-    return item;
-  }));
-}
-
-async function ensureChatAgent(page) {
-  let session = pageAgentSessions.get(page);
-  if (session) return session;
-
-  const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
-  const token = randomUUID();
-  const listBinding = `__shuncodeListTools_${suffix}`;
-  const invokeBinding = `__shuncodeInvokeTool_${suffix}`;
-
-  await page.exposeBinding(listBinding, async (_source, providedToken) => {
-    if (providedToken !== token) throw new Error('Invalid ShunCode page bridge token');
-    const tools = await listAllTools();
-    return tools.map(tool => ({
-      name: tool.name,
-      description: tool.description || tool.modelDescription || tool.name,
-      inputSchema: tool.inputSchema || { type: 'object' },
-    }));
-  });
-  await page.exposeBinding(invokeBinding, async (_source, providedToken, name, args) => {
-    if (providedToken !== token) throw new Error('Invalid ShunCode page bridge token');
-    const result = await callAnyTool(String(name || ''), args && typeof args === 'object' ? args : {});
-    return serializeForPage(result);
-  });
-
-  const factorySource = await getChatAgentFactorySource();
-  const expression = `(${factorySource})(${JSON.stringify({ token, listBinding, invokeBinding })});`;
-  await page.addInitScript({ content: expression });
-  if (/^https?:/i.test(page.url())) {
-    try { await page.evaluate(expression); } catch {}
-  }
-  session = { token, listBinding, invokeBinding, expression };
-  pageAgentSessions.set(page, session);
-  return session;
-}
-
-async function connectCurrentChatPage({ prime = true } = {}) {
-  const page = await managedBrowserProvider.currentPage();
-  const pages = await managedBrowserProvider.pages();
-  await ensureChatAgent(page);
-
-  let status = null;
-  if (/^https?:/i.test(page.url())) {
-    try { status = await page.evaluate(() => window.__shuncodeWebMcp?.status?.() || null); } catch {}
-  }
-
-  let primeResult = null;
-  if (prime && status?.composerFound && !status?.primed) {
-    try { primeResult = await page.evaluate(() => window.__shuncodeWebMcp?.prime?.()); }
-    catch (error) { primeResult = { ok: false, reason: error instanceof Error ? error.message : String(error) }; }
-    try { status = await page.evaluate(() => window.__shuncodeWebMcp?.status?.() || null); } catch {}
-  }
-
-  const info = await managedBrowserProvider.pageInfo(page, pages.indexOf(page));
-  return { ok: true, page: info, chatDetected: !!status?.composerFound, status, primeResult };
-}
+const webMcpPageHost = createWebMcpPageHost({
+  managedBrowser: managedBrowserProvider,
+  listTools: listAllTools,
+  callTool: callAnyTool,
+  fallbackAgentPath: CHAT_AGENT_PATH,
+  sharedPageCorePath: SHARED_PAGE_CORE_PATH,
+  sharedSiteAdaptersPath: SHARED_SITE_ADAPTERS_PATH,
+  sharedPageAgentPath: SHARED_PAGE_AGENT_PATH,
+});
 
 function createServer() {
   const server = new Server(
@@ -238,7 +162,7 @@ app.post('/control/invoke-shuncode', async (req, res) => {
     if (!name) return res.status(400).json({ ok: false, error: 'tool name is required' });
     const args = req.body?.arguments && typeof req.body.arguments === 'object' ? req.body.arguments : {};
     const result = await callShunCodeTool(name, args);
-    res.json({ ok: true, result: serializeForPage(result) });
+    res.json({ ok: true, result: webMcpPageHost.serialize(result) });
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -264,7 +188,7 @@ app.post('/control/open', async (req, res) => {
 
 app.post('/control/connect-current', async (req, res) => {
   try {
-    res.json(await connectCurrentChatPage({ prime: req.body?.prime !== false }));
+    res.json(await webMcpPageHost.connect({ prime: req.body?.prime !== false }));
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }

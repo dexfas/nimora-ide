@@ -169,6 +169,8 @@ Phase 6.4 起，Managed Browser 的 Playwright lifecycle 也成为独立 provide
 
 Phase 6.5 起，Personal Edge localhost protocol 的状态机也由独立 provider 持有。`register` 更新 active client/shared tab heartbeat；`poll` 先消费仍有 pending result 的 queued command，否则建立可由 HTTP AbortSignal 取消的 waiter；`result` 只接受当前 active client 且仍 pending 的 command id。HTTP disconnect 只结束 poll waiter，tool command 的 pending result 仍保留到 result 或 command timeout。原有 403 invalid token、400 missing client id、409 inactive client、410 stale result 状态码保持不变。
 
+Phase 6.6 起，Gateway-managed WebMCP page binding 由独立 Page Host 持有。每个 page 建立一组随机 token + `listTools/invokeTool` Playwright bindings，重复 connect 复用同一 page session；binding token mismatch 必须在调用 capability 前拒绝。canonical v25 source 仍通过 Core/Site/Agent 三段源码组合生成，standalone generic agent 仅作为 shared source 未配置时的 compatibility fallback。Page Host 只依赖 capability list/call callbacks，不直接知道 upstream/Integrated/Personal provider。
+
 重要安全语义：只有明确的 read-only upstream tools 可以在 transport failure 后自动 retry；side-effecting tools 不自动 retry，而是要求 caller 核实状态。
 
 这条语义与 WebMCP execution ledger 是同一个更高层问题，未来应统一到 Tool metadata + execution policy。

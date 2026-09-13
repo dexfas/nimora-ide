@@ -362,7 +362,11 @@ web model → request → Nimora tool → result delivery → final model respon
 
 `personal-edge-provider.mjs` 现在独立拥有 shared-tab client state、90 秒 heartbeat freshness、7 个 Personal Edge tool definitions、command queue、pending result timeout、long-poll waiters 与 result settlement。Gateway route 层仍保留 `/control/personal-edge/register|poll|result` 原路径和 payload，但鉴权/active-client/pending-result 校验已由 provider 返回同样的 403/400/409/410 语义。poll HTTP 断开通过 AbortSignal 仅取消当前 waiter，不自动取消已经发出的 tool command。`test-shuncode-gateway-personal-edge-provider` 保护 auth/status/tool/poll/result/timeout/abort；`test-shuncode-gateway-federation` 进一步用真实 Gateway `/mcp` 验证 `personal_edge_read → poll → result → MCP result`。
 
-当前 `server.mjs` 剩余主要职责为 WebMCP page-agent source/session/injection、HTTP/MCP route composition 与 process bootstrap。下一步先抽 WebMCP page host，再评估是否需要把 HTTP/MCP exposure adapter 独立出来；不在同一 commit 改 endpoint owner。
+### Phase 6.6 — WebMCP Page Host Extraction
+
+`webmcp-page-host.mjs` 现在独立拥有 managed Web AI page 的 agent source/session boundary：优先组合 canonical `webmcp-page-core.js + webmcp-site-adapters.js + arena-agent-bridge.js`，缺少 shared source env 时仍读取 `generic-chat-agent.js` compatibility fallback；factory source 只加载一次。每个 Playwright page 只建立一次随机 token + list/invoke binding session，binding 必须校验 token；tool result 经过 binary-safe serialization 后才进入网页。`connect()` 负责当前 page 的 ensure/status/prime/page-info，但不拥有 browser lifecycle。`test-shuncode-gateway-webmcp-page-host` 保护 source cache/composition、fallback、session reuse、token guard、binding payload、serialization、prime；真实 `test-shuncode-webmcp-gateway-shared-agent` 继续保护 canonical v25 binding transport。
+
+当前 `server.mjs` 已收缩为 provider/page-host composition、HTTP control routes、MCP exposure/session 与 process bootstrap。下一步评估 MCP Exposure Adapter / HTTP control router 是否值得继续拆；Bridge endpoint ownership 仍不在这一 commit 切换。
 
 ### 风险
 

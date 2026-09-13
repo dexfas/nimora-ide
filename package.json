@@ -33,6 +33,7 @@
 		"test-shuncode-gateway-upstream-provider": "node scripts/shuncode-gateway-upstream-provider-smoke.mjs",
 		"test-shuncode-gateway-managed-browser-provider": "node scripts/shuncode-gateway-managed-browser-provider-smoke.mjs",
 		"test-shuncode-gateway-personal-edge-provider": "node scripts/shuncode-gateway-personal-edge-provider-smoke.mjs",
+		"test-shuncode-gateway-webmcp-page-host": "node scripts/shuncode-gateway-webmcp-page-host-smoke.mjs",
 		"test-shuncode-webmcp-command-transport": "node scripts/shuncode-webmcp-command-transport-smoke.mts",
 		"test-shuncode-web-worker-stack": "node scripts/shuncode-web-worker-stack-smoke.mts",
 		"test-shuncode-web-worker-release-gate": "node scripts/shuncode-web-worker-release-gate-smoke.mts",
