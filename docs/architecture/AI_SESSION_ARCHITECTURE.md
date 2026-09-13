@@ -67,6 +67,20 @@ interface WorkerAdapter {
 - rate-limit/usage；
 - terminal state。
 
+### Phase 4.1 当前实现
+
+该 contract 已实际落地在 `src/worker-contract.ts`，不是仅作为文档示意。当前 event union 明确包含：
+
+- `text_delta` / `reasoning_delta`；
+- `capability_call` / `capability_result`；
+- `artifact_proposal`；
+- `checkpoint`；
+- `usage`；
+- `provider_event`，用于保留不能安全压平的 provider-specific 语义；
+- `terminal = completed | interrupted | cancelled | error`。
+
+`WorkerAdapter<TSessionOptions, TInput>` 使用 generics 允许每个 adapter 扩展自己的 typed options，而不是把所有 provider 参数塞进最低公分母。Wire protocol 仍属于 adapter：API Runtime 可以走 JSON-RPC/HTTP，Core 继续走 AHP，Web Worker 继续走 DOM/WebMCP。
+
 ## 4. Adapter 不负责什么
 
 Worker Adapter **不应该**拥有：
@@ -94,6 +108,22 @@ Worker Adapter **不应该**拥有：
 
 现有 `ShunCodeLanguageModelProvider` 可继续把这些模型暴露给 VS Code model picker，但不再成为 Worker domain 的唯一 Source of Truth。
 
+Phase 4.1 已新增 `extensions/shuncode/src/api-worker-adapter.ts`：
+
+```text
+Worker Contract
+      ↓
+ApiWorkerAdapter
+      ↓
+existing RuntimeClient.runAgent()
+      ↓
+first-party agent-host child / model protocols
+```
+
+Adapter 当前把 Runtime trace 映射成 WorkerEvent，并保留 checkpoint resume、interrupt/cancel 和 health。它暂时没有替换 Native Chat 的直接 `RuntimeClient.runAgent()` 调用；这是刻意的 rollback boundary，等 caller parity 映射验证后再切换。
+
+为降低切换风险，Phase 4.1 同时提供临时 `worker-runtime-trace-compat.ts`：Native Chat 可以先继续复用现有 tool card、tool-history 与 workspace reference 投影，再逐步把这些消费者改成直接读取 WorkerEvent。VS Code `toolInvocationToken` 同样只作为 `ApiWorkerInput` 的 host-specific runtime invocation extension 透传，不下沉到跨 provider contract。
+
 ## 6. Core AgentHost Worker
 
 Code-OSS `IAgentHostService` / Sessions provider 已经拥有 session/provider/remote/worktree 能力。
@@ -109,6 +139,8 @@ Core Agent Host / remote host
 ```
 
 这样 Core Claude/Codex/Copilot 和未来 remote agent 能与 Web/API worker 进入同一个 Task 体系。
+
+现有协议审计确认无需新增“统一 wire”：AHP `ChatTurnStarted` 本身就是 client-dispatchable send；`ChatTurnCancelled` 是 interrupt；完成、错误、usage、reasoning、tool call/result 已由 chat action/state 表达。`AgentHostWorkerAdapter` 应只做 semantic translation 和 session ownership，不复制 AgentHost/session implementation。
 
 ## 7. Web Worker / WebMCP
 

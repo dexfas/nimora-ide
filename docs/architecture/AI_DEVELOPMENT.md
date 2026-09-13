@@ -69,6 +69,7 @@ npm run typecheck-shuncode
 npm run compile-shuncode
 npm run test-shuncode-capabilities
 npm run test-shuncode-task-runtime
+npm run test-shuncode-worker-adapter
 npm run test-shuncode-runtime
 ```
 
@@ -93,6 +94,18 @@ npm run compile-shuncode
 ```
 
 `test-shuncode-task-runtime` 必须覆盖 event replay、torn journal recovery、live/replay parity 和 concurrent duplicate execution identity。
+
+### Worker contract / adapter changes
+
+至少运行：
+
+```powershell
+npm run test-shuncode-worker-adapter
+npm run typecheck-shuncode
+npm run compile-shuncode
+```
+
+`ApiWorkerAdapter` smoke 当前必须覆盖：normalized streaming/reasoning、capability call/result、checkpoint resume、interrupt/cancel、session state、health、host `toolInvocationToken` passthrough，以及 WorkerEvent → legacy RuntimeTrace parity。Native Chat 仍直连旧 Runtime 时，不能把 fake-runtime adapter smoke 写成“real API model parity 已验证”；切换 caller 后需另补真实 Native Chat/API 回归。
 
 如果改动 Bridge shadow wiring，还要在隔离源码实例中做真实 local MCP roundtrip。由于第一方扩展在普通 source carrier 中仍可能被当作 builtin/Production mode，Bridge local smoke 应显式使用 extension development path：
 

@@ -193,13 +193,15 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 
 ## 6. Phase 4 — Worker Contract
 
+**Status: In progress — Phase 4.1 semantic contract + ApiWorkerAdapter completed (2026-09-13)**
+
 ### 目标
 
 让 API runtime、Core AgentHost、WebMCP 都可以被 Task Runtime 视为 Worker。
 
 ### 工作顺序
 
-1. `ApiWorkerAdapter` 包装现有 first-party Runtime；
+1. `ApiWorkerAdapter` 包装现有 first-party Runtime；✅ contract/adapter 已落地，Native Chat 尚未切换 caller
 2. `AgentHostWorkerAdapter` 包装现有 IAgentHostService/AHP；
 3. Worker Session Manager；
 4. Context handoff package；
@@ -213,9 +215,18 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 
 统一 semantic contract，允许 adapter expose extensions/capability metadata；不要强迫所有 provider 使用同一种 wire protocol。
 
+Phase 4.1 已将 contract 放在 VS Code 无关的 `src/worker-contract.ts`。当前最小语义包括 Worker descriptor、logical session、streaming `send()`、interrupt/resume/dispose/health，以及 text/reasoning/capability/checkpoint/usage/provider/terminal events。
+
+`ApiWorkerAdapter` 位于第一方 Extension adapter 层，只包装 `RuntimeClient`；它不会拥有 Task state、approval policy 或 artifact storage。第一版 adapter 仍允许 typed session options 携带 API Runtime 的 protocol/model-specific 参数，因此不会为了“统一”丢掉 Codex/Anthropic/Responses 等 provider-specific 能力。
+
+Native Chat caller 切换前的 parity bridge 也已建立：`worker-runtime-trace-compat.ts` 可把 normalized WorkerEvent 临时还原为现有 `RuntimeTraceItem`，保留 tool card/history/workspace-reference 依赖的 call id、arguments、result text/error、duration 与 step。`toolInvocationToken` 属于 VS Code UI host 细节，因此只放在 `ApiWorkerInput.runtimeInvocation`，不进入通用 Worker Contract。
+
+Core 审计同时确认 AHP 已有天然映射点：client `ChatTurnStarted` = send，`ChatTurnCancelled` = interrupt，server `ChatTurnComplete/ChatError/ChatUsage/ChatReasoning/tool-call actions` = WorkerEvent。Phase 4.2 应包装这些语义，不重写 AHP。
+
 ### 测试
 
-- API model session；
+- API adapter fake-runtime parity（streaming/reasoning/capability/checkpoint/cancel/health/tool invocation context/legacy trace projection）；✅
+- real API model session；⏳ caller 尚未切换
 - AgentHost local session；
 - cancel/resume/health；
 - worker switch with same Task context。
