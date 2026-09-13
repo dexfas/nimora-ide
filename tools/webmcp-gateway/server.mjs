@@ -17,6 +17,9 @@ const EDGE_PATH = process.env.EDGE_PATH || 'C:\\Program Files (x86)\\Microsoft\\
 const PROFILE_DIR = path.resolve(process.env.BROWSER_PROFILE || './browser-profile');
 const SCREENSHOT_DIR = path.resolve('./screenshots');
 const CHAT_AGENT_PATH = path.resolve('./generic-chat-agent.js');
+const SHARED_PAGE_CORE_PATH = process.env.SHUNCODE_WEBMCP_PAGE_CORE_PATH || '';
+const SHARED_SITE_ADAPTERS_PATH = process.env.SHUNCODE_WEBMCP_SITE_ADAPTERS_PATH || '';
+const SHARED_PAGE_AGENT_PATH = process.env.SHUNCODE_WEBMCP_PAGE_AGENT_PATH || '';
 const PERSONAL_EDGE_BRIDGE_TOKEN = process.env.SHUNCODE_PERSONAL_EDGE_TOKEN || 'shuncode-local-development';
 
 let upstreamClient;
@@ -396,7 +399,23 @@ async function getBrowser() {
 }
 
 async function getChatAgentFactorySource() {
-  if (!chatAgentFactorySource) chatAgentFactorySource = await fs.readFile(CHAT_AGENT_PATH, 'utf8');
+  if (!chatAgentFactorySource) {
+    if (SHARED_PAGE_CORE_PATH && SHARED_SITE_ADAPTERS_PATH && SHARED_PAGE_AGENT_PATH) {
+      const [coreSource, siteAdaptersSource, agentSource] = await Promise.all([
+        fs.readFile(SHARED_PAGE_CORE_PATH, 'utf8'),
+        fs.readFile(SHARED_SITE_ADAPTERS_PATH, 'utf8'),
+        fs.readFile(SHARED_PAGE_AGENT_PATH, 'utf8'),
+      ]);
+      chatAgentFactorySource = `(function shunCodeWebMcpComposedAgent(config) {\n`
+        + `  const createCore = (${coreSource.trim()});\n`
+        + `  const createSiteAdapter = (${siteAdaptersSource.trim()});\n`
+        + `  const agent = (${agentSource.trim()});\n`
+        + `  return agent(config, { createCore, createSiteAdapter });\n`
+        + `})`;
+    } else {
+      chatAgentFactorySource = await fs.readFile(CHAT_AGENT_PATH, 'utf8');
+    }
+  }
   return chatAgentFactorySource;
 }
 

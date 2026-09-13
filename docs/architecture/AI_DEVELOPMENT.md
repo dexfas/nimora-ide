@@ -133,9 +133,18 @@ $devExt = (Resolve-Path "extensions/shuncode").Path
 
 ```powershell
 node --check extensions/shuncode-webmcp/arena-agent-bridge.js
+node --check extensions/shuncode-webmcp/webmcp-page-core.js
+node --check extensions/shuncode-webmcp/webmcp-site-adapters.js
 node --check tools/webmcp-gateway/generic-chat-agent.js
 node --check tools/webmcp-gateway/server.mjs
+npm run test-shuncode-webmcp-core
+npm run test-shuncode-webmcp-browser
+npm run test-shuncode-webmcp-gateway-shared-agent
 ```
+
+`test-shuncode-webmcp-core` 必须保护 JSON/DeepSeek line protocol、nested args/heredoc、streaming incomplete-call guard、bounded repair、dedupe persistence/migration 与 pending-delivery bookkeeping。`test-shuncode-webmcp-browser` 使用真实 Edge 和 synthetic DeepSeek DOM 验证 HTTP/binding transport、result delivery 与 repeated-scan no-reexecution；`test-shuncode-webmcp-gateway-shared-agent` 则启动真实 Gateway process/managed Edge，确认 Gateway 使用 canonical v25 Core/Site/Agent。三者都是自动 integration baseline，**不能写成 live DeepSeek 服务 E2E**；涉及发布级 DeepSeek 兼容时仍需要用户已登录网页上的真实 roundtrip。
+
+源码实例与正式安装版并行时，优先使用 `SHUNCODE_WEBMCP_CONTROL_PORT` / `SHUNCODE_WEBMCP_GATEWAY_PORT` 分配隔离端口；禁止为了抢占默认 48322 去结束 `C:\Program Files\ShunCode` 正式进程。默认端口兼容性与动态 discovery 是两个不同问题。
 
 并根据影响回归：DeepSeek real roundtrip / browser provider / Personal Edge。
 

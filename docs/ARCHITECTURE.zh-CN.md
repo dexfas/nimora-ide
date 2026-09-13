@@ -18,7 +18,7 @@ Agent Runtime 的主要源码位于仓库根 `src/agent-host.ts`、`src/openai-a
 
 ## 2. WebMCP
 
-当前 WebMCP Bridge 为 `0.4.10`，page agent 为 `v24`。
+当前 WebMCP Bridge 为 `0.4.11`，page agent 为 `v25`。v25 已把 parser/dedupe/delivery state 抽到 WebMCP Core，并把 DeepSeek/Generic 网页差异放进 Site Adapter；Integrated Browser 与由扩展启动的 Gateway-managed Browser 共用同一份 canonical page agent，仅 transport 分别使用 localhost HTTP 与 Playwright binding。
 
 ```text
 AI 网页（Arena / DeepSeek 等）
@@ -34,8 +34,8 @@ ShunCode Bridge MCP
 
 端口：
 
-- `48322`：ShunCode WebMCP 页面桥；
-- `48321`：Browser MCP / WebMCP Gateway；
+- `48322`：ShunCode WebMCP 页面桥默认端口，可用 `SHUNCODE_WEBMCP_CONTROL_PORT` 为源码/测试实例覆盖；
+- `48321`：Browser MCP / WebMCP Gateway 默认端口，可用 `SHUNCODE_WEBMCP_GATEWAY_PORT` 覆盖；
 - `48323` / `48324`：历史方案，不应作为新架构依赖。
 
 WebMCP 页面监听使用页面内 `MutationObserver`，不采用持续高频 Playwright DOM polling。

@@ -109,13 +109,13 @@ arg.files.0.start_line=1
 
 ## 7. WebMCP execution ledger semantics
 
-当前 v24 page agent 已经确立一条必须保留的 contract：
+当前 v25 WebMCP Core/page agent 继续执行一条必须保留的 contract：
 
 > Tool execution 和 result delivery 是两个不同事务。
 
 如果工具执行成功但结果回灌网页失败，只允许重试 delivery，禁止盲目重复调用 tool。
 
-当前实现使用：
+当前 Core/page 实现使用：
 
 - call occurrence key；
 - `seen`；
@@ -123,7 +123,7 @@ arg.files.0.start_line=1
 - sessionStorage dedupe；
 - bounded delivery retry。
 
-未来应把这一语义升级为 Gateway/Task Runtime 的通用 **Execution Ledger / at-most-once side-effect policy**，而不是只存在于页面脚本里。
+Phase 5 已把 parser/dedupe/pending-delivery bookkeeping 从单体 page agent 抽到 `webmcp-page-core.js`，但它仍属于 page-session 层。下一步仍应把这一语义与 Gateway/Task Runtime 的通用 **Execution Ledger / at-most-once side-effect policy** 绑定，而不是把 page-local Core 当成最终 Source of Truth。
 
 ## 8. Gateway federation contract
 

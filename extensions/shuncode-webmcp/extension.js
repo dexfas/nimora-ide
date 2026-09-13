@@ -4,8 +4,13 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const vscode = require('vscode');
 
+function envPort(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 && value <= 65535 ? value : fallback;
+}
+
 const HOST = '127.0.0.1';
-const PORT = 48322;
+const PORT = envPort('SHUNCODE_WEBMCP_CONTROL_PORT', 48322);
 const BUILTIN_BROWSER_TOOLS = [
   'open_browser_page', 'list_browser_pages', 'read_page', 'click_element',
   'type_in_page', 'navigate_page', 'hover_element', 'drag_element',
@@ -13,13 +18,15 @@ const BUILTIN_BROWSER_TOOLS = [
 ];
 
 const ARENA_AGENT_SCRIPT_PATH = path.join(__dirname, 'arena-agent-bridge.js');
+const WEB_MCP_PAGE_CORE_SCRIPT_PATH = path.join(__dirname, 'webmcp-page-core.js');
+const WEB_MCP_SITE_ADAPTERS_SCRIPT_PATH = path.join(__dirname, 'webmcp-site-adapters.js');
 const ARENA_PANEL_ID = 'shuncode-agent-bridge-panel';
 const ARENA_AGENT_SCRIPT_URL = 'http://127.0.0.1:48324/agent.js';
 const CDP_HOST = '127.0.0.1';
 const CDP_PORT = 48323;
 const ARENA_POLL_MS = 2500;
 const WEB_MCP_HOST = '127.0.0.1';
-const WEB_MCP_PORT = 48321;
+const WEB_MCP_PORT = envPort('SHUNCODE_WEBMCP_GATEWAY_PORT', 48321);
 const WEB_MCP_HIGH_IMPACT = new Set([
   'apply_patch', 'run_command', 'send_command_input',
   'personal_edge_click', 'personal_edge_fill', 'personal_edge_navigate', 'personal_edge_reload',
@@ -150,7 +157,15 @@ function httpGetJson(host, port, requestPath, timeoutMs = 1500) {
 
 function getArenaAgentSource() {
   if (arenaAgentSource === null) {
-    arenaAgentSource = fs.readFileSync(ARENA_AGENT_SCRIPT_PATH, 'utf8');
+    const agentSource = fs.readFileSync(ARENA_AGENT_SCRIPT_PATH, 'utf8').trim();
+    const coreSource = fs.readFileSync(WEB_MCP_PAGE_CORE_SCRIPT_PATH, 'utf8').trim();
+    const siteAdaptersSource = fs.readFileSync(WEB_MCP_SITE_ADAPTERS_SCRIPT_PATH, 'utf8').trim();
+    arenaAgentSource = `(function shunCodeWebMcpComposedAgent(config) {\n`
+      + `  const createCore = (${coreSource});\n`
+      + `  const createSiteAdapter = (${siteAdaptersSource});\n`
+      + `  const agent = (${agentSource});\n`
+      + `  return agent(config, { createCore, createSiteAdapter });\n`
+      + `})`;
   }
   return arenaAgentSource;
 }
@@ -423,7 +438,7 @@ async function ensureWebMcpGateway(output) {
   const ready = await gatewayIsReady();
   if (ready?.integratedWebMcp) return ready;
   if (ready) {
-    throw new Error('端口 48321 正在运行旧版 Web MCP 网关。请先停止旧网关，再重新点击 MCP。');
+    throw new Error(`端口 ${WEB_MCP_PORT} 正在运行旧版 Web MCP 网关。请先停止旧网关，再重新点击 MCP。`);
   }
   if (webMcpStartPromise) return await webMcpStartPromise;
 
@@ -438,6 +453,11 @@ async function ensureWebMcpGateway(output) {
     if (!webMcpProcess || webMcpProcess.exitCode !== null) {
       const env = { ...process.env };
       delete env.ELECTRON_RUN_AS_NODE;
+      env.PORT = String(WEB_MCP_PORT);
+      env.SHUNCODE_INTEGRATED_BROWSER_BRIDGE = `http://${HOST}:${PORT}`;
+      env.SHUNCODE_WEBMCP_PAGE_CORE_PATH = WEB_MCP_PAGE_CORE_SCRIPT_PATH;
+      env.SHUNCODE_WEBMCP_SITE_ADAPTERS_PATH = WEB_MCP_SITE_ADAPTERS_SCRIPT_PATH;
+      env.SHUNCODE_WEBMCP_PAGE_AGENT_PATH = ARENA_AGENT_SCRIPT_PATH;
       webMcpProcess = spawn('node', ['server.mjs'], {
         cwd: gatewayDir,
         env,
@@ -664,7 +684,7 @@ async function connectCurrentWebMcpPage(output) {
     `;
     const injected = await invokeBuiltinBrowserTool('run_playwright_code', { pageId: page.pageId, code, timeoutMs: 20000 });
     const text = resultText(injected);
-    if (!/toolCount|alreadyPrimed|version[^\d]*20/i.test(text)) {
+    if (!/toolCount|alreadyPrimed|version[^\d]*25/i.test(text)) {
       throw new Error(`网页 Web MCP 注入未确认成功：${text.slice(0, 1200) || '无返回结果'}`);
     }
     const tools = await webMcpRequest('GET', '/control/shuncode-tools?protocol=2', undefined, 10000);

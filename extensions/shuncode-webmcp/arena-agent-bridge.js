@@ -1,13 +1,19 @@
-(function shunCodeWebMcpAgent(config) {
-  if (!config || !config.bridge || !config.token) throw new Error('Missing ShunCode Web MCP config');
-  const BRIDGE = String(config.bridge).replace(/\/$/, '');
+(function shunCodeWebMcpAgent(config, modules) {
+  if (!config || !config.token) throw new Error('Missing ShunCode Web MCP config');
+  if (typeof modules?.createCore !== 'function' || typeof modules?.createSiteAdapter !== 'function') throw new Error('Missing Web MCP Core/Site Adapter modules');
   const TOKEN = String(config.token);
-  if (window.__shuncodeWebMcp?.version === 24 && window.__shuncodeWebMcp?.matchesConfig?.(BRIDGE, TOKEN)) {
+  const LIST_BINDING = String(config.listBinding || '');
+  const INVOKE_BINDING = String(config.invokeBinding || '');
+  const BINDING_TRANSPORT = !!LIST_BINDING && !!INVOKE_BINDING;
+  const BRIDGE = String(config.bridge || '').replace(/\/$/, '');
+  if (!BINDING_TRANSPORT && !BRIDGE) throw new Error('Missing Web MCP HTTP bridge or page bindings');
+  const TRANSPORT_KEY = BINDING_TRANSPORT ? `binding:${LIST_BINDING}:${INVOKE_BINDING}` : `http:${BRIDGE}`;
+  if (window.__shuncodeWebMcp?.version === 25 && window.__shuncodeWebMcp?.matchesConfig?.(TRANSPORT_KEY, TOKEN)) {
     return window.__shuncodeWebMcp.status();
   }
   try { window.__shuncodeWebMcp?.stop?.(); } catch {}
 
-  const PRIME_CONTEXT_MARKER = 'SHUNCODE_WEBMCP_CONTEXT_V24';
+  const PRIME_CONTEXT_MARKER = 'SHUNCODE_WEBMCP_CONTEXT_V25';
   const pageSessionStorageKey = 'shuncode-webmcp-page-session-id';
   let pageSessionId = '';
   try {
@@ -19,12 +25,9 @@
   } catch {
     pageSessionId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
-  const seen = new Set();
-  const pendingDeliveries = new Map();
   const seenStorageKey = `shuncode-webmcp-seen:${location.origin}${location.pathname}`;
-  const isDeepSeek = /(^|\.)deepseek\.com$/i.test(location.hostname);
-  const isDeepSeekAuthPage = isDeepSeek && /^\/(?:sign_in|sign_up|forgot_password)(?:\/|$)/i.test(location.pathname);
-  const sendStateKey = `shuncode-webmcp-send-state:${location.origin}`;
+  const core = modules.createCore({ storage: sessionStorage, seenStorageKey });
+  const site = modules.createSiteAdapter({ window, document, location, visible, storage: sessionStorage });
   let enabled = true;
   let busy = false;
   let primed = false;
@@ -36,10 +39,6 @@
   let lastHandledCallKey = '';
   let lastDeliveryError = '';
   const responseWatchTimers = new Set();
-  let lastAutomaticSendAt = 0;
-  let rateLimitCooldownUntil = 0;
-  let rateLimitStrikes = 0;
-  let recentAutomaticSendTimes = [];
 
   const short = (value, max = 12000) => String(value ?? '').slice(0, max);
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -67,85 +66,8 @@
     }
   }
 
-  try {
-    const state = JSON.parse(sessionStorage.getItem(sendStateKey) || '{}');
-    lastAutomaticSendAt = Number(state.lastAutomaticSendAt || 0);
-    rateLimitCooldownUntil = Number(state.rateLimitCooldownUntil || 0);
-    rateLimitStrikes = Number(state.rateLimitStrikes || 0);
-    recentAutomaticSendTimes = Array.isArray(state.recentAutomaticSendTimes)
-      ? state.recentAutomaticSendTimes.map(Number).filter(Number.isFinite)
-      : [];
-  } catch {}
-
-  function persistSendState() {
-    try {
-      sessionStorage.setItem(sendStateKey, JSON.stringify({
-        lastAutomaticSendAt,
-        rateLimitCooldownUntil,
-        rateLimitStrikes,
-        recentAutomaticSendTimes: recentAutomaticSendTimes.slice(-8),
-      }));
-    } catch {}
-  }
-
-  function trimRecentAutomaticSends(now = Date.now()) {
-    recentAutomaticSendTimes = recentAutomaticSendTimes.filter(timestamp => now - timestamp < 30000);
-  }
-
-  function deepSeekAdaptiveIntervalMs(now = Date.now()) {
-    if (!isDeepSeek) return 0;
-    trimRecentAutomaticSends(now);
-    if (recentAutomaticSendTimes.length <= 1) return 3000;
-    if (recentAutomaticSendTimes.length === 2) return 4500;
-    return 6000;
-  }
-
-  function deepSeekRateLimitNotices() {
-    if (!isDeepSeek) return [];
-    const pattern = /消息发送过于频繁.*稍后重试|rate[ _-]?limit(?:ed| reached|_reached)|too many requests|sending requests too quickly/i;
-    return [...document.querySelectorAll('div, span, p')].filter(element => {
-      if (!visible(element)) return false;
-      const text = String(element.textContent || '').trim();
-      if (!text || text.length > 160 || !pattern.test(text)) return false;
-      const rect = element.getBoundingClientRect();
-      return rect.bottom >= 0 && rect.top <= window.innerHeight;
-    });
-  }
-
-  async function waitForAutomaticSendWindow() {
-    // v12: user explicitly prefers the original fast chat round-trip behavior.
-    // Keep this hook so pacing can be reintroduced later without touching sendMessage,
-    // but do not impose any automatic delay now.
-    return;
-  }
-
-  function recordDeepSeekRateLimit() {
-    if (!isDeepSeek) return;
-    rateLimitStrikes = Math.min(3, rateLimitStrikes + 1);
-    const cooldownMs = Math.min(120000, 30000 * (2 ** (rateLimitStrikes - 1)));
-    rateLimitCooldownUntil = Date.now() + cooldownMs;
-    persistSendState();
-    console.warn(`[ShunCode Web MCP] DeepSeek rate limit detected; cooling down for ${cooldownMs}ms.`);
-  }
-
-  function recordSuccessfulDeepSeekSend() {
-    if (!isDeepSeek) return;
-    const now = Date.now();
-    lastAutomaticSendAt = now;
-    trimRecentAutomaticSends(now);
-    recentAutomaticSendTimes.push(now);
-    if (rateLimitStrikes > 0 && now >= rateLimitCooldownUntil) rateLimitStrikes -= 1;
-    if (rateLimitStrikes === 0) rateLimitCooldownUntil = 0;
-    persistSendState();
-  }
-
-  async function verifyDeepSeekAcceptedSend(previousNotices) {
-    // v12: do not add a post-send wait. If DeepSeek rejects a message for rate
-    // limiting, its own UI retry control remains available to the user.
-    return;
-  }
-
   async function request(path, options = {}) {
+    if (BINDING_TRANSPORT) throw new Error('HTTP request is unavailable for binding WebMCP transport');
     const response = await fetch(`${BRIDGE}${path}`, {
       ...options,
       cache: 'no-store',
@@ -161,11 +83,22 @@
   }
 
   async function fetchTools() {
+    if (BINDING_TRANSPORT) {
+      const fn = window[LIST_BINDING];
+      if (typeof fn !== 'function') throw new Error('ShunCode list-tools page binding is unavailable');
+      const tools = await fn(TOKEN);
+      return Array.isArray(tools) ? tools : [];
+    }
     const body = await request('/webmcp/tools');
     return Array.isArray(body.tools) ? body.tools : [];
   }
 
   async function invokeTool(name, args) {
+    if (BINDING_TRANSPORT) {
+      const fn = window[INVOKE_BINDING];
+      if (typeof fn !== 'function') throw new Error('ShunCode invoke-tool page binding is unavailable');
+      return await fn(TOKEN, name, args || {});
+    }
     const body = await request('/webmcp/invoke', {
       method: 'POST',
       body: JSON.stringify({
@@ -185,25 +118,8 @@
     return !!element && !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
   }
 
-  function composerScore(element) {
-    if (!visible(element) || element.disabled || element.readOnly) return -Infinity;
-    const rect = element.getBoundingClientRect();
-    if (rect.width < 100 || rect.height < 18) return -Infinity;
-    const attrs = [element.getAttribute('placeholder'), element.getAttribute('aria-label'), element.getAttribute('data-placeholder'), element.getAttribute('role'), element.className, element.id].filter(Boolean).join(' ').toLowerCase();
-    let score = rect.top / Math.max(1, window.innerHeight) * 8;
-    if (/ask|message|chat|prompt|type|send|reply|question|问|消息|输入|聊天|提问/.test(attrs)) score += 20;
-    if (element.matches('textarea')) score += 10;
-    if (element.isContentEditable) score += 8;
-    if (element.closest('form')) score += 4;
-    if (element.closest('main')) score += 3;
-    return score;
-  }
-
   function findComposer() {
-    if (isDeepSeekAuthPage) return null;
-    const selectors = ['textarea', '[contenteditable="true"][role="textbox"]', '[contenteditable="true"][data-lexical-editor="true"]', '[contenteditable="true"]', 'input[type="text"]'];
-    const candidates = [...new Set(selectors.flatMap(selector => [...document.querySelectorAll(selector)]))];
-    return candidates.map(element => ({ element, score: composerScore(element) })).filter(item => Number.isFinite(item.score)).sort((a, b) => b.score - a.score)[0]?.element || null;
+    return site.findComposer();
   }
 
   function findResumeWorkButton() {
@@ -313,8 +229,8 @@
   }
 
   async function sendMessage(text) {
-    await waitForAutomaticSendWindow();
-    const previousRateLimitNotices = new Set(deepSeekRateLimitNotices());
+    await site.beforeAutomaticSend();
+    const previousRateLimitNotices = site.captureRateLimitNotices();
     const composer = await ensureComposer();
     const existing = composerText(composer);
     if (existing && existing !== text) {
@@ -328,13 +244,10 @@
     setComposerText(composer, text);
     const resultId = outboundToolResultId(text);
     const resultCountBaseline = resultId ? completedResultCountForId(resultId) : 0;
-    if (isDeepSeek) {
-      lastAutomaticSendAt = Date.now();
-      persistSendState();
-    }
+    site.onAutomaticSendAttempt();
     await submitComposer(composer);
     if (await waitForMessageSubmission(composer, text, resultId, resultCountBaseline, 5000)) {
-      await verifyDeepSeekAcceptedSend(previousRateLimitNotices);
+      await site.verifyAcceptedSend(previousRateLimitNotices);
       return;
     }
 
@@ -342,7 +255,7 @@
     if (form && typeof form.requestSubmit === 'function') {
       try { form.requestSubmit(); } catch {}
       if (await waitForMessageSubmission(composer, text, resultId, resultCountBaseline, 2500)) {
-        await verifyDeepSeekAcceptedSend(previousRateLimitNotices);
+        await site.verifyAcceptedSend(previousRateLimitNotices);
         return;
       }
     }
@@ -368,208 +281,16 @@
     armResponseScanBurst();
   }
 
-  function parseJsonObjectAt(text, startIndex) {
-    const start = text.indexOf('{', startIndex);
-    if (start < 0) return null;
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (let index = start; index < text.length; index += 1) {
-      const char = text[index];
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (char === '\\') escaped = true;
-        else if (char === '"') inString = false;
-        continue;
-      }
-      if (char === '"') {
-        inString = true;
-        continue;
-      }
-      if (char === '{') depth += 1;
-      else if (char === '}') {
-        depth -= 1;
-        if (depth === 0) {
-          const raw = text.slice(start, index + 1);
-          try { return { value: JSON.parse(raw), endIndex: index + 1 }; }
-          catch { return null; }
-        }
-      }
-    }
-    return null;
-  }
-
-  function parseToolJsonObject(text, markerIndex, markerLength) {
-    const parsed = parseJsonObjectAt(text, markerIndex + markerLength);
-    if (parsed) return parsed;
-
-    // DeepSeek occasionally renders a completed tool fence with one or more
-    // trailing object braces missing, especially for very large apply_patch
-    // payloads. Only attempt repair once the explicit closing tool marker is
-    // present, so streaming/incomplete responses can never execute early.
-    const closeMarkerIndex = text.indexOf('[/SHUNCODE_TOOL]', markerIndex + markerLength);
-    if (closeMarkerIndex < 0) return null;
-    const start = text.indexOf('{', markerIndex + markerLength);
-    if (start < 0 || start >= closeMarkerIndex) return null;
-
-    const raw = text.slice(start, closeMarkerIndex).trim();
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (let index = 0; index < raw.length; index += 1) {
-      const char = raw[index];
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (char === '\\') escaped = true;
-        else if (char === '"') inString = false;
-        continue;
-      }
-      if (char === '"') {
-        inString = true;
-        continue;
-      }
-      if (char === '{') depth += 1;
-      else if (char === '}') depth -= 1;
-      if (depth < 0) return null;
-    }
-    if (inString || depth < 1 || depth > 3) return null;
-
-    const repaired = raw + '}'.repeat(depth);
-    try {
-      return { value: JSON.parse(repaired), endIndex: closeMarkerIndex, repairedTrailingBraces: depth };
-    } catch {
-      return null;
-    }
-  }
-
-  function parseLineScalar(value) {
-    const text = String(value ?? '').trim();
-    if (text === 'true') return true;
-    if (text === 'false') return false;
-    if (text === 'null') return null;
-    if (/^-?(?:\d+\.?\d*|\.\d+)$/.test(text)) return Number(text);
-    if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
-      try { return JSON.parse(text); } catch {}
-    }
-    return text;
-  }
-
-  function setLineArgument(target, dottedPath, value) {
-    const parts = String(dottedPath || '').split('.').filter(Boolean);
-    if (!parts.length) return;
-    let current = target;
-    for (let index = 0; index < parts.length; index += 1) {
-      const part = parts[index];
-      const key = /^\d+$/.test(part) ? Number(part) : part;
-      if (index === parts.length - 1) {
-        current[key] = value;
-        return;
-      }
-      const nextIsArray = /^\d+$/.test(parts[index + 1]);
-      if (!current[key] || typeof current[key] !== 'object') current[key] = nextIsArray ? [] : {};
-      current = current[key];
-    }
-  }
-
-  function parseToolLineObject(text, markerIndex, markerLength) {
-    const closeMarker = '[/SHUNCODE_TOOL]';
-    const closeMarkerIndex = text.indexOf(closeMarker, markerIndex + markerLength);
-    if (closeMarkerIndex < 0) return null;
-    const raw = text.slice(markerIndex + markerLength, closeMarkerIndex).trim();
-    if (!raw || raw.startsWith('{')) return null;
-
-    const lines = raw.split(/\r?\n/);
-    const call = { arguments: {} };
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index].trim();
-      if (!line) continue;
-      const heredoc = line.match(/^arg\.([A-Za-z0-9_.-]+)<<([A-Za-z0-9_-]+)$/);
-      if (heredoc) {
-        const [, dottedPath, terminator] = heredoc;
-        const chunks = [];
-        let closed = false;
-        for (index += 1; index < lines.length; index += 1) {
-          if (lines[index].trim() === terminator) {
-            closed = true;
-            break;
-          }
-          chunks.push(lines[index]);
-        }
-        if (!closed) return null;
-        setLineArgument(call.arguments, dottedPath, chunks.join('\n'));
-        continue;
-      }
-      const pair = line.match(/^(id|name|arg\.([A-Za-z0-9_.-]+))=(.*)$/);
-      if (!pair) continue;
-      if (pair[1] === 'id') call.id = pair[3].trim();
-      else if (pair[1] === 'name') call.name = pair[3].trim();
-      else setLineArgument(call.arguments, pair[2], parseLineScalar(pair[3]));
-    }
-    if (typeof call.name !== 'string' || !call.name) return null;
-    return { value: call, endIndex: closeMarkerIndex + closeMarker.length, lineProtocol: true };
-  }
-
-  function parseToolObject(text, markerIndex, markerLength) {
-    return parseToolJsonObject(text, markerIndex, markerLength)
-      || parseToolLineObject(text, markerIndex, markerLength);
-  }
-
-  function extractCalls(text) {
-    const calls = [];
-    const markers = ['[SHUNCODE_TOOL]', '```SHUNCODE_TOOL'];
-    for (const marker of markers) {
-      let fromIndex = 0;
-      while (fromIndex < text.length) {
-        const markerIndex = text.indexOf(marker, fromIndex);
-        if (markerIndex < 0) break;
-        const parsed = parseToolObject(text, markerIndex, marker.length);
-        fromIndex = parsed?.endIndex || markerIndex + marker.length;
-        const call = parsed?.value;
-        if (!call || typeof call.name !== 'string') continue;
-        if (call.name === '__example__' || call.name === 'TOOL_NAME' || String(call.id || '').startsWith('example-')) continue;
-        calls.push(call);
-      }
-    }
-    return calls;
-  }
-
-  function extractCompletedCallCounts(text) {
-    const counts = new Map();
-    const marker = '[SHUNCODE_TOOL_RESULT]';
-    let fromIndex = 0;
-    while (fromIndex < text.length) {
-      const markerIndex = text.indexOf(marker, fromIndex);
-      if (markerIndex < 0) break;
-      const parsed = parseJsonObjectAt(text, markerIndex + marker.length);
-      fromIndex = parsed?.endIndex || markerIndex + marker.length;
-      const id = parsed?.value?.id;
-      if (id != null) {
-        const key = String(id);
-        counts.set(key, (counts.get(key) || 0) + 1);
-      }
-    }
-    return counts;
-  }
+  const parseJsonObjectAt = core.parseJsonObjectAt;
+  const extractCalls = core.extractCalls;
+  const extractCompletedCallCounts = core.extractCompletedCallCounts;
 
   function assistantTextCandidates() {
-    const selectors = ['[data-message-author-role="assistant"]', '[data-role="assistant"]', '[class*="assistant-message"]', '.ds-assistant-message-main-content', '.ds-message .md-code-block pre', 'main article', 'main pre', 'main code', 'main .prose'];
-    const candidates = [...new Set(selectors.flatMap(selector => [...document.querySelectorAll(selector)]))]
-      .filter(element => !element.isContentEditable && !['TEXTAREA', 'INPUT'].includes(element.tagName))
-      .filter(element => !element.closest('[class*="bg-surface-raised"]'))
-      .filter(element => (element.textContent || '').includes('[SHUNCODE_TOOL]'));
-    return candidates
-      .filter(element => !candidates.some(other => other !== element && other.contains(element)))
-      .sort((a, b) => {
-        if (a === b) return 0;
-        const position = a.compareDocumentPosition(b);
-        if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-        if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-        return 0;
-      });
+    return site.assistantTextCandidates();
   }
 
   function callBaseKey(call) {
-    return String(call.id || `${call.name}:${JSON.stringify(call.arguments || {})}`);
+    return core.callBaseKey(call);
   }
 
   function toolCallOccurrences() {
@@ -588,20 +309,14 @@
   }
 
   function laneKeyFor(element) {
-    let node = element;
-    for (let depth = 0; node && depth < 10; depth += 1, node = node.parentElement) {
-      const text = String(node.innerText || '').slice(0, 260);
-      if (/回复\s*A|response\s*A/i.test(text)) return 'A';
-      if (/回复\s*B|response\s*B/i.test(text)) return 'B';
-    }
-    return '';
+    return site.laneKeyFor(element);
   }
 
   async function deliverPending(key, delivery) {
     if (!delivery || Date.now() < delivery.nextAttemptAt) return false;
     try {
       await sendToolResult(delivery.call, delivery.result, delivery.error);
-      pendingDeliveries.delete(key);
+      core.deletePendingDelivery(key);
       lastDeliveryError = '';
       return true;
     } catch (error) {
@@ -609,7 +324,7 @@
       delivery.nextAttemptAt = Date.now() + Math.min(8000, 1800 * delivery.attempts);
       lastDeliveryError = short(error?.message || error, 1000);
       if (delivery.attempts >= 8) {
-        pendingDeliveries.delete(key);
+        core.deletePendingDelivery(key);
         console.error('[ShunCode Web MCP] result delivery failed permanently:', error);
       } else {
         console.warn('[ShunCode Web MCP] result delivery failed; will retry without re-running tool:', error);
@@ -620,17 +335,11 @@
   }
 
   async function handleCall(call, laneKey = '', key = callBaseKey(call)) {
-    if (seen.has(key)) return false;
+    if (core.hasSeen(key)) return false;
     if (lockedLane && laneKey && laneKey !== lockedLane) return false;
     if (!lockedLane && laneKey) lockedLane = laneKey;
-    seen.add(key);
+    core.rememberSeen(key);
     lastHandledCallKey = key;
-    try {
-      const stored = JSON.parse(sessionStorage.getItem(seenStorageKey) || '[]');
-      const values = Array.isArray(stored) ? stored.map(String) : [];
-      if (!values.includes(key)) values.push(key);
-      sessionStorage.setItem(seenStorageKey, JSON.stringify(values.slice(-200)));
-    } catch {}
     let result = null;
     let invocationError = null;
     try {
@@ -639,7 +348,7 @@
       invocationError = error;
     }
     const delivery = { call, result, error: invocationError, attempts: 0, nextAttemptAt: 0 };
-    pendingDeliveries.set(key, delivery);
+    core.setPendingDelivery(key, delivery);
     await deliverPending(key, delivery);
     return true;
   }
@@ -654,7 +363,7 @@
     scanRequestedWhileBusy = false;
     lastScanAt = Date.now();
     try {
-      for (const [key, delivery] of pendingDeliveries) {
+      for (const [key, delivery] of core.pendingDeliveryEntries()) {
         if (Date.now() >= delivery.nextAttemptAt) {
           await deliverPending(key, delivery);
           return;
@@ -674,22 +383,7 @@
   function seedSeenFromHistory() {
     const occurrences = toolCallOccurrences();
     const completedCounts = extractCompletedCallCounts(document.body?.innerText || '');
-    for (const occurrence of occurrences) {
-      if (occurrence.ordinal <= (completedCounts.get(occurrence.baseKey) || 0)) seen.add(occurrence.key);
-    }
-    try {
-      const stored = JSON.parse(sessionStorage.getItem(seenStorageKey) || '[]');
-      if (Array.isArray(stored)) {
-        for (const rawKey of stored.map(String)) {
-          if (rawKey.includes('::occurrence:')) {
-            seen.add(rawKey);
-            continue;
-          }
-          const legacyOccurrence = occurrences.find(item => item.baseKey === rawKey && !seen.has(item.key));
-          if (legacyOccurrence) seen.add(legacyOccurrence.key);
-        }
-      }
-    } catch {}
+    core.seedSeenFromHistory(occurrences, completedCounts);
   }
 
   function hasPrimingPrompt() {
@@ -737,15 +431,13 @@
   }
 
   async function prime() {
-    if (isDeepSeekAuthPage) throw new Error('DeepSeek authentication page is not a chat page');
+    if (site.isDeepSeekAuthPage) throw new Error('DeepSeek authentication page is not a chat page');
     if (primed || hasPrimingPrompt()) {
       primed = true;
       return { ok: true, alreadyPrimed: true };
     }
     const tools = await fetchTools();
-    const transportRule = isDeepSeek
-      ? `DEEPSEEK TRANSPORT RULE: Do NOT use JSON and do NOT use a Markdown code fence for tool requests. When a tool is needed, reply with exactly one block and no prose:\n[SHUNCODE_TOOL]\nid=unique-call-id\nname=TOOL_NAME\narg.path=.\narg.depth=1\n[/SHUNCODE_TOOL]\nUse one arg.<name>=<value> line per argument. Use dotted paths for nested values and numeric indexes for arrays, for example arg.files.0.path=README.md. Numbers and booleans should be unquoted. For a multiline string use arg.patch<<SHUNCODE_EOF on one line, then the exact multiline value, then SHUNCODE_EOF on its own line. Always include [/SHUNCODE_TOOL]. Wait for [SHUNCODE_TOOL_RESULT] before continuing.`
-      : `IMPORTANT TRANSPORT RULE: Chat renderers can corrupt JSON, quotes, backslashes, HTML and patch text unless the entire tool request is inside a code fence. Whenever a tool is needed, reply with exactly ONE FOUR-BACKTICK text fence and no prose. Inside that outer fence put exactly this request format:\n\n\`\`\`\`text\n[SHUNCODE_TOOL]\n{"id":"unique-call-id","name":"TOOL_NAME","arguments":{}}\n[/SHUNCODE_TOOL]\n\`\`\`\`\n\nDo not omit the outer four-backtick fence. Do not omit [/SHUNCODE_TOOL]. Keep JSON valid and preserve all backslashes exactly. Wait for [SHUNCODE_TOOL_RESULT] before continuing.`;
+    const transportRule = site.transportRule();
     const prompt = `${PRIME_CONTEXT_MARKER}\nYou have LIVE access to the user's ShunCode environment through Web MCP.\n\n${environmentModelPrompt(tools)}\n\nAvailable tools (* = required argument):\n${tools.map(summarizeTool).join('\n')}\n\n${transportRule}\n\nNever invent tool results. If the user asks you to create or modify a workspace file, you MUST actually use apply_patch or an appropriate ShunCode tool; do not merely print code in chat and claim the file was created. Prefer read/search/diagnostic tools before edits or commands. Minimize tool round-trips: batch compatible file reads in one read_files call, prefer one multi-file apply_patch instead of many tiny patches, and do not perform redundant verification calls. Do not open local files in the browser or start a local preview server merely to visually verify work unless the user explicitly asks for a preview; this self-verification restriction does NOT mean you should avoid browser tools when the user's actual task involves the web. Keep using the appropriate workspace, Windows, and browser tools until the user's task is complete.`;
     await sendMessage(prompt);
     primed = true;
@@ -758,13 +450,13 @@
   scheduleScan(0);
 
   window.__shuncodeWebMcp = {
-    version: 24,
-    matchesConfig: (bridge, token) => String(bridge || '').replace(/\/$/, '') === BRIDGE && String(token || '') === TOKEN,
+    version: 25,
+    matchesConfig: (transportKey, token) => String(transportKey || '') === TRANSPORT_KEY && String(token || '') === TOKEN,
     prime,
     scan,
     invokeTool,
     fetchTools,
-    status: () => ({ version: 24, enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: seen.size, pendingDeliveries: pendingDeliveries.size, lockedLane, isDeepSeek, isDeepSeekAuthPage, deepSeekPacing: 'disabled-user-preference', dedupeMode: 'call-occurrence-v2', lastScanAt, lastHandledCallKey, lastDeliveryError }),
+    status: () => ({ version: 25, coreVersion: 1, siteAdapter: site.id, transport: BINDING_TRANSPORT ? 'binding' : 'http', enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: core.seenCount(), pendingDeliveries: core.pendingDeliveryCount(), lockedLane, isDeepSeek: site.isDeepSeek, isDeepSeekAuthPage: site.isDeepSeekAuthPage, deepSeekPacing: site.pacingMode, dedupeMode: 'call-occurrence-v2', lastScanAt, lastHandledCallKey, lastDeliveryError }),
     stop: () => {
       enabled = false;
       observer.disconnect();

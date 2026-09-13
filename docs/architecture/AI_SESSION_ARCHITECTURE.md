@@ -235,6 +235,28 @@ real webpage AI session
 
 当前 Web Worker semantic smoke 使用 fake transport 验证 session ownership、event mapping、allowed capability 透传、interrupt/disconnect、terminal guard 与 capability honesty；它不等于真实 DeepSeek/Arena 网页回归。真实网页接线必须继续使用现有已验证 page agent/Gateway 行为，而不是另造第二套 DOM 自动化。
 
+### Phase 5.1 canonical page runtime
+
+Phase 5.1 已把现有网页执行链拆成可验证但仍兼容原行为的三层：
+
+```text
+WebMCP Page Agent v25
+    ├─ WebMCP Core
+    │    ├─ JSON / DeepSeek line parser
+    │    ├─ call-occurrence dedupe
+    │    ├─ seen/sessionStorage migration
+    │    └─ pending result-delivery state
+    └─ Site Adapter
+         ├─ DeepSeek auth/composer/prompt/send-policy hooks
+         └─ Generic composer/assistant/prompt behavior
+```
+
+Page Agent 本身保留 MutationObserver/bounded scan、tool invocation orchestration 和 result reinjection。它现在有 HTTP 与 Playwright-binding 两种 transport；transport 差异不会进入 Site Adapter，也不会进入 `WebWorkerAdapter`。
+
+由 WebMCP Extension 启动的 Gateway 会获得 canonical Core/Site/Agent 的绝对路径，并在 managed Edge 中组合同一份 v25 page runtime。Standalone Gateway 若没有这些 source-path env 仍可使用旧 `generic-chat-agent.js` fallback，因此 legacy 文件现在是兼容债务而不是主实现。
+
+这一步尚未完成 `WebWorkerTransport` 的真实 caller 接线：page session/token/ledger 还没有成为 `WorkerSessionManager` 管理的 Web WorkerSession。Phase 5 后续必须在不复制 DOM state 的前提下建立该 binding。
+
 ### 正式 Adapter Layer
 
 WebMCP 应建立明确分层：

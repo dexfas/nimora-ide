@@ -188,9 +188,9 @@ Phase 3 新增的 Task Runtime 不改变以上部署：Task domain 当前也是 
 
 ### Page Agent
 
-`arena-agent-bridge.js` 当前为 v24。它已经具备重要可靠性语义：
+`arena-agent-bridge.js` 当前为 v25。页面实现已经拆成三个协作层：`webmcp-page-core.js`、`webmcp-site-adapters.js` 与薄化后的 page agent。它保留并继续验证以下可靠性语义：
 
-- version + bridge URL + page token 一致才复用；
+- version + transport identity + page token 一致才复用；
 - DeepSeek 登录页保护；
 - MutationObserver / bounded scan；
 - execution 与 result delivery 分离；
@@ -198,6 +198,10 @@ Phase 3 新增的 Task Runtime 不改变以上部署：Task domain 当前也是 
 - DeepSeek line protocol；
 - generic JSON protocol；
 - delivery retry 不重复执行工具。
+
+WebMCP Core 当前拥有 tool request parsing、call-occurrence dedupe、sessionStorage seen migration 与 pending delivery state；Site Adapter 当前拥有 composer/assistant DOM 选择、DeepSeek auth guard、lane detection、site-specific transport prompt 与 DeepSeek send-policy hook。Page agent 负责调度 MutationObserver、调用 capability、把结果回填网页。
+
+v25 支持两种 page transport：Integrated Browser 使用 localhost HTTP bridge；Gateway-managed Edge 使用 Playwright page binding。由 `extensions/shuncode-webmcp` 启动 Gateway 时，扩展会把 canonical Core/Site/Agent 源码路径传给 Gateway，因此这两条主路径不再维护两套 page agent。`tools/webmcp-gateway/generic-chat-agent.js` 目前仅保留为 standalone Gateway 未收到 canonical source path 时的兼容 fallback。
 
 ### Gateway
 
@@ -211,6 +215,8 @@ Phase 3 新增的 Task Runtime 不改变以上部署：Task domain 当前也是 
 - managed browser WebMCP host/control API。
 
 它已经接近“Gateway”的长期方向，但当前内部职责仍需模块化。
+
+默认 WebMCP control/gateway 端口仍保持 48322/48321 以兼容现有安装版；源码/测试实例可通过 `SHUNCODE_WEBMCP_CONTROL_PORT` / `SHUNCODE_WEBMCP_GATEWAY_PORT` 隔离运行。动态 discovery/多 workspace handshake 尚未完成。
 
 ## 9. Browser 的三个不同环境
 

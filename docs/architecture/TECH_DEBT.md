@@ -17,8 +17,8 @@
 | P1 | Nimora product logic 进入 Chat Core | Bridge/branch/model/tool renderer patches | 上游升级成本、AI 误改 | Thin Core migration |
 | P1 | Bridge 职责过宽 | `bridge-server.ts` 同时 MCP/tunnel/state/UI | 修改牵连大、难测试 | split exposure/tunnel/task state |
 | P1 | Gateway 单文件职责过宽 | `server.mjs` federation/browser/personal/web agent | failure isolation 差 | modular providers |
-| P1 | WebMCP 两套 page agent 漂移 | v24 rich agent vs simpler generic agent | site fix 只修一边 | shared WebMCP Core + adapters |
-| P1 | 固定 localhost ports | 48321/48322 与安装版真实冲突 | 并行开发/多 workspace 失败 | dynamic port + discovery/handshake |
+| P2 | standalone Gateway legacy page-agent fallback | Phase 5 已让 Extension + Extension-launched Gateway 共用 canonical v25 Core/Site/Agent，但 standalone Gateway 缺 shared-source env 时仍回退 `generic-chat-agent.js` | standalone fix 仍可能漂移 | 后续把 fallback 也改为可打包的 canonical WebMCP bundle，再删除 legacy agent |
+| P1 | localhost port discovery 尚未完成 | Phase 5 已允许源码通过 env 覆盖 48321/48322，但默认安装、多 workspace 仍无 discovery/handshake | 多 workspace/并行实例需手工分配 | dynamic port + discovery/handshake |
 | P1 | Context/tool 全量暴露趋势 | Capability metadata 已存在，但 WebMCP prime 仍可发送大量 tools | token/attention/attack surface | Capability Router / Context Budget / dynamic loading |
 | P1 | Multi-model state 绑定 Chat | Core branch + extension globalState | 无法服务 Task/Web worker | migrate to Task WorkerAttempt |
 | P1 | Bridge todo/progress 仍是 UI Source of Truth | Phase 3 已双写 Task journal，但现有 `BridgeManager.todos/activities` 仍驱动 UI | Task continuity/多 session ownership 仍不完整 | 验证 projection consistency 后切 Task progress store 为 owner |
@@ -27,7 +27,7 @@
 | P2 | `model-provider.ts` 过大 | catalog/auth/protocol/config mixed | provider change 高风险 | split catalog/auth/worker adapters |
 | P2 | `native-chat.ts` 混 UI/orchestration | runtime/tool/branch/checkpoint | Chat 变 state owner | thin Chat projection |
 | P2 | Core↔extension magic command IDs | `shuncode.branch.*`, Bridge commands | 类型弱/隐藏依赖 | typed adapter/proposed API |
-| P2 | old architecture docs drift | v20 vs code v24 | 新 AI 错判 | architecture docs as source |
+| P2 | architecture docs 需要持续随协议版本更新 | Phase 5 已将入口文档同步到 v25，但 WebMCP/Worker/Gateway 仍在迁移 | 新 AI 读取旧版本事实 | architecture docs + smoke outputs as source of truth |
 | P2 | strict root typecheck ≠ production recovered scope | documented ~1173 historical errors | 新 AI 误“修复” recovered code | explicit validation tiers |
 | P3 | historical license/payment dead path | free access early return | 噪音/误解 | delete after compatibility audit |
 | P3 | internal ShunCode naming | runtime/IDs/protocol paths | branding confusion | keep compatibility; rename only behind migrations |

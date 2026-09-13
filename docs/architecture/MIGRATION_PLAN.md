@@ -257,19 +257,23 @@ Native Chat 仍可直连旧 Runtime 直到 adapter parity 完成。
 
 ## 7. Phase 5 — WebMCP Core + Site Adapters
 
+**Status: In progress — Phase 5.1 canonical v25 Core/Site/page-agent extraction + HTTP/binding transport parity landed (2026-09-13); WorkerSession binding, dynamic discovery and live DeepSeek release gate remain**
+
 ### 目标
 
 消除 `arena-agent-bridge.js` / `generic-chat-agent.js` 逻辑漂移，让网页变化只进入 site adapter。
 
 ### 工作
 
-- 提取 WebMCP semantic core；
-- DeepSeekAdapter 首先迁移已有 v24 兼容；
-- GenericAdapter；
+- 提取 WebMCP semantic core；✅ parser / call-occurrence dedupe / pending-delivery state 已进入 `webmcp-page-core.js`
+- DeepSeekAdapter 首先迁移已有 v24 兼容；✅ auth/composer/line protocol prompt/send policy 已进入 Site Adapter，page agent 升级为 v25
+- GenericAdapter；✅ generic composer/assistant selection + JSON transport prompt 已进入 Site Adapter
 - Arena/Claude/Gemini 后续按真实测试增加；
 - page token/session/ledger 与 Gateway WorkerSession 绑定；
-- 固定端口改为可配置/动态 discovery；
-- auth page / streaming / delivery contract tests。
+- 固定端口改为可配置/动态 discovery；🟡 env override 已落地，dynamic discovery/handshake 待完成
+- auth page / streaming / delivery contract tests。🟡 auth/parser/delivery/dedupe/synthetic browser 已覆盖，live provider streaming/release gate 待完成
+
+Phase 5.1 同时让 v25 page agent 支持两种 transport：Integrated Browser 使用 localhost HTTP；Gateway-managed Edge 使用 Playwright binding。Extension 启动 Gateway 时传入 canonical Core/Site/Agent 源码路径，因此正常产品路径不再由 `generic-chat-agent.js` 维护第二份逻辑；legacy generic agent 暂时只作为 standalone Gateway fallback。
 
 ### 风险
 
@@ -284,6 +288,8 @@ web model → request → Nimora tool → result delivery → final model respon
 ```
 
 必须至少覆盖 nested args 和一次 side-effect-safe failure simulation。
+
+当前自动验证已经覆盖：Core JSON/DeepSeek line parser、nested args/heredoc、incomplete-stream guard、bounded JSON repair、dedupe replay、pending-delivery state；真实 Edge synthetic DeepSeek 页面同时覆盖 HTTP 与 binding transport 的 request → tool → result delivery → repeated-scan no-reexecution；真实 Gateway process + managed Edge 验证 canonical v25 source 通过 binding transport 注入。**这些 synthetic/integration smoke 不等于 live DeepSeek service release gate**。
 
 ### 回滚
 
