@@ -203,6 +203,10 @@ WebMCP Core 当前拥有 tool request parsing、call-occurrence dedupe、session
 
 v25 支持两种 page transport：Integrated Browser 使用 localhost HTTP bridge；Gateway-managed Edge 使用 Playwright page binding。由 `extensions/shuncode-webmcp` 启动 Gateway 时，扩展会把 canonical Core/Site/Agent 源码路径传给 Gateway，因此这两条主路径不再维护两套 page agent。`tools/webmcp-gateway/generic-chat-agent.js` 目前仅保留为 standalone Gateway 未收到 canonical source path 时的兼容 fallback。
 
+Phase 5.2 在 page agent 上新增 Worker control surface：`workerSession()` 提供稳定 page-session identity，`workerSend()` 建立一轮网页 Worker turn，`workerPoll()` 输出 sequence-numbered assistant/capability/status/terminal events，`workerInterrupt()` 委托 Site Adapter 停止当前生成。工具协议正文不会作为普通 assistant text 暴露；发生 capability call 后，只有 result delivery 完成且出现新的 post-tool assistant revision，turn 才允许进入 completed。
+
+WebMCP Extension 把上述 surface 封装为 `_shuncode.webMcp.worker*` 内部 command contract，并始终校验 `pageId + pageSessionId`，防止页面刷新/换页后继续控制陈旧 session。第一方扩展通过 `WebMcpCommandTransport` 消费 command contract，再进入 `WebWorkerAdapter → WorkerSessionManager`；page session id 是 adapter-native session id，managed session id 与 Task binding 仍由 `WorkerSessionManager/TaskRuntime` 拥有。WebMCP page token 不向 Worker/Task 层暴露。
+
 ### Gateway
 
 `tools/webmcp-gateway/server.mjs` 默认监听 `127.0.0.1:48321`，同时是：

@@ -53,12 +53,11 @@
     return candidates.map(element => ({ element, score: composerScore(element) })).filter(item => Number.isFinite(item.score)).sort((a, b) => b.score - a.score)[0]?.element || null;
   }
 
-  function assistantTextCandidates() {
+  function assistantMessageCandidates() {
     const selectors = ['[data-message-author-role="assistant"]', '[data-role="assistant"]', '[class*="assistant-message"]', '.ds-assistant-message-main-content', '.ds-message .md-code-block pre', 'main article', 'main pre', 'main code', 'main .prose'];
     const candidates = [...new Set(selectors.flatMap(selector => [...document.querySelectorAll(selector)]))]
       .filter(element => !element.isContentEditable && !['TEXTAREA', 'INPUT'].includes(element.tagName))
-      .filter(element => !element.closest('[class*="bg-surface-raised"]'))
-      .filter(element => (element.textContent || '').includes('[SHUNCODE_TOOL]'));
+      .filter(element => !element.closest('[class*="bg-surface-raised"]'));
     return candidates
       .filter(element => !candidates.some(other => other !== element && other.contains(element)))
       .sort((a, b) => {
@@ -68,6 +67,34 @@
         if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
         return 0;
       });
+  }
+
+  function assistantTextCandidates() {
+    return assistantMessageCandidates().filter(element => (element.textContent || '').includes('[SHUNCODE_TOOL]'));
+  }
+
+  function assistantMessageText(element) {
+    return String(element?.innerText || element?.textContent || '').trim();
+  }
+
+  function generationStopButton() {
+    const pattern = /^(stop|stop generating|cancel generation|停止|停止生成|停止回答|中止)$/i;
+    return [...document.querySelectorAll('button')].find(button => {
+      if (!visible(button) || button.disabled) return false;
+      const text = String(button.getAttribute('aria-label') || button.title || button.textContent || '').trim();
+      return pattern.test(text);
+    }) || null;
+  }
+
+  function isResponseStreaming() {
+    return !!generationStopButton();
+  }
+
+  async function interruptGeneration() {
+    const button = generationStopButton();
+    if (!button) return false;
+    button.click();
+    return true;
   }
 
   function laneKeyFor(element) {
@@ -123,7 +150,11 @@
     isDeepSeek,
     isDeepSeekAuthPage,
     findComposer,
+    assistantMessageCandidates,
+    assistantMessageText,
     assistantTextCandidates,
+    isResponseStreaming,
+    interruptGeneration,
     laneKeyFor,
     deepSeekRateLimitNotices,
     beforeAutomaticSend,

@@ -28,6 +28,8 @@
 		"test-shuncode-webmcp-core": "node scripts/shuncode-webmcp-core-smoke.mjs",
 		"test-shuncode-webmcp-browser": "node scripts/shuncode-webmcp-browser-smoke.mjs",
 		"test-shuncode-webmcp-gateway-shared-agent": "node scripts/shuncode-webmcp-gateway-shared-agent-smoke.mjs",
+		"test-shuncode-webmcp-command-transport": "node scripts/shuncode-webmcp-command-transport-smoke.mts",
+		"test-shuncode-web-worker-stack": "node scripts/shuncode-web-worker-stack-smoke.mts",
 		"check-cyclic-dependencies": "node build/lib/checkCyclicDependencies.ts out",
 		"preinstall": "node build/npm/preinstall.ts",
 		"postinstall": "node build/npm/postinstall.ts",

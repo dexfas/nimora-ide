@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { getCapabilityMetadata } from "../../../src/capability-registry.js";
 import { TaskRuntime } from "../../../src/task-runtime.js";
 import type { TaskArtifactRef, TaskInteractionOutcome, TaskProgress, TaskTodo } from "../../../src/task-contract.js";
+import type { WorkerTaskBindingStore } from "../../../src/worker-session-manager.js";
 
 export interface ShadowExecutionHandle {
   taskId: string;
@@ -14,9 +15,10 @@ export interface ShadowExecutionHandle {
  * Fail-open compatibility layer for Phase 3 shadow mode. Task journaling must
  * never break the established Chat, Bridge, tool execution, or UI path.
  */
-export class TaskShadowRecorder implements vscode.Disposable {
+export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingStore {
   private readonly runtime: TaskRuntime;
   private readonly ready: Promise<void>;
+  private initializationError: Error | undefined;
 
   constructor(context: vscode.ExtensionContext, private readonly output: vscode.OutputChannel) {
     this.runtime = new TaskRuntime({
@@ -24,6 +26,7 @@ export class TaskShadowRecorder implements vscode.Disposable {
       log: message => this.output.appendLine(message),
     });
     this.ready = this.runtime.initialize().catch(error => {
+      this.initializationError = error instanceof Error ? error : new Error(String(error));
       this.logFailure("initialize", error);
     });
   }
@@ -119,6 +122,18 @@ export class TaskShadowRecorder implements vscode.Disposable {
         diffTruncated: row.diff_truncated === true,
       },
     }));
+  }
+
+  async attachWorkerSession(taskId: string, input: { managedSessionId: string; workerId: string; adapterSessionId: string; model?: string }): Promise<unknown> {
+    await this.ready;
+    if (this.initializationError) throw this.initializationError;
+    return await this.runtime.attachWorkerSession(taskId, input);
+  }
+
+  async detachWorkerSession(taskId: string, managedSessionId: string): Promise<void> {
+    await this.ready;
+    if (this.initializationError) throw this.initializationError;
+    await this.runtime.detachWorkerSession(taskId, managedSessionId);
   }
 
   dispose(): void {

@@ -255,7 +255,29 @@ Page Agent 本身保留 MutationObserver/bounded scan、tool invocation orchestr
 
 由 WebMCP Extension 启动的 Gateway 会获得 canonical Core/Site/Agent 的绝对路径，并在 managed Edge 中组合同一份 v25 page runtime。Standalone Gateway 若没有这些 source-path env 仍可使用旧 `generic-chat-agent.js` fallback，因此 legacy 文件现在是兼容债务而不是主实现。
 
-这一步尚未完成 `WebWorkerTransport` 的真实 caller 接线：page session/token/ledger 还没有成为 `WorkerSessionManager` 管理的 Web WorkerSession。Phase 5 后续必须在不复制 DOM state 的前提下建立该 binding。
+### Phase 5.2 real Web Worker binding
+
+Phase 5.2 已建立真实 caller boundary，且没有把 DOM state 上移到 Task/Worker 层：
+
+```text
+TaskRuntime
+    ↑ attach/detach/replay
+WorkerSessionManager
+    ↓
+WebWorkerAdapter
+    ↓
+WebMcpCommandTransport
+    ↓ VS Code internal command contract
+WebMCP Extension
+    ↓ pageId + pageSessionId validation
+Page Agent v25 worker control
+    ↓
+Site Adapter / WebMCP Core / real webpage
+```
+
+Page Agent 的 worker turn 输出 sequence-numbered `status / assistant_text / capability_call / capability_result / completed|cancelled|error` events。`WebMcpCommandTransport` 用 event cursor 消除轮询重放，再映射为 `WebWorkerTransportEvent`；`WebWorkerAdapter` 最终映射到统一 `WorkerEvent`。page token 始终停留在 WebMCP Extension/Page Agent 边界，WorkerSession 只保存 page id、page session id 与非敏感状态。
+
+第一方扩展启动时已注册 `nimora.web-worker`，并通过 `WorkerSessionManager({ taskBindings: taskShadow })` 使用现有 TaskRuntime journal。自动 stack smoke 已证明 Task worker attach/detach 可在重启后 replay。**仍未完成的部分**是：WebMCP capability call/result 还没有自动投影成 Task Execution Service 的统一 execution ledger；Native Chat/未来 Work orchestrator 也尚未自动选择 Web worker。
 
 ### 正式 Adapter Layer
 

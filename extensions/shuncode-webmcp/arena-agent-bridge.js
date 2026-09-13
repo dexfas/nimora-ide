@@ -38,6 +38,7 @@
   let lastScanAt = 0;
   let lastHandledCallKey = '';
   let lastDeliveryError = '';
+  let activeWorkerTurn = null;
   const responseWatchTimers = new Set();
 
   const short = (value, max = 12000) => String(value ?? '').slice(0, max);
@@ -312,12 +313,128 @@
     return site.laneKeyFor(element);
   }
 
+  function assistantMessageTexts() {
+    return site.assistantMessageCandidates()
+      .map(site.assistantMessageText)
+      .filter(text => text && !text.includes('[SHUNCODE_TOOL]'));
+  }
+
+  function appendWorkerEvent(turn, type, data = {}) {
+    turn.events.push({ seq: turn.nextEventSeq++, type, at: Date.now(), ...data });
+    if (turn.events.length > 200) turn.events.splice(0, turn.events.length - 200);
+  }
+
+  function workerTurnSnapshot(turn) {
+    return {
+      inputId: turn.inputId,
+      state: turn.state,
+      text: turn.text,
+      error: turn.error || null,
+      startedAt: turn.startedAt,
+      sentAt: turn.sentAt || null,
+      completedAt: turn.completedAt || null,
+      toolCallCount: turn.toolCallCount,
+      pendingDeliveries: core.pendingDeliveryCount(),
+      events: turn.events.map(event => ({ ...event })),
+    };
+  }
+
+  function currentWorkerResponseText(turn) {
+    const current = assistantMessageTexts();
+    if (current.length > turn.baselineMessages.length) return current.slice(turn.baselineMessages.length).join('\n\n').trim();
+    if (current.length && turn.baselineMessages.length && current.at(-1) !== turn.baselineMessages.at(-1)) return current.at(-1).trim();
+    return '';
+  }
+
+  function refreshWorkerTurn(turn) {
+    if (!turn || turn.state !== 'running') return turn;
+    const now = Date.now();
+    const nextText = currentWorkerResponseText(turn);
+    if (nextText !== turn.text) {
+      const previousText = turn.text;
+      turn.text = nextText;
+      turn.revision += 1;
+      turn.lastChangeAt = now;
+      const delta = nextText.startsWith(previousText) ? nextText.slice(previousText.length) : nextText;
+      if (delta) appendWorkerEvent(turn, 'assistant_text', { text: delta, reset: !!previousText && !nextText.startsWith(previousText) });
+    }
+    const postToolResponseObserved = turn.toolCallCount === 0 || turn.revision > turn.revisionAtLastDelivery;
+    const stable = !!turn.text && now - turn.lastChangeAt >= 1200;
+    if (stable && postToolResponseObserved && core.pendingDeliveryCount() === 0 && !site.isResponseStreaming()) {
+      turn.state = 'completed';
+      turn.completedAt = now;
+      appendWorkerEvent(turn, 'completed', { text: turn.text });
+    }
+    return turn;
+  }
+
+  async function workerSend(input) {
+    const inputId = String(input?.inputId || '').trim();
+    const prompt = String(input?.prompt || '');
+    if (!inputId) throw new Error('WebMCP worker inputId is required');
+    if (!prompt.trim()) throw new Error('WebMCP worker prompt is required');
+    if (activeWorkerTurn && activeWorkerTurn.state === 'running') throw new Error(`WebMCP worker turn is already running: ${activeWorkerTurn.inputId}`);
+    const now = Date.now();
+    const turn = {
+      inputId,
+      state: 'running',
+      text: '',
+      error: '',
+      baselineMessages: assistantMessageTexts(),
+      startedAt: now,
+      sentAt: 0,
+      completedAt: 0,
+      lastChangeAt: now,
+      revision: 0,
+      revisionAtLastDelivery: 0,
+      toolCallCount: 0,
+      nextEventSeq: 1,
+      events: [],
+    };
+    activeWorkerTurn = turn;
+    appendWorkerEvent(turn, 'status', { name: 'sending' });
+    try {
+      await sendMessage(prompt);
+      turn.sentAt = Date.now();
+      appendWorkerEvent(turn, 'status', { name: 'sent' });
+      armResponseScanBurst();
+      return workerTurnSnapshot(turn);
+    } catch (error) {
+      turn.state = 'error';
+      turn.error = short(error?.message || error, 2000);
+      turn.completedAt = Date.now();
+      appendWorkerEvent(turn, 'error', { error: turn.error });
+      throw error;
+    }
+  }
+
+  function workerPoll(inputId) {
+    if (!activeWorkerTurn || activeWorkerTurn.inputId !== String(inputId || '')) throw new Error(`Unknown WebMCP worker turn: ${inputId}`);
+    refreshWorkerTurn(activeWorkerTurn);
+    return workerTurnSnapshot(activeWorkerTurn);
+  }
+
+  async function workerInterrupt(inputId) {
+    if (!activeWorkerTurn || activeWorkerTurn.inputId !== String(inputId || '')) return false;
+    if (activeWorkerTurn.state !== 'running') return false;
+    const interrupted = await site.interruptGeneration();
+    activeWorkerTurn.state = 'cancelled';
+    activeWorkerTurn.completedAt = Date.now();
+    appendWorkerEvent(activeWorkerTurn, 'cancelled', { interrupted });
+    return interrupted;
+  }
+
   async function deliverPending(key, delivery) {
     if (!delivery || Date.now() < delivery.nextAttemptAt) return false;
     try {
       await sendToolResult(delivery.call, delivery.result, delivery.error);
       core.deletePendingDelivery(key);
       lastDeliveryError = '';
+      if (activeWorkerTurn?.state === 'running' && delivery.workerInputId === activeWorkerTurn.inputId) {
+        refreshWorkerTurn(activeWorkerTurn);
+        activeWorkerTurn.revisionAtLastDelivery = activeWorkerTurn.revision;
+        appendWorkerEvent(activeWorkerTurn, 'status', { name: 'capability_result_delivered', callId: delivery.call.id || null, capability: delivery.call.name });
+      }
       return true;
     } catch (error) {
       delivery.attempts += 1;
@@ -340,6 +457,16 @@
     if (!lockedLane && laneKey) lockedLane = laneKey;
     core.rememberSeen(key);
     lastHandledCallKey = key;
+    const workerTurn = activeWorkerTurn?.state === 'running' ? activeWorkerTurn : null;
+    if (workerTurn) {
+      refreshWorkerTurn(workerTurn);
+      workerTurn.toolCallCount += 1;
+      appendWorkerEvent(workerTurn, 'capability_call', {
+        callId: call.id || null,
+        name: call.name,
+        arguments: call.arguments || {},
+      });
+    }
     let result = null;
     let invocationError = null;
     try {
@@ -347,7 +474,15 @@
     } catch (error) {
       invocationError = error;
     }
-    const delivery = { call, result, error: invocationError, attempts: 0, nextAttemptAt: 0 };
+    if (workerTurn) {
+      appendWorkerEvent(workerTurn, 'capability_result', {
+        callId: call.id || null,
+        name: call.name,
+        text: invocationError ? short(invocationError?.message || invocationError, 5000) : toolResultText(result),
+        isError: !!invocationError,
+      });
+    }
+    const delivery = { call, result, error: invocationError, attempts: 0, nextAttemptAt: 0, workerInputId: workerTurn?.inputId || '' };
     core.setPendingDelivery(key, delivery);
     await deliverPending(key, delivery);
     return true;
@@ -456,7 +591,11 @@
     scan,
     invokeTool,
     fetchTools,
-    status: () => ({ version: 25, coreVersion: 1, siteAdapter: site.id, transport: BINDING_TRANSPORT ? 'binding' : 'http', enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: core.seenCount(), pendingDeliveries: core.pendingDeliveryCount(), lockedLane, isDeepSeek: site.isDeepSeek, isDeepSeekAuthPage: site.isDeepSeekAuthPage, deepSeekPacing: site.pacingMode, dedupeMode: 'call-occurrence-v2', lastScanAt, lastHandledCallKey, lastDeliveryError }),
+    workerSend,
+    workerPoll,
+    workerInterrupt,
+    workerSession: () => ({ sessionId: pageSessionId, site: site.id, origin: location.origin, href: location.href, transport: BINDING_TRANSPORT ? 'binding' : 'http' }),
+    status: () => ({ version: 25, coreVersion: 1, siteAdapter: site.id, transport: BINDING_TRANSPORT ? 'binding' : 'http', pageSessionId, enabled, primed, composerFound: !!findComposer(), resumeButtonFound: !!findResumeWorkButton(), seen: core.seenCount(), pendingDeliveries: core.pendingDeliveryCount(), lockedLane, isDeepSeek: site.isDeepSeek, isDeepSeekAuthPage: site.isDeepSeekAuthPage, deepSeekPacing: site.pacingMode, dedupeMode: 'call-occurrence-v2', workerTurn: activeWorkerTurn ? { inputId: activeWorkerTurn.inputId, state: activeWorkerTurn.state } : null, lastScanAt, lastHandledCallKey, lastDeliveryError }),
     stop: () => {
       enabled = false;
       observer.disconnect();

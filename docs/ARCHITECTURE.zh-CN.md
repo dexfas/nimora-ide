@@ -18,7 +18,7 @@ Agent Runtime 的主要源码位于仓库根 `src/agent-host.ts`、`src/openai-a
 
 ## 2. WebMCP
 
-当前 WebMCP Bridge 为 `0.4.11`，page agent 为 `v25`。v25 已把 parser/dedupe/delivery state 抽到 WebMCP Core，并把 DeepSeek/Generic 网页差异放进 Site Adapter；Integrated Browser 与由扩展启动的 Gateway-managed Browser 共用同一份 canonical page agent，仅 transport 分别使用 localhost HTTP 与 Playwright binding。
+当前 WebMCP Bridge 为 `0.4.12`，page agent 为 `v25`。v25 已把 parser/dedupe/delivery state 抽到 WebMCP Core，并把 DeepSeek/Generic 网页差异放进 Site Adapter；Integrated Browser 与由扩展启动的 Gateway-managed Browser 共用同一份 canonical page agent，仅 transport 分别使用 localhost HTTP 与 Playwright binding。Phase 5.2 又在 page runtime 上增加稳定的 Worker control surface（session/send/poll/interrupt），由第一方扩展通过命令桥接为 `WebMcpCommandTransport → WebWorkerAdapter → WorkerSessionManager`，page session id 作为 adapter session id 写入 Task worker-session journal。
 
 ```text
 AI 网页（Arena / DeepSeek 等）

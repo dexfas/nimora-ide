@@ -140,9 +140,13 @@ node --check tools/webmcp-gateway/server.mjs
 npm run test-shuncode-webmcp-core
 npm run test-shuncode-webmcp-browser
 npm run test-shuncode-webmcp-gateway-shared-agent
+npm run test-shuncode-webmcp-command-transport
+npm run test-shuncode-web-worker-stack
 ```
 
-`test-shuncode-webmcp-core` 必须保护 JSON/DeepSeek line protocol、nested args/heredoc、streaming incomplete-call guard、bounded repair、dedupe persistence/migration 与 pending-delivery bookkeeping。`test-shuncode-webmcp-browser` 使用真实 Edge 和 synthetic DeepSeek DOM 验证 HTTP/binding transport、result delivery 与 repeated-scan no-reexecution；`test-shuncode-webmcp-gateway-shared-agent` 则启动真实 Gateway process/managed Edge，确认 Gateway 使用 canonical v25 Core/Site/Agent。三者都是自动 integration baseline，**不能写成 live DeepSeek 服务 E2E**；涉及发布级 DeepSeek 兼容时仍需要用户已登录网页上的真实 roundtrip。
+`test-shuncode-webmcp-core` 必须保护 JSON/DeepSeek line protocol、nested args/heredoc、streaming incomplete-call guard、bounded repair、dedupe persistence/migration 与 pending-delivery bookkeeping。`test-shuncode-webmcp-browser` 使用真实 Edge 和 synthetic DeepSeek DOM 验证 HTTP/binding transport、result delivery、worker plain/tool/interrupt lifecycle 与 repeated-scan no-reexecution；`test-shuncode-webmcp-gateway-shared-agent` 启动真实 Gateway process/managed Edge，确认 Gateway 使用 canonical v25 Core/Site/Agent；`test-shuncode-webmcp-command-transport` 保护 command bridge event cursor/terminal/interrupt/health/disconnect；`test-shuncode-web-worker-stack` 保护 command transport → adapter → manager → TaskRuntime attach/detach/replay。以上都是自动 integration baseline，**不能写成 live DeepSeek 服务 E2E**；涉及发布级 DeepSeek 兼容时仍需要用户已登录网页上的真实 roundtrip。
+
+修改 page Worker control / command transport / WorkerSession binding 后，还必须运行 `npm run typecheck-shuncode` 与 `npm run compile-shuncode`。真实源码载体验证应确认 Extension Host 同时激活第一方扩展与 `shuncode-integrated-browser-bridge`，隔离 control port 的 `/agent.js` 包含 worker control surface，并在 ShunCode output log 中出现 `Web worker registered: nimora.web-worker via webmcp.integrated-browser`。这只证明真实 Extension Host wiring，不等于 live provider E2E。
 
 源码实例与正式安装版并行时，优先使用 `SHUNCODE_WEBMCP_CONTROL_PORT` / `SHUNCODE_WEBMCP_GATEWAY_PORT` 分配隔离端口；禁止为了抢占默认 48322 去结束 `C:\Program Files\ShunCode` 正式进程。默认端口兼容性与动态 discovery 是两个不同问题。
 

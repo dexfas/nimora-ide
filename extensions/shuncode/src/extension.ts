@@ -11,6 +11,10 @@ import { ShunCodeLanguageModelProvider } from "./model-provider.js";
 import { registerShunCodeNativeChat } from "./native-chat.js";
 import { RuntimeClient } from "./runtime-client.js";
 import { TaskShadowRecorder } from "./task-shadow.js";
+import { WebMcpCommandTransport } from "./webmcp-worker-transport.js";
+import { WebWorkerAdapter, type WebWorkerSessionOptions } from "../../../src/web-worker-adapter.js";
+import { WorkerSessionManager } from "../../../src/worker-session-manager.js";
+import type { WorkerInput } from "../../../src/worker-contract.js";
 
 let activeBridge: BridgeManager | undefined;
 
@@ -52,6 +56,18 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("ShunCode");
   const ideToolBroker = new IdeToolBroker();
   const taskShadow = new TaskShadowRecorder(context, output);
+  const webWorkerSessions = new WorkerSessionManager({ taskBindings: taskShadow });
+  const webWorkerTransport = new WebMcpCommandTransport({
+    executeCommand: <T>(command: string, ...args: unknown[]) => vscode.commands.executeCommand<T>(command, ...args),
+  });
+  const webWorkerAdapter = new WebWorkerAdapter(webWorkerTransport);
+  const webWorkerReady = webWorkerSessions.register(webWorkerAdapter).then(descriptor => {
+    output.appendLine(`[extension] Web worker registered: ${descriptor.id} via ${descriptor.provider}`);
+    return descriptor;
+  }, error => {
+    output.appendLine(`[extension] Web worker registration failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  });
   const bridgeLicense = new BridgeLicenseService(context, output);
   const authorizeBridgeStart = async () => {
     output.appendLine("[bridge] free access enabled");
@@ -425,13 +441,72 @@ export function activate(context: vscode.ExtensionContext): void {
       await bridgeReady;
       return bridge.rotateEndpoint();
     }),
+    vscode.commands.registerCommand("_shuncode.worker.web.createSession", async (value: unknown) => {
+      await webWorkerReady;
+      const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
+      const taskId = typeof input.taskId === "string" && input.taskId.trim() ? input.taskId : undefined;
+      const options: WebWorkerSessionOptions = {
+        model: typeof input.model === "string" ? input.model : undefined,
+        workspaceRoot: typeof input.workspaceRoot === "string" ? input.workspaceRoot : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        contextHandle: typeof input.contextHandle === "string" ? input.contextHandle : undefined,
+        transport: input.transport && typeof input.transport === "object" && !Array.isArray(input.transport) ? input.transport as Record<string, unknown> : undefined,
+      };
+      return webWorkerSessions.createSession("nimora.web-worker", options, taskId);
+    }),
+    vscode.commands.registerCommand("_shuncode.worker.web.run", async (value: unknown) => {
+      await webWorkerReady;
+      const input = value && typeof value === "object" ? value as { managedSessionId?: unknown; input?: unknown } : {};
+      if (typeof input.managedSessionId !== "string" || !input.managedSessionId) throw new Error("Web worker managedSessionId is required.");
+      if (!input.input || typeof input.input !== "object" || Array.isArray(input.input)) throw new Error("Web worker input is required.");
+      const workerInput = input.input as Partial<WorkerInput>;
+      if (typeof workerInput.inputId !== "string" || !workerInput.inputId) throw new Error("Web worker inputId is required.");
+      if (typeof workerInput.prompt !== "string" || !workerInput.prompt.trim()) throw new Error("Web worker prompt is required.");
+      const events = [];
+      for await (const event of webWorkerSessions.send(input.managedSessionId, workerInput as WorkerInput)) events.push(event);
+      return { events, session: webWorkerSessions.getSession(input.managedSessionId) };
+    }),
+    vscode.commands.registerCommand("_shuncode.worker.web.interrupt", async (managedSessionId: unknown) => {
+      await webWorkerReady;
+      if (typeof managedSessionId !== "string" || !managedSessionId) throw new Error("Web worker managedSessionId is required.");
+      await webWorkerSessions.interrupt(managedSessionId);
+      return webWorkerSessions.getSession(managedSessionId);
+    }),
+    vscode.commands.registerCommand("_shuncode.worker.web.health", async (managedSessionId: unknown) => {
+      await webWorkerReady;
+      if (managedSessionId === undefined) return webWorkerSessions.healthWorker("nimora.web-worker");
+      if (typeof managedSessionId !== "string" || !managedSessionId) throw new Error("Web worker managedSessionId must be a string.");
+      return webWorkerSessions.health(managedSessionId);
+    }),
+    vscode.commands.registerCommand("_shuncode.worker.web.listSessions", async () => {
+      await webWorkerReady;
+      return webWorkerSessions.listSessions({ workerId: "nimora.web-worker" });
+    }),
+    vscode.commands.registerCommand("_shuncode.worker.web.dispose", async (managedSessionId: unknown) => {
+      await webWorkerReady;
+      if (typeof managedSessionId !== "string" || !managedSessionId) throw new Error("Web worker managedSessionId is required.");
+      await webWorkerSessions.dispose(managedSessionId);
+      return { disposed: true };
+    }),
   );
+
+  context.subscriptions.push({
+    dispose: () => {
+      void webWorkerReady.then(async () => {
+        for (const session of webWorkerSessions.listSessions({ workerId: "nimora.web-worker" })) {
+          await webWorkerSessions.dispose(session.managedSessionId).catch(error => {
+            output.appendLine(`[extension] Web worker dispose failed: ${error instanceof Error ? error.message : String(error)}`);
+          });
+        }
+      }).catch(() => undefined);
+    },
+  });
 
   output.appendLine("[extension] native Chat participant registered: shuncode.agent");
   output.appendLine("[extension] native Language Model provider registered: shuncode");
   output.appendLine("[extension] first-party modes registered: ShunCode Ask, ShunCode Plan, ShunCode Code");
   output.appendLine("[extension] IDE tool broker registered: list_directory, run_command, get_command_output, send_command_input, get_diagnostics, lsp");
   output.appendLine("[extension] Bridge registered: Streamable HTTP MCP + Cloudflare Quick/Named Tunnel + ngrok + report_progress");
+  output.appendLine("[extension] Web WorkerSessionManager wiring enabled: WebMCP command transport → WebWorkerAdapter → Task bindings");
   if (vscode.workspace.getConfiguration("shuncode.bridge").get<boolean>("persistentMode", false)) {
     output.appendLine("[extension] persistent Bridge mode enabled; opening Chat and waiting for the rendered view to start Bridge");
     setTimeout(() => {

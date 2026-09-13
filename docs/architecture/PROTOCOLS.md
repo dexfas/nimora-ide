@@ -125,6 +125,10 @@ arg.files.0.start_line=1
 
 Phase 5 已把 parser/dedupe/pending-delivery bookkeeping 从单体 page agent 抽到 `webmcp-page-core.js`，但它仍属于 page-session 层。下一步仍应把这一语义与 Gateway/Task Runtime 的通用 **Execution Ledger / at-most-once side-effect policy** 绑定，而不是把 page-local Core 当成最终 Source of Truth。
 
+Phase 5.2 额外建立 page Worker control contract：page session 具有稳定 `sessionId`；每个 `workerSend(inputId, prompt)` 产生一轮 turn；`workerPoll(inputId)` 返回带单调 `seq` 的 event ledger；`workerInterrupt(inputId)` 只终止该轮生成。Worker event 中 capability call/result 与 assistant text 分离，tool protocol 文本不得冒充普通模型输出。发生 capability call 后，result delivery 完成并出现新的 post-tool assistant revision 之前，turn 不得被标记 completed。
+
+第一方 `WebMcpCommandTransport` 通过 `pageId + pageSessionId` 调用 WebMCP Extension 内部 command，再用 event `seq` 去重轮询结果。这里的 WorkerSession binding **不等于 execution-ledger ownership 已迁移**：page Core 仍负责当前网页 tool at-most-once/delivery retry，Task Execution Service 的统一 ownership 是后续迁移项。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

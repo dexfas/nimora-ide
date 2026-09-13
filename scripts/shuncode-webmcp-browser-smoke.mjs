@@ -70,6 +70,17 @@ const browser = await chromium.launch({ executablePath: edgePath, headless: true
 let invokeCount = 0;
 let lastInvoke = null;
 
+async function pollWorkerUntil(page, inputId, expectedState, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  let snapshot = null;
+  while (Date.now() < deadline) {
+    snapshot = await page.evaluate(id => window.__shuncodeWebMcp.workerPoll(id), inputId);
+    if (snapshot.state === expectedState) return snapshot;
+    await page.waitForTimeout(250);
+  }
+  throw new Error(`Timed out waiting for worker turn ${inputId} to reach ${expectedState}; last=${JSON.stringify(snapshot)}`);
+}
+
 try {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -196,7 +207,102 @@ try {
   assert.equal(bindingInvokeArgs.args.files[0].path, 'README.md');
   await bindingContext.close();
 
-  console.log('[smoke] WebMCP v25 synthetic DeepSeek HTTP+binding roundtrip/dedupe/result delivery ok');
+  const workerContext = await browser.newContext();
+  const workerPage = await workerContext.newPage();
+  const workerListName = '__shuncodeListTools_worker_smoke';
+  const workerInvokeName = '__shuncodeInvokeTool_worker_smoke';
+  let workerInvokeCount = 0;
+  await workerPage.exposeFunction(workerListName, async token => {
+    assert.equal(token, 'worker-token');
+    return [{
+      name: 'read_files',
+      description: 'Read files',
+      inputSchema: { type: 'object', properties: { files: { type: 'array' } }, required: ['files'] },
+    }];
+  });
+  await workerPage.exposeFunction(workerInvokeName, async (token, name, args) => {
+    assert.equal(token, 'worker-token');
+    workerInvokeCount += 1;
+    assert.equal(name, 'read_files');
+    assert.equal(args.files[0].path, 'README.md');
+    return { content: [{ type: 'text', text: 'WORKER_READ_OK' }] };
+  });
+  await workerPage.route('https://chat.deepseek.com/**', async route => {
+    await route.fulfill({ status: 200, contentType: 'text/html', body: html });
+  });
+  await workerPage.goto('https://chat.deepseek.com/chat', { waitUntil: 'domcontentloaded' });
+  await workerPage.evaluate(({ source, listBinding, invokeBinding }) => {
+    const factory = (0, eval)(source);
+    factory({ token: 'worker-token', listBinding, invokeBinding });
+  }, { source: composedSource, listBinding: workerListName, invokeBinding: workerInvokeName });
+  await workerPage.evaluate(async () => await window.__shuncodeWebMcp.prime());
+  const workerSession = await workerPage.evaluate(() => window.__shuncodeWebMcp.workerSession());
+  assert.ok(workerSession.sessionId);
+  assert.equal(workerSession.site, 'deepseek');
+  assert.equal(workerSession.transport, 'binding');
+
+  const plainStart = await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerSend({ inputId: 'worker-plain-1', prompt: 'Reply with a plain worker response.' }));
+  assert.equal(plainStart.state, 'running');
+  await workerPage.evaluate(() => {
+    const response = document.createElement('div');
+    response.className = 'ds-assistant-message-main-content';
+    response.innerText = 'PLAIN_WORKER_OK';
+    document.getElementById('messages').appendChild(response);
+  });
+  const plainDone = await pollWorkerUntil(workerPage, 'worker-plain-1', 'completed');
+  assert.equal(plainDone.state, 'completed');
+  assert.equal(plainDone.text, 'PLAIN_WORKER_OK');
+  assert.ok(plainDone.events.some(event => event.type === 'assistant_text' && event.text.includes('PLAIN_WORKER_OK')));
+  assert.ok(plainDone.events.some(event => event.type === 'completed'));
+
+  const toolStart = await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerSend({ inputId: 'worker-tool-1', prompt: 'Read README.md, then answer.' }));
+  assert.equal(toolStart.state, 'running');
+  await workerPage.evaluate(() => {
+    const response = document.createElement('div');
+    response.className = 'ds-assistant-message-main-content';
+    response.innerText = `[SHUNCODE_TOOL]\nid=worker-call-1\nname=read_files\narg.files.0.path=README.md\n[/SHUNCODE_TOOL]`;
+    document.getElementById('messages').appendChild(response);
+  });
+  await workerPage.waitForFunction(() => window.__submittedMessages.some(text => text.includes('[SHUNCODE_TOOL_RESULT]') && text.includes('WORKER_READ_OK')), null, { timeout: 10000 });
+  await workerPage.waitForFunction(() => window.__shuncodeWebMcp.status().pendingDeliveries === 0, null, { timeout: 10000 });
+  const afterToolDelivery = await workerPage.evaluate(() => window.__shuncodeWebMcp.workerPoll('worker-tool-1'));
+  assert.equal(afterToolDelivery.state, 'running', 'tool result delivery must not complete the turn before a post-tool assistant response');
+  assert.equal(afterToolDelivery.toolCallCount, 1);
+  assert.equal(afterToolDelivery.text, '');
+  assert.ok(afterToolDelivery.events.some(event => event.type === 'capability_call' && event.name === 'read_files'));
+  assert.ok(afterToolDelivery.events.some(event => event.type === 'capability_result' && event.text.includes('WORKER_READ_OK')));
+  assert.ok(afterToolDelivery.events.some(event => event.type === 'status' && event.name === 'capability_result_delivered'));
+  assert.equal(workerInvokeCount, 1);
+  await workerPage.evaluate(() => {
+    const response = document.createElement('div');
+    response.className = 'ds-assistant-message-main-content';
+    response.innerText = 'TOOL_WORKER_FINAL';
+    document.getElementById('messages').appendChild(response);
+  });
+  const toolDone = await pollWorkerUntil(workerPage, 'worker-tool-1', 'completed');
+  assert.equal(toolDone.state, 'completed');
+  assert.equal(toolDone.text, 'TOOL_WORKER_FINAL');
+  assert.ok(!toolDone.events.some(event => event.type === 'assistant_text' && event.text.includes('[SHUNCODE_TOOL]')));
+
+  const interruptStart = await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerSend({ inputId: 'worker-cancel-1', prompt: 'Start a long response.' }));
+  assert.equal(interruptStart.state, 'running');
+  await workerPage.evaluate(() => {
+    window.__stopClicked = false;
+    const stop = document.createElement('button');
+    stop.setAttribute('aria-label', 'Stop generating');
+    stop.textContent = 'Stop';
+    stop.addEventListener('click', () => { window.__stopClicked = true; });
+    document.body.appendChild(stop);
+  });
+  const interrupted = await workerPage.evaluate(async () => await window.__shuncodeWebMcp.workerInterrupt('worker-cancel-1'));
+  assert.equal(interrupted, true);
+  assert.equal(await workerPage.evaluate(() => window.__stopClicked), true);
+  const cancelled = await workerPage.evaluate(() => window.__shuncodeWebMcp.workerPoll('worker-cancel-1'));
+  assert.equal(cancelled.state, 'cancelled');
+  assert.ok(cancelled.events.some(event => event.type === 'cancelled'));
+  await workerContext.close();
+
+  console.log('[smoke] WebMCP v25 synthetic DeepSeek HTTP+binding roundtrip + worker plain/tool/interrupt lifecycle ok');
 } finally {
   await browser.close();
 }

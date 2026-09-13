@@ -13,7 +13,7 @@ Nimora IDE 是一个基于 **Code - OSS / Visual Studio Code** 的开源 AI 编�
 - 官方 `1.132.0` tag commit：`df53daabb18cd157bdb08c7f01c34df936cf12f4`
 - 本机 ShunCode 产品版本：`1.132.0`
 - ShunCode 第一方扩展版本：`0.7.2`
-- Web MCP Bridge：`0.4.11`
+- Web MCP Bridge：`0.4.12`
 - WebMCP page agent：`v25`
 
 安装包 `product.json` 中的 `09533f921029d9d073c06e70f566ebe31e43cebc` 并不是 Microsoft VS Code 仓库可抓取的 commit，因此本仓库没有把它伪装成上游提交；重建依据与差异说明见 [docs/RECONSTRUCTION.md](docs/RECONSTRUCTION.md)。

@@ -133,6 +133,17 @@ function resultText(result) {
   }).join('\n');
 }
 
+function playwrightResultValue(result, label = 'WebMCP page control') {
+  const text = resultText(result);
+  const line = text.split(/\r?\n/).find(value => value.startsWith('Result: '));
+  if (!line) throw new Error(`${label} did not return a structured result: ${text.slice(0, 1200) || 'empty result'}`);
+  try {
+    return JSON.parse(line.slice('Result: '.length));
+  } catch (error) {
+    throw new Error(`${label} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 function httpGetJson(host, port, requestPath, timeoutMs = 1500) {
   return new Promise((resolve, reject) => {
     const req = http.get({ host, port, path: requestPath }, res => {
@@ -700,6 +711,74 @@ async function connectCurrentWebMcpPage(output) {
   }
 }
 
+async function connectWebMcpWorkerPage(output, options = {}) {
+  await ensureWebMcpGateway(output);
+  const page = await getOrShareCurrentBrowserPage(output);
+  if (shouldBypassWebMcp(page.url)) {
+    throw new Error(`Web worker transport cannot attach to a native-MCP bypass page: ${page.url || page.title || page.pageId}`);
+  }
+  const source = getArenaAgentSource();
+  const expression = `(${source})(${JSON.stringify({ bridge: `http://${HOST}:${PORT}`, token: WEB_MCP_PAGE_TOKEN })})`;
+  const shouldPrime = options?.prime !== false;
+  const code = `
+    const expression = ${JSON.stringify(expression)};
+    const status = await page.evaluate(source => (0, eval)(source), expression);
+    const prime = ${shouldPrime ? 'await page.evaluate(async () => await window.__shuncodeWebMcp.prime())' : 'null'};
+    const workerSession = await page.evaluate(() => window.__shuncodeWebMcp.workerSession());
+    return { status, prime, workerSession, url: page.url() };
+  `;
+  const result = await invokeBuiltinBrowserTool('run_playwright_code', { pageId: page.pageId, code, timeoutMs: 20000 });
+  const connected = playwrightResultValue(result, 'WebMCP worker connect');
+  if (connected?.status?.version !== 25 || !connected?.workerSession?.sessionId) {
+    throw new Error(`WebMCP worker connection did not expose the v25 worker contract: ${JSON.stringify(connected).slice(0, 1200)}`);
+  }
+  output.appendLine(`[web-mcp:worker] connected page=${page.pageId} session=${connected.workerSession.sessionId} site=${connected.workerSession.site || connected.status.siteAdapter || ''}`);
+  return {
+    pageId: page.pageId,
+    ...connected.workerSession,
+    status: connected.status,
+    prime: connected.prime,
+  };
+}
+
+async function controlWebMcpWorkerPage(request) {
+  const pageId = String(request?.pageId || '').trim();
+  const sessionId = String(request?.sessionId || '').trim();
+  const action = String(request?.action || '').trim();
+  if (!pageId || !sessionId || !action) throw new Error('WebMCP worker control requires pageId, sessionId and action.');
+  const payload = {
+    sessionId,
+    action,
+    input: request?.input,
+    inputId: request?.inputId,
+  };
+  const code = `
+    const request = ${JSON.stringify(payload)};
+    return await page.evaluate(async request => {
+      const api = window.__shuncodeWebMcp;
+      if (!api || api.version !== 25 || typeof api.workerSession !== 'function') throw new Error('WebMCP v25 worker contract is unavailable on this page');
+      const session = api.workerSession();
+      if (session.sessionId !== request.sessionId) throw new Error('WebMCP worker page session changed; reconnect the worker session');
+      if (request.action === 'send') return await api.workerSend(request.input);
+      if (request.action === 'poll') return api.workerPoll(request.inputId);
+      if (request.action === 'interrupt') return { interrupted: await api.workerInterrupt(request.inputId), turn: api.workerPoll(request.inputId) };
+      if (request.action === 'health') return { session, status: api.status() };
+      if (request.action === 'disconnect') {
+        const status = api.status();
+        if (status.workerTurn?.state === 'running') await api.workerInterrupt(status.workerTurn.inputId);
+        return { disconnected: true, session };
+      }
+      throw new Error('Unsupported WebMCP worker action: ' + request.action);
+    }, request);
+  `;
+  const result = await invokeBuiltinBrowserTool('run_playwright_code', {
+    pageId,
+    code,
+    timeoutMs: action === 'send' ? 20000 : 10000,
+  });
+  return playwrightResultValue(result, `WebMCP worker ${action}`);
+}
+
 async function stopCurrentWebMcpPage(output) {
   try {
     const listed = await invokeBuiltinBrowserTool('list_browser_pages', {});
@@ -910,6 +989,12 @@ function activate(context) {
     vscode.commands.registerCommand('shuncode.webMcp.approvalMode', () => chooseWebMcpApprovalMode(context)),
     vscode.commands.registerCommand('_shuncode.webMcp.getPrompt', options => getIntegratedWebMcpPrompt(output, options)),
     vscode.commands.registerCommand('_shuncode.webMcp.invoke', request => invokeIntegratedWebMcpTool(output, request)),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerConnect', options => connectWebMcpWorkerPage(output, options)),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerSend', request => controlWebMcpWorkerPage({ ...request, action: 'send' })),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerPoll', request => controlWebMcpWorkerPage({ ...request, action: 'poll' })),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerInterrupt', request => controlWebMcpWorkerPage({ ...request, action: 'interrupt' })),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerHealth', request => controlWebMcpWorkerPage({ ...request, action: 'health' })),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerDisconnect', request => controlWebMcpWorkerPage({ ...request, action: 'disconnect' })),
   );
   updateWebMcpStatus('$(plug) Web MCP', '连接当前内置浏览器聊天页');
 
