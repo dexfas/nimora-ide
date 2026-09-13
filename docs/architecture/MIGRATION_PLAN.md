@@ -476,6 +476,12 @@ Bridge 的 `read_files` / `find_files` 结果开始脱离 manager-global rich pr
 
 Work Sessions 现在把 `file` artifact 与 `changeset` artifact 一起投影成原生 `ChatResponseFileTreePart`，并继续走同一条路径清洗边界。对应的 `bridgePresentation()` 中 `read_files` / `find_files` 专用分支已经删除；旧 Bridge Session 对这两类调用只剩 generic compatibility output。`search_files` 暂时不迁，因为它的行号、列号和 snippet 语义还没有被 native Work Sessions 无损承接，不能为了删旧 UI 丢定位信息。
 
+### Phase 7.12 — Native Search Location Artifacts
+
+`search_files` 现在也进入 durable Task `file` artifact。artifact 保留完整匹配文件集合，并最多持久化 40 个 `{ path, line, column, label }` location（与旧 Bridge card 的 40-row 可见上限一致），同时单独记录 backend result truncation 与 location-link truncation。Task Center presentation 会再次清洗 workspace-relative path、1-based line/column 和单行 snippet，防止不安全 path 进入原生导航。
+
+Work Sessions 使用 `ChatResponseAnchorPart(new vscode.Location(...))` 渲染这些行级位置，因此 search 的 file + line/column + snippet 导航不再依赖旧 Chat Bridge Session。`bridgePresentation()` 的 `search_files` 分支已删除，Bridge/Core 的 `search` presentation kind 与 `match` item kind 也一起删除。剩余 rich compatibility 主要收敛到 `apply_patch` mini diff、terminal、diagnostics/LSP 与 `list_directory`。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

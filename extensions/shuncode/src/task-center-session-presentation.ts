@@ -23,6 +23,16 @@ export interface TaskSessionArtifactPresentation {
   deletions?: number;
   diffTruncated: boolean;
   resultTruncated: boolean;
+  locations: TaskSessionArtifactLocation[];
+  locationCount?: number;
+  locationsTruncated: boolean;
+}
+
+export interface TaskSessionArtifactLocation {
+  path: string;
+  line: number;
+  column?: number;
+  label?: string;
 }
 
 export interface TaskSessionFileTreeNode {
@@ -96,6 +106,24 @@ function metadataNumber(metadata: Record<string, unknown> | undefined, key: stri
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function artifactLocations(metadata: Record<string, unknown> | undefined): TaskSessionArtifactLocation[] {
+  if (!Array.isArray(metadata?.locations)) return [];
+  return metadata.locations.flatMap(value => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    const row = value as Record<string, unknown>;
+    const path = safeWorkspaceRelativePath(row.path);
+    const line = typeof row.line === "number" && Number.isInteger(row.line) && row.line >= 1 ? row.line : undefined;
+    if (!path || line === undefined) return [];
+    const column = typeof row.column === "number" && Number.isInteger(row.column) && row.column >= 1 ? row.column : undefined;
+    return [{
+      path,
+      line,
+      column,
+      label: oneLine(typeof row.label === "string" ? row.label : undefined, 240),
+    }];
+  }).slice(0, 40);
+}
+
 export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskSessionArtifactPresentation[] {
   return detail.artifacts.map(artifact => {
     const metadata = artifact.metadata;
@@ -103,6 +131,7 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       ? [...new Set(metadata.files.map(safeWorkspaceRelativePath).filter((value): value is string => Boolean(value)))]
       : [];
     const uri = typeof artifact.uri === "string" && artifact.uri.trim() ? artifact.uri.trim() : undefined;
+    const locations = artifactLocations(metadata);
     return {
       artifactId: artifact.artifactId,
       kind: artifact.kind,
@@ -113,6 +142,9 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       deletions: metadataNumber(metadata, "deletions"),
       diffTruncated: metadata?.diffTruncated === true,
       resultTruncated: metadata?.resultTruncated === true,
+      locations,
+      locationCount: metadataNumber(metadata, "locationCount"),
+      locationsTruncated: metadata?.locationsTruncated === true,
     };
   });
 }
@@ -181,6 +213,8 @@ export function formatTaskSessionMarkdown(detail: TaskCenterTaskDetail): string 
         artifact.deletions !== undefined ? `-${artifact.deletions}` : undefined,
         artifact.diffTruncated ? "diff summary truncated" : undefined,
         artifact.resultTruncated ? "results truncated" : undefined,
+        artifact.locationCount !== undefined ? `${artifact.locationCount} location${artifact.locationCount === 1 ? "" : "s"}` : undefined,
+        artifact.locationsTruncated ? "location links truncated" : undefined,
       ].filter((value): value is string => Boolean(value));
       lines.push(`- **${artifact.title}** · ${artifact.kind}${stats.length ? ` · ${stats.join(" · ")}` : ""}`);
       for (const file of artifact.files.slice(0, 12)) lines.push(`  - \`${file}\``);

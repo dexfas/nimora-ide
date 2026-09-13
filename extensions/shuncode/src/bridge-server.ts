@@ -202,7 +202,7 @@ export interface BridgeTodo {
 }
 
 export interface BridgeActivityPresentation {
-  readonly kind: "files" | "search" | "edit" | "terminal" | "diagnostics" | "lsp" | "generic";
+  readonly kind: "files" | "edit" | "terminal" | "diagnostics" | "lsp" | "generic";
   readonly title: string;
   readonly subtitle?: string;
   readonly input?: string;
@@ -239,7 +239,7 @@ export interface BridgeDiffLinePreview {
 }
 
 export interface BridgeActivityItem {
-  readonly kind: "file" | "folder" | "match" | "diagnostic" | "symbol";
+  readonly kind: "file" | "folder" | "diagnostic" | "symbol";
   readonly path: string;
   readonly line?: number;
   readonly column?: number;
@@ -499,31 +499,6 @@ function bridgePresentation(
   const input = boundedText(args, 8_000);
   const output = boundedText(resultText, 24_000);
   const structured = structuredContent ?? {};
-
-  if (toolName === "search_files") {
-    const matches = recordArray(structured.matches);
-    const files = uniqueStrings(matches.map((match) => typeof match.path === "string" ? match.path : undefined));
-    const pattern = typeof args.pattern === "string" ? args.pattern : "";
-    const items: BridgeActivityItem[] = matches.flatMap((match) => {
-      if (typeof match.path !== "string") return [];
-      return [{
-        kind: "match" as const,
-        path: match.path,
-        line: typeof match.line === "number" ? match.line : undefined,
-        column: typeof match.column === "number" ? match.column : undefined,
-        label: typeof match.text === "string" ? match.text.trim() : undefined,
-      }];
-    });
-    return {
-      kind: "search",
-      title: pattern ? `Searched “${pattern}”` : "Searched workspace",
-      subtitle: matches.length ? `${matches.length} match${matches.length === 1 ? "" : "es"} in ${files.length} file${files.length === 1 ? "" : "s"}` : undefined,
-      files,
-      items,
-      input: undefined,
-      output: isError ? output : undefined,
-    };
-  }
 
   if (toolName === "apply_patch") {
     const fileRows = recordArray(structured.files);

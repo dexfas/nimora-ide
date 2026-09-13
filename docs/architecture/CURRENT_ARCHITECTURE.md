@@ -175,6 +175,8 @@ Phase 7.10 又把 end-to-end MCP health diagnostics 收敛到同一个 Bridge se
 
 Phase 7.11 开始迁最后一组 rich tool presentation，但只迁能无损落到原生 surface 的部分。成功的 `read_files` / `find_files` 现在产出 durable Task `file` artifact，Work Sessions 将这些文件与 changeset 文件统一显示为 native file tree；Bridge-only 的 read/find presentation 分支已删除。`search_files` 仍保留旧 rich location/snippet card，因为 native Task projection 还没有等价的 line-level search location 表达；terminal、diff、diagnostics/LSP 也仍属于后续迁移边界。
 
+Phase 7.12 补齐了 search 的无损 native 表达：`search_files` Task artifact 除 file set 外，还保存有界的 line/column/snippet locations；Work Sessions 把它们渲染为 `ChatResponseAnchorPart(Location)`。因此 Bridge-only search presentation 与 Core 的 `search`/`match` renderer 已删除。当前 legacy Session 的真正不可替代部分进一步缩小到 apply-patch mini diff、terminal、diagnostics/LSP，以及尚未 artifact 化的 directory exploration。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

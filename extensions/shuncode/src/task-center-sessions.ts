@@ -48,6 +48,15 @@ function safeArtifactUri(value: string | undefined, workspace: string | undefine
   return uri;
 }
 
+function safeWorkspaceFileUri(value: string, workspace: string | undefined): vscode.Uri | undefined {
+  if (!workspace) return undefined;
+  const workspacePath = path.resolve(workspace);
+  const filePath = path.resolve(workspacePath, value);
+  const relative = path.relative(workspacePath, filePath);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) return undefined;
+  return vscode.Uri.file(filePath);
+}
+
 function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatResponseMarkdownPart | vscode.ChatResponseFileTreePart | vscode.ChatResponseAnchorPart> {
   const parts: Array<vscode.ChatResponseMarkdownPart | vscode.ChatResponseFileTreePart | vscode.ChatResponseAnchorPart> = [
     new vscode.ChatResponseMarkdownPart(new vscode.MarkdownString(formatTaskSessionMarkdown(detail))),
@@ -63,6 +72,14 @@ function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatRes
   for (const artifact of artifacts) {
     const uri = safeArtifactUri(artifact.uri, detail.summary.workspace);
     if (uri) parts.push(new vscode.ChatResponseAnchorPart(uri, artifact.title));
+    for (const location of artifact.locations) {
+      const fileUri = safeWorkspaceFileUri(location.path, detail.summary.workspace);
+      if (!fileUri) continue;
+      const position = new vscode.Position(location.line - 1, Math.max(0, (location.column ?? 1) - 1));
+      const target = new vscode.Location(fileUri, position);
+      const locationLabel = `${location.path}:${location.line}${location.column ? `:${location.column}` : ""}`;
+      parts.push(new vscode.ChatResponseAnchorPart(target, location.label ? `${locationLabel} · ${location.label}` : locationLabel));
+    }
   }
   return parts;
 }

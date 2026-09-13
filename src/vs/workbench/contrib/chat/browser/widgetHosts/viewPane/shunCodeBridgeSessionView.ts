@@ -14,7 +14,7 @@ import { ICommandService } from '../../../../../../platform/commands/common/comm
 import { defaultButtonStyles } from '../../../../../../platform/theme/browser/defaultStyles.js';
 
 interface BridgeActivityPresentation {
-	readonly kind: 'files' | 'search' | 'edit' | 'terminal' | 'diagnostics' | 'lsp' | 'generic';
+	readonly kind: 'files' | 'edit' | 'terminal' | 'diagnostics' | 'lsp' | 'generic';
 	readonly title: string;
 	readonly subtitle?: string;
 	readonly input?: string;
@@ -51,7 +51,7 @@ interface BridgeDiffLinePreview {
 }
 
 interface BridgeActivityItem {
-	readonly kind: 'file' | 'folder' | 'match' | 'diagnostic' | 'symbol';
+	readonly kind: 'file' | 'folder' | 'diagnostic' | 'symbol';
 	readonly path: string;
 	readonly line?: number;
 	readonly column?: number;
@@ -130,7 +130,6 @@ function activityIcon(activity: BridgeActivity): ThemeIcon {
 	}
 	switch (activity.presentation?.kind) {
 		case 'files': return Codicon.files;
-		case 'search': return Codicon.search;
 		case 'edit': return Codicon.edit;
 		case 'terminal': return Codicon.terminal;
 		case 'diagnostics': return Codicon.warning;
@@ -522,9 +521,8 @@ export class ShunCodeBridgeSessionView extends Disposable {
 			row.setAttribute('title', item.line ? `${item.path}:${item.line}:${item.column ?? 1}` : item.path);
 			const icon = append(row, $('span.shuncode-bridge-tool-item-icon'));
 			const itemIcon = item.kind === 'folder' ? Codicon.folder
-				: item.kind === 'match' ? Codicon.search
-					: item.kind === 'diagnostic' ? (item.severity === 'error' ? Codicon.error : item.severity === 'warning' ? Codicon.warning : Codicon.info)
-						: item.kind === 'symbol' ? Codicon.symbolMethod : Codicon.file;
+				: item.kind === 'diagnostic' ? (item.severity === 'error' ? Codicon.error : item.severity === 'warning' ? Codicon.warning : Codicon.info)
+					: item.kind === 'symbol' ? Codicon.symbolMethod : Codicon.file;
 			icon.classList.add(...ThemeIcon.asClassNameArray(itemIcon));
 			const labels = append(row, $('.shuncode-bridge-tool-item-labels'));
 			append(labels, $('span.shuncode-bridge-tool-item-primary', undefined, item.label || item.path));

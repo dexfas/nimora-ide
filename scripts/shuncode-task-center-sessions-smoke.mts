@@ -43,7 +43,7 @@ const summary = {
   workerCount: 2,
   activeWorkerCount: 1,
   executionCounts: { total: 4, running: 0, succeeded: 3, failed: 1, unknown: 0, pendingDelivery: 1 },
-  artifactCount: 4,
+  artifactCount: 5,
 };
 
 const detail = {
@@ -66,6 +66,7 @@ const detail = {
   artifacts: [
     { artifactId: 'changes', kind: 'changeset', title: 'Workspace patch', createdAt: '2026-09-13T08:04:00.000Z', metadata: { files: ['src/b.ts', 'src/a.ts', '../escape.txt', '/absolute.txt'], additions: 10, deletions: 2, diffTruncated: true } },
     { artifactId: 'read', kind: 'file', title: 'Read source files', createdAt: '2026-09-13T08:04:10.000Z', metadata: { files: ['src/c.ts', '../outside.ts'], sourceTool: 'read_files', resultTruncated: true } },
+    { artifactId: 'search', kind: 'file', title: 'Search needle', createdAt: '2026-09-13T08:04:20.000Z', metadata: { files: ['src/search.ts', '../outside.ts'], locations: [{ path: 'src/search.ts', line: 12, column: 7, label: ' needle here ' }, { path: '../outside.ts', line: 1, column: 1, label: 'unsafe' }, { path: 'src/invalid.ts', line: 0, column: 1, label: 'invalid' }], locationCount: 3, locationsTruncated: false } },
     { artifactId: 'report', kind: 'report', title: 'Review report', uri: 'https://example.com/report', createdAt: '2026-09-13T08:04:30.000Z' },
     { artifactId: 'unsafe', kind: 'other', title: 'Unsafe command URI', uri: 'command:do-not-run', createdAt: '2026-09-13T08:04:40.000Z' },
   ],
@@ -74,7 +75,7 @@ const detail = {
 try {
   const presentation = presentTaskSession(summary);
   assert.equal(presentation.label, 'Ship Task-owned Work Sessions', 'session labels must stay single-line');
-  assert.equal(presentation.description, '1/3 todos · 1 active AI · 4 actions · 4 artifacts');
+  assert.equal(presentation.description, '1/3 todos · 1 active AI · 4 actions · 5 artifacts');
   assert.equal(presentation.badge, '60%');
   assert.equal(presentation.status, 'in_progress');
   assert.equal(presentation.terminal, false);
@@ -90,6 +91,9 @@ try {
   assert.deepEqual(buildTaskSessionFileTree(artifacts[0].files), [{ name: 'src', children: [{ name: 'a.ts' }, { name: 'b.ts' }] }]);
   assert.deepEqual(artifacts[1].files, ['src/c.ts'], 'file-navigation artifacts use the same workspace-relative path safety boundary');
   assert.equal(artifacts[1].resultTruncated, true);
+  assert.deepEqual(artifacts[2].files, ['src/search.ts'], 'search artifact files must drop traversal paths before native presentation');
+  assert.deepEqual(artifacts[2].locations, [{ path: 'src/search.ts', line: 12, column: 7, label: 'needle here' }], 'search locations must preserve safe 1-based locations and reject traversal/invalid entries');
+  assert.equal(artifacts[2].locationCount, 3);
 
   const readArtifact = taskFileNavigationArtifact('read_files', {
     files: [
@@ -106,7 +110,28 @@ try {
     summary: { truncated: true },
   });
   assert.deepEqual(findArtifact?.metadata?.files, ['src/found.ts', 'test/found.test.ts']);
-  assert.equal(taskFileNavigationArtifact('search_files', { matches: [{ path: 'src/search.ts' }] }), undefined, 'search results retain their richer line-level presentation until a native replacement exists');
+  const searchArtifact = taskFileNavigationArtifact('search_files', {
+    pattern: 'needle',
+    matches: [
+      { path: 'src/search.ts', line: 12, column: 7, text: ' const needle = true; ' },
+      { path: 'src/search.ts', line: 18, column: 3, text: 'needle();' },
+      { path: '../outside.ts', line: 1, column: 1, text: 'unsafe path is filtered by presentation' },
+    ],
+    summary: { returned_matches: 3, truncated: true },
+  });
+  assert.deepEqual(searchArtifact?.metadata?.files, ['src/search.ts', '../outside.ts']);
+  assert.deepEqual((searchArtifact?.metadata?.locations as Array<{ path: string; line: number; column?: number; label?: string }>).slice(0, 2), [
+    { path: 'src/search.ts', line: 12, column: 7, label: 'const needle = true;' },
+    { path: 'src/search.ts', line: 18, column: 3, label: 'needle();' },
+  ]);
+  assert.equal(searchArtifact?.metadata?.resultTruncated, true);
+  const manySearchLocations = taskFileNavigationArtifact('search_files', {
+    pattern: 'many',
+    matches: Array.from({ length: 41 }, (_, index) => ({ path: 'src/many.ts', line: index + 1, column: 1, text: `match ${index}` })),
+    summary: { returned_matches: 41, truncated: false },
+  });
+  assert.equal((manySearchLocations?.metadata?.locations as unknown[]).length, 40, 'search location anchors must stay bounded');
+  assert.equal(manySearchLocations?.metadata?.locationsTruncated, true);
 
   const markdown = formatTaskSessionMarkdown(detail);
   assert.match(markdown, /### Todos/);
@@ -115,6 +140,7 @@ try {
   assert.match(markdown, /### Artifacts/);
   assert.match(markdown, /Workspace patch\*\* · changeset · 2 files · \+10 · -2 · diff summary truncated/);
   assert.match(markdown, /Read source files\*\* · file · 1 file · results truncated/);
+  assert.match(markdown, /Search needle\*\* · file · 1 file · 3 locations/);
   assert.match(markdown, /`src\/a\.ts`/);
   assert.doesNotMatch(markdown, /escape\.txt|absolute\.txt/, 'unsafe artifact paths must not reach Work Sessions markdown');
   assert.match(markdown, /read_files:\*\* succeeded · result pending delivery/, 'execution and result delivery state must remain separate in presentation');
@@ -125,6 +151,8 @@ try {
   assert.match(sessionsSource, /registerChatSessionContentProvider\(/);
   assert.match(sessionsSource, /artifact\.kind === "changeset" \|\| artifact\.kind === "file"/, 'changeset and durable file-navigation artifacts must share native file-tree presentation');
   assert.match(sessionsSource, /new vscode\.ChatResponseFileTreePart\(/, 'workspace file artifacts must use the native file-tree presentation');
+  assert.match(sessionsSource, /new vscode\.Location\(fileUri, position\)/, 'search artifacts must preserve line-level locations with native Location anchors');
+  assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(target,/, 'search locations must render as native anchors');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(/, 'URI artifacts must use native anchors');
   assert.match(sessionsSource, /uri\.scheme === "http" \|\| uri\.scheme === "https"/);
   assert.match(sessionsSource, /uri\.scheme !== "file" \|\| !workspace/, 'file anchors require a workspace containment check');
@@ -141,7 +169,9 @@ try {
   assert.match(bridgeSource, /recordFileNavigationArtifact\(execution, toolName, result\.structuredContent\)/, 'successful Bridge file navigation must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "read_files"\)/, 'read_files must no longer have a Bridge-only rich presentation branch');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "find_files"\)/, 'find_files must no longer have a Bridge-only rich presentation branch');
-  assert.match(bridgeSource, /if \(toolName === "search_files"\)/, 'line-level search presentation stays in Bridge until Work Sessions can preserve locations/snippets');
+  assert.doesNotMatch(bridgeSource, /if \(toolName === "search_files"\)/, 'search_files must no longer have a Bridge-only rich presentation branch after native Location anchors exist');
+  const bridgeSessionSource = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'shunCodeBridgeSessionView.ts'), 'utf8');
+  assert.doesNotMatch(bridgeSessionSource, /case 'search'|item\.kind === 'match'/, 'dead search-specific Chat Core rendering must be removed');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));
