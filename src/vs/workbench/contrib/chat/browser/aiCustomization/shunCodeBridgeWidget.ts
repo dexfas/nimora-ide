@@ -41,6 +41,28 @@ interface BridgeStatus {
 	readonly toolNames: string[];
 	readonly toolCount: number;
 	readonly activeRequests: number;
+	readonly health?: BridgeHealthReport;
+}
+
+interface BridgeHealthProbe {
+	readonly ok: boolean;
+	readonly url?: string;
+	readonly latencyMs?: number;
+	readonly error?: string;
+}
+
+interface BridgeHealthReport {
+	readonly at: string;
+	readonly ok: boolean;
+	readonly state: BridgeStatus['state'];
+	readonly durationMs: number;
+	readonly local: BridgeHealthProbe;
+	readonly public?: BridgeHealthProbe;
+	readonly tunnelProcessAlive: boolean;
+	readonly sessions: number;
+	readonly activeRequests: number;
+	readonly lastSessionActivityAt?: string;
+	readonly summary: string;
 }
 
 interface BridgePaymentPlan {
@@ -99,6 +121,7 @@ const BRIDGE_SET_TUNNEL_PROVIDER = 'shuncode.bridge.setTunnelProvider';
 const BRIDGE_START = 'shuncode.bridge.start';
 const BRIDGE_STOP = 'shuncode.bridge.stop';
 const BRIDGE_CHECK_TUNNEL = 'shuncode.bridge.checkTunnel';
+const BRIDGE_CHECK_HEALTH = 'shuncode.bridge.checkHealth';
 const BRIDGE_INSTALL_CLOUDFLARED = 'shuncode.bridge.installCloudflared';
 const BRIDGE_ROTATE_ENDPOINT = 'shuncode.bridge.rotateEndpoint';
 const BRIDGE_OPEN_SESSION = 'shuncode.bridge.openSession';
@@ -171,6 +194,7 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 	private readonly addressNotice: HTMLElement;
 	private readonly tunnelSetupPanel: HTMLElement;
 	private readonly tunnelState: HTMLElement;
+	private readonly healthState: HTMLElement;
 	private readonly cloudflareSetupDetails: HTMLDetailsElement;
 	private readonly cloudflareSetupSummary: HTMLElement;
 	private readonly cloudflareNamedSetupDetails: HTMLDetailsElement;
@@ -180,6 +204,7 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 	private readonly toolsContainer: HTMLElement;
 	private readonly startStopButton: Button;
 	private readonly checkButton: Button;
+	private readonly healthButton: Button;
 	private readonly installCloudflaredButton: Button;
 	private readonly rotateButton: Button;
 	private readonly persistentModeToggle: HTMLButtonElement;
@@ -193,6 +218,8 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 	private quickLinkButtons: Button[] = [];
 	private quickLinkRowButtons: Button[] = [];
 	private busy = false;
+	private checkingHealth = false;
+	private healthError = '';
 	private domainInputDirty = false;
 	private namedTunnelInputDirty = false;
 	private tunnelNeedsSetup: boolean | undefined;
@@ -510,6 +537,18 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 		this.installCloudflaredButton = this._register(new Button(tunnelStatusActions, { ...defaultButtonStyles, supportIcons: true }));
 		this.installCloudflaredButton.label = `$(${Codicon.cloudDownload.id}) ${localizeBridge('shuncodeBridge.installCloudflaredNow', "Install cloudflared")}`;
 		this._register(this.installCloudflaredButton.onDidClick(() => this.installCloudflared()));
+
+		const healthStatusRow = dom.append(configurationCard, dom.$('.shuncode-bridge-health-status-row'));
+		const healthStatusText = dom.append(healthStatusRow, dom.$('.shuncode-bridge-health-status-text'));
+		dom.append(healthStatusText, dom.$('.shuncode-bridge-label', undefined,
+			localizeBridge('shuncodeBridge.mcpHealth', "MCP health")));
+		this.healthState = dom.append(healthStatusText, dom.$('.shuncode-bridge-health-state', undefined,
+			localizeBridge('shuncodeBridge.healthUnchecked', "No end-to-end health check has been run yet.")));
+		const healthStatusActions = dom.append(healthStatusRow, dom.$('.shuncode-bridge-controls.shuncode-bridge-health-actions'));
+		this.healthButton = this._register(new Button(healthStatusActions, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
+		this.healthButton.label = `$(${Codicon.pulse.id}) ${localizeBridge('shuncodeBridge.checkHealth', "Check health")}`;
+		this.healthButton.setTitle(localizeBridge('shuncodeBridge.checkHealthTitle', "Probe local MCP, public tunnel, tunnel process, and MCP sessions"));
+		this._register(this.healthButton.onDidClick(() => this.checkHealth()));
 		const cloudflareSetup = this.createCloudflareSetupSection(this.tunnelSetupPanel);
 		this.cloudflareSetupDetails = cloudflareSetup.details;
 		this.cloudflareSetupSummary = cloudflareSetup.summary;
@@ -920,6 +959,29 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 		await this.runCommand(BRIDGE_ROTATE_ENDPOINT);
 	}
 
+	private async checkHealth(): Promise<void> {
+		if (this.busy || this.checkingHealth) return;
+		this.busy = true;
+		this.checkingHealth = true;
+		this.healthError = '';
+		this.renderHealth(this.lastStatus?.health);
+		this.updateControls();
+		try {
+			const status = await this.commandService.executeCommand<BridgeStatus>(BRIDGE_CHECK_HEALTH);
+			if (status) this.render(status);
+		} catch (error) {
+			this.connectionCard.open = true;
+			this.healthError = error instanceof Error ? error.message : String(error);
+			this.renderLocalError(this.healthError);
+		} finally {
+			this.busy = false;
+			this.checkingHealth = false;
+			this.renderHealth(this.lastStatus?.health);
+			this.updateControls();
+			void this.refresh();
+		}
+	}
+
 	private async runCommand(command: string, ...args: unknown[]): Promise<BridgeStatus | undefined> {
 		if (this.busy) return undefined;
 		this.busy = true;
@@ -1291,6 +1353,7 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 		}
 		this.tunnelNeedsSetup = needsTunnelSetup;
 		this.tunnelSetupProvider = status.tunnelProvider;
+		this.renderHealth(status.health);
 
 		this.publicUrlSection.style.display = status.state === 'running' && status.publicUrl ? '' : 'none';
 		this.publicUrlValue.value = status.publicUrl ?? '';
@@ -1328,6 +1391,33 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 		this.persistentModeToggle.title = enabled
 			? localizeBridge('shuncodeBridge.persistentModeOn', "Bridge will start automatically after restart without opening Chat")
 			: localizeBridge('shuncodeBridge.persistentModeOff', "Bridge starts only when you choose Start");
+	}
+
+	private renderHealth(health: BridgeHealthReport | undefined): void {
+		if (this.checkingHealth) {
+			this.healthState.textContent = localizeBridge('shuncodeBridge.healthChecking', "Checking end-to-end MCP health…");
+			this.healthState.title = '';
+			return;
+		}
+		if (this.healthError) {
+			this.healthState.textContent = localizeBridge('shuncodeBridge.healthFailed', "Health check failed: {0}", this.healthError);
+			this.healthState.title = this.healthError;
+			return;
+		}
+		if (!health) {
+			this.healthState.textContent = localizeBridge('shuncodeBridge.healthUnchecked', "No end-to-end health check has been run yet.");
+			this.healthState.title = '';
+			return;
+		}
+		const checkedAt = new Date(health.at);
+		const checkedLabel = Number.isNaN(checkedAt.getTime()) ? '' : checkedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+		this.healthState.textContent = checkedLabel ? `${health.summary} · ${checkedLabel}` : health.summary;
+		const details = [health.summary];
+		if (health.local.url) details.push(`Local: ${health.local.url}${health.local.latencyMs === undefined ? '' : ` (${health.local.latencyMs} ms)`}`);
+		if (health.public?.url) details.push(`Public: ${health.public.url}${health.public.latencyMs === undefined ? '' : ` (${health.public.latencyMs} ms)`}`);
+		details.push(`MCP sessions: ${health.sessions} · active requests: ${health.activeRequests}`);
+		if (health.lastSessionActivityAt) details.push(`Last MCP activity: ${health.lastSessionActivityAt}`);
+		this.healthState.title = details.join('\n');
 	}
 
 	private renderLocalError(message: string): void {
@@ -1372,6 +1462,10 @@ class ShunCodeBridgeWidget extends Disposable implements IAICustomizationManagem
 			&& Number.isInteger(Number(this.namedTunnelPortInput.value));
 		this.clearNamedTunnelTokenButton.enabled = !this.busy && !running && !starting && isNamed && this.lastStatus?.namedTunnelTokenConfigured === true;
 		this.checkButton.enabled = !this.busy && !starting;
+		this.healthButton.enabled = !this.busy && !starting;
+		this.healthButton.label = this.checkingHealth
+			? `$(${Codicon.loading.id}) ${localizeBridge('shuncodeBridge.checkingHealth', "Checking…")}`
+			: `$(${Codicon.pulse.id}) ${localizeBridge('shuncodeBridge.checkHealth', "Check health")}`;
 		this.installCloudflaredButton.enabled = !this.busy && !running && !starting && (isQuick || isNamed) && this.lastStatus?.tunnelInstalled !== true;
 		this.installCloudflaredButton.label = this.installingCloudflared
 			? `$(${Codicon.loading.id}) ${localizeBridge('shuncodeBridge.installingCloudflaredShort', "Installing…")}`

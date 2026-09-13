@@ -90,33 +90,10 @@ interface BridgeStatus {
 		readonly lastToolAt?: string;
 	};
 	readonly activities: BridgeActivity[];
-	readonly health?: BridgeHealthReport;
-}
-
-interface BridgeHealthProbe {
-	readonly ok: boolean;
-	readonly url?: string;
-	readonly latencyMs?: number;
-	readonly error?: string;
-}
-
-interface BridgeHealthReport {
-	readonly at: string;
-	readonly ok: boolean;
-	readonly state: BridgeStatus['state'];
-	readonly durationMs: number;
-	readonly local: BridgeHealthProbe;
-	readonly public?: BridgeHealthProbe;
-	readonly tunnelProcessAlive: boolean;
-	readonly sessions: number;
-	readonly activeRequests: number;
-	readonly lastSessionActivityAt?: string;
-	readonly summary: string;
 }
 
 const BRIDGE_GET_STATUS = 'shuncode.bridge.getStatus';
 const BRIDGE_OPEN_VIEW = 'shuncode.bridge.openView';
-const BRIDGE_CHECK_HEALTH = 'shuncode.bridge.checkHealth';
 const BRIDGE_CLEAR_ACTIVITY_LOG = 'shuncode.bridge.clearActivityLog';
 const BRIDGE_OPEN_RESOURCE = 'shuncode.bridge.openResource';
 const BRIDGE_OPEN_DIFF = 'shuncode.bridge.openDiff';
@@ -176,19 +153,13 @@ export class ShunCodeBridgeSessionView extends Disposable {
 	private readonly statsContainer: HTMLElement;
 	private readonly footerMeta: HTMLElement;
 	private readonly footerHint: HTMLElement;
-	private readonly healthRow: HTMLElement;
-	private readonly healthDot: HTMLElement;
-	private readonly healthText: HTMLElement;
 	private readonly bridgeSettingsButton: Button;
-	private readonly healthButton: Button;
 	private readonly clearLogButton: Button;
 	private readonly workSessionsButton: Button;
 	private readonly collapseButton: Button;
 	private visible = false;
 	private refreshing = false;
 	private busy = false;
-	private checkingHealth = false;
-	private healthError: string | undefined;
 	private footerCollapsed = false;
 	private readonly expandedToolActivities = new Set<number>();
 	private lastRevision = -1;
@@ -245,9 +216,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		this.bridgeSettingsButton.setTitle(bridgeSettingsTitle);
 		this.bridgeSettingsButton.element.setAttribute('aria-label', bridgeSettingsTitle);
 		this._register(this.bridgeSettingsButton.onDidClick(() => void this.commandService.executeCommand(BRIDGE_OPEN_VIEW)));
-		this.healthButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
-		this.healthButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-health-button');
-		this._register(this.healthButton.onDidClick(() => void this.checkHealth()));
 		this.workSessionsButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
 		this.workSessionsButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-work-sessions-button');
 		this.workSessionsButton.label = `$(${Codicon.tasklist.id}) ${localize('shuncodeBridgeSession.workSessionsShort', "Work Sessions")}`;
@@ -261,10 +229,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 
 		this.footerDetails = append(footer, $('.shuncode-bridge-session-footer-details'));
 		this.statsContainer = append(this.footerDetails, $('.shuncode-bridge-session-stats'));
-		this.healthRow = append(this.footerDetails, $('.shuncode-bridge-session-health'));
-		this.healthDot = append(this.healthRow, $('span.shuncode-bridge-session-dot'));
-		this.healthText = append(this.healthRow, $('span.shuncode-bridge-session-health-text'));
-		setVisibility(false, this.healthRow);
 		this.footerMeta = append(this.footerDetails, $('.shuncode-bridge-session-meta'));
 		this.footerHint = append(this.footerDetails, $('.shuncode-bridge-session-hint'));
 		this.renderFooterCollapsedState();
@@ -288,29 +252,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		this.renderFooterCollapsedState();
 		if (this.lastStatus) {
 			this.renderStatus(this.lastStatus);
-		}
-	}
-
-	private async checkHealth(): Promise<void> {
-		if (this.checkingHealth) {
-			return;
-		}
-		this.checkingHealth = true;
-		this.healthError = undefined;
-		this.renderControls();
-		this.renderHealth(this.lastStatus?.health);
-		try {
-			const status = await this.commandService.executeCommand<BridgeStatus>(BRIDGE_CHECK_HEALTH);
-			if (status) {
-				this.lastStatus = status;
-				this.render(status, false);
-			}
-		} catch (error) {
-			this.healthError = error instanceof Error ? error.message : String(error);
-		} finally {
-			this.checkingHealth = false;
-			this.renderControls();
-			this.renderHealth(this.lastStatus?.health);
 		}
 	}
 
@@ -654,7 +595,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		this.appendStat(localize('shuncodeBridgeSession.averageResponse', "Average response"), formatDuration(status.stats.averageDurationMs));
 		this.appendStat(localize('shuncodeBridgeSession.failures', "Failures"), String(status.stats.failedToolCalls));
 		this.appendStat(localize('shuncodeBridgeSession.successRate', "Success rate"), `${status.stats.successRate.toFixed(status.stats.successRate === 100 ? 0 : 1)}%`);
-		this.renderHealth(status.health);
 
 		const pieces = [localize('shuncodeBridgeSession.transport', "Streamable HTTP")];
 		if (status.activeRequests > 0) {
@@ -679,77 +619,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		append(stat, $('strong', undefined, value || '—'));
 	}
 
-	private renderHealth(health: BridgeHealthReport | undefined): void {
-		if (this.checkingHealth) {
-			setVisibility(true, this.healthRow);
-			this.healthDot.className = 'shuncode-bridge-session-dot state-starting';
-			this.healthText.textContent = localize('shuncodeBridgeSession.healthChecking', "Checking Bridge health…");
-			this.healthRow.title = '';
-			return;
-		}
-		if (this.healthError) {
-			setVisibility(true, this.healthRow);
-			this.healthDot.className = 'shuncode-bridge-session-dot state-error';
-			this.healthText.textContent = localize('shuncodeBridgeSession.healthFailed', "Health check failed: {0}", this.healthError);
-			this.healthRow.title = this.healthError;
-			return;
-		}
-		if (!health) {
-			setVisibility(false, this.healthRow);
-			return;
-		}
-		setVisibility(true, this.healthRow);
-		this.healthDot.className = `shuncode-bridge-session-dot ${health.ok ? 'state-connected' : 'state-error'}`;
-		const parts: string[] = [];
-		if (health.ok) {
-			parts.push(localize('shuncodeBridgeSession.healthOk', "Healthy"));
-			// Keep the inline summary short: the public round-trip is the number
-			// that matters; local latency and session count live in the tooltip.
-			parts.push(formatDuration((health.public ?? health.local).latencyMs ?? 0));
-		} else {
-			parts.push(localize('shuncodeBridgeSession.healthUnhealthy', "Unhealthy"));
-			if (health.state !== 'running') {
-				parts.push(localize('shuncodeBridgeSession.healthNotRunning', "Bridge is {0}", health.state));
-			}
-			if (!health.local.ok) {
-				parts.push(localize('shuncodeBridgeSession.healthLocalFailed', "local: {0}", health.local.error ?? 'failed'));
-			}
-			if (health.public && !health.public.ok) {
-				parts.push(localize('shuncodeBridgeSession.healthPublicFailed', "public: {0}", health.public.error ?? 'failed'));
-			}
-			if (health.state === 'running' && !health.tunnelProcessAlive) {
-				parts.push(localize('shuncodeBridgeSession.healthTunnelDown', "tunnel process not running"));
-			}
-		}
-		const checkedAt = formatTime(health.at);
-		if (checkedAt) {
-			parts.push(checkedAt);
-		}
-		this.healthText.textContent = parts.join(' · ');
-		const tooltip: string[] = [health.summary];
-		if (health.local.url) {
-			tooltip.push(localize('shuncodeBridgeSession.healthTooltipLocal', "Local: {0} ({1})", health.local.url, formatDuration(health.local.latencyMs ?? 0)));
-		}
-		if (health.public?.url) {
-			tooltip.push(localize('shuncodeBridgeSession.healthTooltipPublic', "Public: {0} ({1})", health.public.url, formatDuration(health.public.latencyMs ?? 0)));
-		}
-		tooltip.push(localize('shuncodeBridgeSession.healthTooltipSessions', "MCP sessions: {0} · active requests: {1}", health.sessions, health.activeRequests));
-		if (health.lastSessionActivityAt) {
-			tooltip.push(localize('shuncodeBridgeSession.healthLastActivity', "Last MCP activity: {0}", formatTime(health.lastSessionActivityAt)));
-		}
-		this.healthRow.title = tooltip.join('\n');
-	}
-
 	private renderControls(): void {
-		const starting = this.lastStatus?.state === 'starting';
-		this.healthButton.enabled = !this.checkingHealth && !starting;
-		this.healthButton.label = this.checkingHealth
-			? `$(${Codicon.loading.id}) ${localize('shuncodeBridgeSession.checkingHealthShort', "Checking…")}`
-			: `$(${Codicon.pulse.id}) ${localize('shuncodeBridgeSession.checkHealthShort', "Health")}`;
-		const healthTitle = localize('shuncodeBridgeSession.checkHealth', "Check MCP health");
-		this.healthButton.setTitle(healthTitle);
-		this.healthButton.element.setAttribute('aria-label', healthTitle);
-
 		const hasLog = (this.lastStatus?.activities.length ?? 0) > 0 || (this.lastStatus?.stats.toolCalls ?? 0) > 0;
 		this.clearLogButton.enabled = !this.busy && hasLog;
 		this.clearLogButton.label = `$(${Codicon.clearAll.id}) ${localize('shuncodeBridgeSession.clearLogShort', "Clear log")}`;

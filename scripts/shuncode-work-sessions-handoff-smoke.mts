@@ -36,6 +36,8 @@ assert.match(
 );
 assert.doesNotMatch(bridgeSessionSource, /BRIDGE_START|BRIDGE_STOP|toggleBridge\(|startStopButton|Start the Bridge here/, 'Chat Bridge Session must not own Bridge start/stop mutations');
 assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-session-start-stop-button/, 'dead Bridge Session start/stop styling must be removed');
+assert.doesNotMatch(bridgeSessionSource, /BRIDGE_CHECK_HEALTH|checkHealth\(|healthButton|BridgeHealthReport|shuncode-bridge-session-health/, 'Chat Bridge Session must not own MCP health diagnostics');
+assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-session-health/, 'dead Bridge Session health styling must be removed after diagnostics move to settings');
 
 assert.match(
   extensionSource,
@@ -46,7 +48,9 @@ assert.match(
 assert.match(bridgeWidgetSource, /const TASK_CENTER_OPEN = 'shuncode\.taskCenter\.open';/);
 assert.match(bridgeWidgetSource, /const BRIDGE_START = 'shuncode\.bridge\.start';/);
 assert.match(bridgeWidgetSource, /const BRIDGE_STOP = 'shuncode\.bridge\.stop';/);
+assert.match(bridgeWidgetSource, /const BRIDGE_CHECK_HEALTH = 'shuncode\.bridge\.checkHealth';/);
 assert.match(bridgeWidgetSource, /startStopButton[\s\S]{0,300}toggleBridge\(\)/, 'Bridge Settings remains the owner of start/stop controls');
+assert.match(bridgeWidgetSource, /MCP health[\s\S]{0,1200}healthButton[\s\S]{0,500}checkHealth\(\)/, 'Bridge Settings must own end-to-end MCP health diagnostics');
 assert.match(
   bridgeWidgetSource,
   /Open Work Sessions[\s\S]{0,300}executeCommand\(TASK_CENTER_OPEN\)/,
@@ -58,4 +62,4 @@ assert.match(
   'Bridge compatibility session entry remains available until rich artifact/tool presentation has migrated',
 );
 
-console.log('[smoke] Bridge compatibility surfaces hand off Task progress to Work Sessions and Bridge mutations to Bridge Settings');
+console.log('[smoke] Bridge compatibility surfaces hand off Task progress, mutations, and MCP health to first-party native surfaces');

@@ -555,11 +555,6 @@
 	padding: 0 9px;
 }
 
-/* Scheme B: secondary buttons stay neutral, only the icon carries a hint colour. */
-.shuncode-bridge-session-health-button.monaco-button .codicon-pulse {
-	color: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
-}
-
 .shuncode-bridge-session-clear-button.monaco-button .codicon-clear-all {
 	color: var(--vscode-charts-orange, #d18616);
 }
@@ -571,25 +566,6 @@
 .shuncode-bridge-session-collapse-button.monaco-button {
 	min-width: 30px;
 	padding: 0 6px;
-}
-
-.shuncode-bridge-session-health {
-	display: flex;
-	align-items: center;
-	gap: 7px;
-	margin-top: 8px;
-	font-size: 11px;
-	line-height: 1.4;
-	color: var(--vscode-descriptionForeground);
-}
-
-.shuncode-bridge-session-health .shuncode-bridge-session-dot {
-	flex: none;
-}
-
-.shuncode-bridge-session-health-text {
-	min-width: 0;
-	overflow-wrap: anywhere;
 }
 
 .shuncode-bridge-session-connection-info {

@@ -464,6 +464,12 @@ Phase 7.6 已让 Bridge status 永远不再产生 todos/progress presentation，
 
 Bridge 的 mutation ownership 因此进一步收敛到 Connections/AI Customization surface：那里继续拥有 start/stop、MCP address、tunnel provider/setup、persistent background startup 等连接控制。旧 Chat Session 仍暂时保留 health check、activity log 与 rich diff/terminal tool cards，因此 `shuncode.bridge.openSession` 尚未删除。`test-shuncode-work-sessions-handoff` 同时保护 Chat Core 不再引用 `shuncode.bridge.start/stop`，而 Bridge Settings 仍保有 start/stop wiring。
 
+### Phase 7.10 — Move MCP Health Diagnostics to Connection Settings
+
+Bridge 的 end-to-end `checkHealth()` contract 本来就探测 local HTTP、public tunnel、tunnel process 和 active MCP sessions，因此它属于 connection diagnostics，而不是 Chat presentation。AI Customization 的 Bridge section 现在新增 `MCP health` 状态行与 `Check health` 按钮，直接消费现有 `shuncode.bridge.checkHealth` / `BridgeHealthReport`；最新 summary、local/public latency、session/active-request 信息与检查时间都在 Connection Settings 中可见。
+
+旧 Chat Bridge Session 已删除 health command、health report 类型、按钮、renderer 与专用 CSS。它现在只保留 connection/activity summary、clear activity log、Work Sessions/Bridge Settings handoff，以及尚未迁出的 rich file/diff/terminal tool cards。`test-shuncode-work-sessions-handoff` 保护 health wiring 只存在于 Bridge Settings，不再回流 Chat Core。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

@@ -386,6 +386,7 @@
 .shuncode-bridge-help,
 .shuncode-bridge-status-details,
 .shuncode-bridge-tunnel-state,
+.shuncode-bridge-health-state,
 .shuncode-bridge-address-notice {
 	color: var(--vscode-descriptionForeground);
 	font-size: 12px;
@@ -429,6 +430,10 @@
 	margin-top: 5px;
 }
 
+.shuncode-bridge-health-state {
+	margin-top: 5px;
+}
+
 .shuncode-bridge-tunnel-panel {
 	box-sizing: border-box;
 	width: min(100%, 680px);
@@ -444,21 +449,34 @@
 	background: var(--vscode-inputValidation-warningBackground, var(--vscode-editor-background));
 }
 
-.shuncode-bridge-tunnel-status-row {
+.shuncode-bridge-tunnel-status-row,
+.shuncode-bridge-health-status-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 16px;
 }
 
-.shuncode-bridge-tunnel-status-text {
+.shuncode-bridge-tunnel-status-text,
+.shuncode-bridge-health-status-text {
 	min-width: 0;
 	flex: 1 1 auto;
 }
 
-.shuncode-bridge-tunnel-actions {
+.shuncode-bridge-tunnel-actions,
+.shuncode-bridge-health-actions {
 	flex: 0 0 auto;
 	margin-top: 0;
+}
+
+.shuncode-bridge-health-status-row {
+	box-sizing: border-box;
+	width: min(100%, 680px);
+	margin-top: 10px;
+	padding: 10px 12px;
+	border: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+	border-radius: 4px;
+	background: var(--vscode-editor-background);
 }
 
 .shuncode-bridge-url-section {
