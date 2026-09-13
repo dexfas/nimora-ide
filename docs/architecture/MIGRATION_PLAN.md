@@ -518,6 +518,12 @@ Bridge 的 unified-diff preview parser、`kind=edit`、Core mini-diff/edit-summa
 
 Work Sessions 用原生 Markdown/code block 展示 terminal command/output，并仅对真实 managed PTY 生成受信的 `shuncode.terminal.openManaged` command link；Markdown trust allow-list 只允许这一条第一方命令。通用 Native Chat 的 Open Terminal action 同步切到该非 Bridge command id。Bridge/Core 的 `kind=terminal` presentation、terminal button 和对应 CSS 已删除，因此旧 Chat Bridge Session 已不存在任何不可替代的 rich tool presentation。
 
+### Phase 7.19 — Remove the Legacy Chat Bridge Session
+
+在所有 Task progress、connection mutations/health、file/search/diagnostics/LSP/directory/changeset/terminal presentation 都已有第一方承接后，legacy Chat Bridge Session 壳正式删除。Core 不再包含 `ShunCodeBridgeSessionView`、专用 stylesheet、`shunCodeBridgeMode` context key、Chat/Bridge mode switch actions、`_shuncode.bridge.showSession/showChat` 或 `ChatViewPane` 的双 surface/layout 分支；Chat 恢复为单一 native Chat surface。
+
+extension 同时删除 `shuncode.bridge.openSession` activation/contribution/handler，Bridge Settings 不再提供回到 compatibility Session 的入口。Bridge connection lifecycle、start/stop/health/tunnel 继续由 AI Customization/extension 拥有，Task/execution/artifact history 继续由 TaskRuntime + native Work Sessions 拥有。`shuncode.openChat` 现在只打开 Chat，不再执行已删除的 Bridge mode command。这标志着 Phase 7 的 Bridge UI ownership 迁移完成。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

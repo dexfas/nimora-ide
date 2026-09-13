@@ -42,7 +42,7 @@ import { IThemeService } from '../../../../../../platform/theme/common/themeServ
 import { IViewPaneOptions, ViewPane } from '../../../../../browser/parts/views/viewPane.js';
 import { Memento } from '../../../../../common/memento.js';
 import { SIDE_BAR_FOREGROUND } from '../../../../../common/theme.js';
-import { IViewContainerModel, IViewDescriptorService, ViewContainerLocation } from '../../../../../common/views.js';
+import { IViewDescriptorService, ViewContainerLocation } from '../../../../../common/views.js';
 import { ILifecycleService, StartupKind } from '../../../../../services/lifecycle/common/lifecycle.js';
 import { IChatViewTitleActionContext } from '../../../common/actions/chatActions.js';
 import { IChatAgentService } from '../../../common/participants/chatAgents.js';
@@ -81,7 +81,6 @@ import { combineVoiceInput } from '../../voiceClient/voiceInputUtils.js';
 import { IAgentTitleBarStatusService } from '../../agentSessions/experiments/agentTitleBarStatusService.js';
 import { IVoicePlaybackService } from '../../../common/voicePlaybackService.js';
 import { IWorkbenchEnvironmentService } from '../../../../../services/environment/common/environmentService.js';
-import { ShunCodeBridgeSessionView } from './shunCodeBridgeSessionView.js';
 
 interface IChatViewPaneState extends Partial<IChatModelInputState> {
 	/**
@@ -120,46 +119,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 
 	private readonly activityBadge = this._register(new MutableDisposable());
 	private readonly _currentSessionResource = observableValue<URI | undefined>(this, undefined);
-	private readonly bridgeModeContext: IContextKey<boolean>;
-	private bridgeMode = false;
-	private bridgeSessionView: ShunCodeBridgeSessionView | undefined;
-	private containerTitleModel: IViewContainerModel | undefined;
-
-	private getModeViewTitle(): string {
-		return this.bridgeMode
-			? localize('shuncodeBridgeViewTitle', "Bridge")
-			: localize('shuncodeChatViewTitle', "Chat");
-	}
-
-	public override get singleViewPaneContainerTitle(): string {
-		return this.getModeViewTitle();
-	}
-
-	protected override renderHeader(container: HTMLElement): void {
-		super.renderHeader(container);
-		this.updateTitle(this.getModeViewTitle());
-	}
-
-	protected override updateTitle(_title: string): void {
-		const title = this.getModeViewTitle();
-		super.updateTitle(title);
-		this.updateContainerTitle(title);
-	}
-
-	private updateContainerTitle(title: string | undefined): void {
-		const viewContainer = this.viewDescriptorService.getViewContainerByViewId(this.id);
-		const model = viewContainer ? this.viewDescriptorService.getViewContainerModel(viewContainer) : undefined;
-		if (this.containerTitleModel && this.containerTitleModel !== model) {
-			this.containerTitleModel.setTitle(undefined);
-		}
-		this.containerTitleModel = model;
-		if (!model) {
-			return;
-		}
-
-		const ownsContainerTitle = model.visibleViewDescriptors.every(view => view.id === this.id);
-		model.setTitle(ownsContainerTitle ? title : undefined);
-	}
 
 	constructor(
 		options: IViewPaneOptions,
@@ -199,8 +158,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 		@IAgentHostEnablementService private readonly agentHostEnablementService: IAgentHostEnablementService,
 	) {
 		super(options, keybindingService2, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
-		this.bridgeModeContext = ChatContextKeys.shunCodeBridgeMode.bindTo(contextKeyService);
-		this._register(toDisposable(() => this.bridgeModeContext.reset()));
 
 		// View state for the ViewPane is currently global per-provider basically,
 		// but some other strictly per-model state will require a separate memento.
@@ -226,12 +183,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 		this.updateContextKeys();
 
 		this.registerListeners();
-		this._register(CommandsRegistry.registerCommand('_shuncode.bridge.showSession', () => this.showBridgeSession()));
-		this._register(CommandsRegistry.registerCommand('_shuncode.bridge.showChat', () => this.showChatSession()));
-		this._register(toDisposable(() => {
-			this.containerTitleModel?.setTitle(undefined);
-			this.containerTitleModel = undefined;
-		}));
 	}
 
 	private updateContextKeys(): void {
@@ -384,7 +335,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 
 		this.viewPaneContainer = parent;
 		this.viewPaneContainer.classList.add('chat-viewpane');
-		this.viewPaneContainer.classList.toggle('shuncode-bridge-mode', this.bridgeMode);
 		this.updateViewPaneClasses(false);
 
 		// Controls wrapper — sessions + chat live inside here
@@ -412,34 +362,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 		this.setupContextMenu(parent);
 
 		this.applyModel();
-	}
-
-	private showBridgeSession(): void {
-		this.bridgeMode = true;
-		this.bridgeModeContext.set(true);
-		this.updateTitle(this.getModeViewTitle());
-		this.viewPaneContainer?.classList.add('shuncode-bridge-mode');
-		this._widget?.setVisible(false);
-		this.bridgeSessionView?.setVisible(this.isBodyVisible());
-		this.refreshSessionsControlVisibility();
-		this.relayout();
-	}
-
-	private showChatSession(): void {
-		this.bridgeModeContext.set(false);
-		if (!this.bridgeMode) {
-			this.updateTitle(this.getModeViewTitle());
-			return;
-		}
-
-		this.bridgeMode = false;
-		this.updateTitle(this.getModeViewTitle());
-		this.viewPaneContainer?.classList.remove('shuncode-bridge-mode');
-		this.bridgeSessionView?.setVisible(false);
-		this._widget?.setVisible(this.isBodyVisible() && !this.welcomeController?.isShowingWelcome.get());
-		this.refreshSessionsControlVisibility();
-		this.relayout();
-		this._widget?.focusInput();
 	}
 
 	private createControls(parent: HTMLElement): void {
@@ -955,9 +877,7 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 		}
 
 		let newSessionsContainerVisible: boolean;
-		if (this.bridgeMode) {
-			newSessionsContainerVisible = false;
-		} else if (!this.configurationService.getValue<boolean>(ChatConfiguration.ChatViewSessionsEnabled)) {
+		if (!this.configurationService.getValue<boolean>(ChatConfiguration.ChatViewSessionsEnabled)) {
 			newSessionsContainerVisible = false; // disabled in settings
 		} else {
 
@@ -1071,16 +991,9 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 				resultEditorBackground: editorBackground,
 			}));
 		this._widget.render(chatControlsContainer);
-		this.bridgeSessionView = this._register(this.instantiationService.createInstance(
-			ShunCodeBridgeSessionView,
-			chatControlsContainer,
-		));
-		this.bridgeSessionView.setVisible(this.bridgeMode && this.isBodyVisible());
-
-		const updateWidgetVisibility = (reader?: IReader) => this._widget.setVisible(!this.bridgeMode && this.isBodyVisible() && !this.welcomeController?.isShowingWelcome.read(reader));
+		const updateWidgetVisibility = (reader?: IReader) => this._widget.setVisible(this.isBodyVisible() && !this.welcomeController?.isShowingWelcome.read(reader));
 		this._register(this.onDidChangeBodyVisibility(() => {
 			updateWidgetVisibility();
-			this.bridgeSessionView?.setVisible(this.bridgeMode && this.isBodyVisible());
 		}));
 		this._register(autorun(reader => updateWidgetVisibility(reader)));
 		return this._widget;
@@ -1512,9 +1425,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 	}
 
 	focusInput(): void {
-		if (this.bridgeMode) {
-			return;
-		}
 		this._widget.focusInput();
 	}
 
@@ -1533,7 +1443,7 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 	private layoutingBody = false;
 
 	private relayout(): void {
-		if (!this.bridgeMode && !this._widget?.visible) {
+		if (!this._widget?.visible) {
 			return;
 		}
 
@@ -1571,13 +1481,6 @@ export class ChatViewPane extends ViewPane implements IViewWelcomeDelegate {
 	}
 
 	private layoutChatAndSessions(height: number, width: number, layoutInput: boolean): void {
-		if (this.bridgeMode) {
-			this.sessionsViewerSashDisposables.clear();
-			this.sessionsViewerSash = undefined;
-			this.lastDimensionsPerOrientation.set(this.sessionsViewerOrientation, { height, width });
-			return;
-		}
-
 		let remainingHeight = height;
 		const remainingWidth = width;
 

@@ -7,37 +7,22 @@ const bridgeSessionPath = path.join(root, 'src', 'vs', 'workbench', 'contrib', '
 const bridgeSessionCssPath = path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'media', 'shunCodeBridgeSessionView.css');
 const bridgeWidgetPath = path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'aiCustomization', 'shunCodeBridgeWidget.ts');
 const extensionPath = path.join(root, 'extensions', 'shuncode', 'src', 'extension.ts');
+const chatViewPath = path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'chatViewPane.ts');
+const chatActionsPath = path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'actions', 'chatActions.ts');
+const chatContextKeysPath = path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'common', 'actions', 'chatContextKeys.ts');
+const packagePath = path.join(root, 'extensions', 'shuncode', 'package.json');
 
-const [bridgeSessionSource, bridgeSessionCss, bridgeWidgetSource, extensionSource] = await Promise.all([
-  fs.readFile(bridgeSessionPath, 'utf8'),
-  fs.readFile(bridgeSessionCssPath, 'utf8'),
+const [bridgeWidgetSource, extensionSource, chatViewSource, chatActionsSource, chatContextKeysSource, extensionPackageText] = await Promise.all([
   fs.readFile(bridgeWidgetPath, 'utf8'),
   fs.readFile(extensionPath, 'utf8'),
+  fs.readFile(chatViewPath, 'utf8'),
+  fs.readFile(chatActionsPath, 'utf8'),
+  fs.readFile(chatContextKeysPath, 'utf8'),
+  fs.readFile(packagePath, 'utf8'),
 ]);
 
-assert.match(bridgeSessionSource, /const TASK_CENTER_OPEN = 'shuncode\.taskCenter\.open';/);
-assert.match(
-  bridgeSessionSource,
-  /workSessionsButton[\s\S]{0,900}executeCommand\(TASK_CENTER_OPEN\)/,
-  'Bridge Session compatibility UI must expose a direct handoff to Task-owned Work Sessions',
-);
-assert.match(
-  bridgeSessionSource,
-  /Task progress is tracked in Work Sessions\.[\s\S]{0,300}Bridge remains output-only here/,
-  'Bridge Session copy must identify Work Sessions as the Task progress surface',
-);
-assert.doesNotMatch(bridgeSessionSource, /interface BridgeTodo|renderTodos\(|renderProgress\(|status: 'running' \| 'completed' \| 'error' \| 'progress'/, 'legacy Bridge coordination rendering must be removed after Work Sessions takes over');
-assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-(?:todos|todo|progress)/, 'dead todo/progress Bridge CSS must be removed with the renderer');
-assert.match(bridgeSessionSource, /const BRIDGE_OPEN_VIEW = 'shuncode\.bridge\.openView';/);
-assert.match(
-  bridgeSessionSource,
-  /Bridge Settings[\s\S]{0,500}executeCommand\(BRIDGE_OPEN_VIEW\)/,
-  'Bridge Session compatibility UI must hand mutation/configuration control to Bridge Settings',
-);
-assert.doesNotMatch(bridgeSessionSource, /BRIDGE_START|BRIDGE_STOP|toggleBridge\(|startStopButton|Start the Bridge here/, 'Chat Bridge Session must not own Bridge start/stop mutations');
-assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-session-start-stop-button/, 'dead Bridge Session start/stop styling must be removed');
-assert.doesNotMatch(bridgeSessionSource, /BRIDGE_CHECK_HEALTH|checkHealth\(|healthButton|BridgeHealthReport|shuncode-bridge-session-health/, 'Chat Bridge Session must not own MCP health diagnostics');
-assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-session-health/, 'dead Bridge Session health styling must be removed after diagnostics move to settings');
+await assert.rejects(fs.access(bridgeSessionPath), { code: 'ENOENT' }, 'legacy Bridge Session view must be deleted after all rich presentation migrates');
+await assert.rejects(fs.access(bridgeSessionCssPath), { code: 'ENOENT' }, 'legacy Bridge Session stylesheet must be deleted with the view');
 
 assert.match(
   extensionSource,
@@ -56,10 +41,14 @@ assert.match(
   /Open Work Sessions[\s\S]{0,300}executeCommand\(TASK_CENTER_OPEN\)/,
   'Bridge configuration/diagnostics UI must expose the same Work Sessions handoff',
 );
-assert.match(
-  bridgeWidgetSource,
-  /Open Bridge Session[\s\S]{0,300}executeCommand\(BRIDGE_OPEN_SESSION\)/,
-  'Bridge compatibility session entry remains available until rich artifact/tool presentation has migrated',
-);
+assert.doesNotMatch(bridgeWidgetSource, /BRIDGE_OPEN_SESSION|Open Bridge Session/, 'Bridge Settings must not link back to a deleted compatibility session');
+assert.doesNotMatch(extensionSource, /shuncode\.bridge\.openSession|_shuncode\.bridge\.showSession/, 'first-party extension must not register the deleted Bridge Session entry');
+assert.doesNotMatch(chatViewSource, /ShunCodeBridgeSessionView|bridgeMode|_shuncode\.bridge\.showSession|_shuncode\.bridge\.showChat|shuncode-bridge-mode/, 'ChatViewPane must have no Bridge mode or compatibility view wiring');
+assert.doesNotMatch(chatActionsSource, /openShunCodeBridgeSession|returnFromShunCodeBridgeSession|shuncode\.bridge\.openSession|_shuncode\.bridge\.showChat/, 'Chat title actions must not expose Bridge mode switching');
+assert.doesNotMatch(chatContextKeysSource, /shunCodeBridgeMode|shuncodeBridgeMode/, 'Chat context keys must not retain a dead Bridge mode flag');
 
-console.log('[smoke] Bridge compatibility surfaces hand off Task progress, mutations, and MCP health to first-party native surfaces');
+const extensionPackage = JSON.parse(extensionPackageText);
+assert.ok(!extensionPackage.activationEvents.includes('onCommand:shuncode.bridge.openSession'));
+assert.ok(!extensionPackage.contributes.commands.some((item: { command: string }) => item.command === 'shuncode.bridge.openSession'));
+
+console.log('[smoke] legacy Bridge Session removed; Work Sessions and Bridge Settings own the migrated surfaces');

@@ -237,18 +237,3 @@
 		}
 	}
 }
-
-/* ShunCode Bridge is an output-only mode hosted inside the Chat view. Keep the
- * regular chat widget mounted for an immediate switch back, but remove its
- * conversation chrome from layout while Bridge output is active. */
-.chat-viewpane.shuncode-bridge-mode {
-	.chat-view-title-container,
-	.chat-welcome-view,
-	.interactive-session {
-		display: none !important;
-	}
-
-	.chat-controls-container {
-		min-height: 0;
-	}
-}

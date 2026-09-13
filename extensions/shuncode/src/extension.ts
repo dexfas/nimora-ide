@@ -305,7 +305,6 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("shuncode.openChat", async () => {
       await vscode.commands.executeCommand("workbench.action.chat.open");
-      await vscode.commands.executeCommand("_shuncode.bridge.showChat");
     }),
     vscode.commands.registerCommand("shuncode.taskCenter.getState", async (taskId?: unknown) => {
       const taskRuntime = taskShadow.executionRuntime();
@@ -318,10 +317,6 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("shuncode.bridge.openView", async () => {
       await vscode.commands.executeCommand("aiCustomization.openManagementEditor", "bridge");
-    }),
-    vscode.commands.registerCommand("shuncode.bridge.openSession", async () => {
-      await vscode.commands.executeCommand("workbench.action.chat.open");
-      await vscode.commands.executeCommand("_shuncode.bridge.showSession");
     }),
     vscode.commands.registerCommand("shuncode.bridge.getStatus", async () => {
       await bridgeReady;

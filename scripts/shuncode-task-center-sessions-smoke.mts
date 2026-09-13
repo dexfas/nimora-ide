@@ -429,18 +429,12 @@ try {
   assert.doesNotMatch(bridgeSource, /parseUnifiedDiffPreview|diffPreview|kind:\s*"edit"/, 'apply_patch must no longer depend on Bridge-only mini-diff parsing or presentation');
   assert.match(bridgeSource, /toolName === "run_command" \|\| toolName === "get_command_output" \|\| toolName === "send_command_input"[\s\S]{0,160}recordTerminalArtifact\(execution, toolName, args, resultText\)/, 'successful terminal tools must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /kind:\s*"terminal"|terminalId|parseUnifiedDiffPreview/, 'Bridge presentation must no longer own terminal or diff-specific rich state');
-  const bridgeSessionSource = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'shunCodeBridgeSessionView.ts'), 'utf8');
-  assert.doesNotMatch(bridgeSessionSource, /case 'search'|item\.kind === 'match'/, 'dead search-specific Chat Core rendering must be removed');
-  assert.doesNotMatch(bridgeSessionSource, /case 'diagnostics'|item\.kind === 'diagnostic'|item\.severity/, 'dead diagnostics-specific Chat Core rendering must be removed');
-  assert.doesNotMatch(bridgeSessionSource, /item\.kind === 'symbol'/, 'dead LSP symbol-item Chat Core rendering must be removed');
-  assert.doesNotMatch(bridgeSessionSource, /case 'lsp'/, 'dead LSP Chat Core presentation kind must be removed after hover migration');
-  assert.doesNotMatch(bridgeSessionSource, /renderToolItems|case 'files'|item\.kind === 'folder'/, 'dead directory/generic item rendering must be removed after native file-tree migration');
-  assert.doesNotMatch(bridgeSessionSource, /renderMiniDiff|renderEditSummaryItems|case 'edit'|diffPreview/, 'dead apply-patch mini-diff rendering must be removed after durable changeset content migration');
-  assert.doesNotMatch(bridgeSessionSource, /case 'terminal'|BRIDGE_OPEN_TERMINAL|presentation\.terminalId/, 'dead terminal-specific Bridge Session rendering must be removed');
-  const bridgeSessionCss = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'media', 'shunCodeBridgeSessionView.css'), 'utf8');
-  assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-tool-item/, 'dead generic item CSS must be removed with the directory renderer');
-  assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-mini-diff|shuncode-bridge-edit-summary/, 'dead apply-patch mini-diff CSS must be removed');
-  assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-tool-action/, 'dead Bridge terminal action CSS must be removed');
+  const bridgeSessionPath = path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'shunCodeBridgeSessionView.ts');
+  const bridgeSessionCssPath = path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'media', 'shunCodeBridgeSessionView.css');
+  await assert.rejects(fs.access(bridgeSessionPath), { code: 'ENOENT' }, 'legacy Bridge Session source must be deleted after terminal migration');
+  await assert.rejects(fs.access(bridgeSessionCssPath), { code: 'ENOENT' }, 'legacy Bridge Session CSS must be deleted after terminal migration');
+  const chatViewSource = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'chatViewPane.ts'), 'utf8');
+  assert.doesNotMatch(chatViewSource, /ShunCodeBridgeSessionView|bridgeMode|shuncode-bridge-mode|_shuncode\.bridge\.showSession|_shuncode\.bridge\.showChat/, 'ChatViewPane must return to a single native Chat surface');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));

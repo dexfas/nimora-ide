@@ -1533,52 +1533,6 @@ export function registerChatActions() {
 		}
 	});
 
-	registerAction2(class EnterShunCodeBridgeModeAction extends Action2 {
-		constructor() {
-			super({
-				id: 'workbench.action.chat.openShunCodeBridgeSession',
-				title: localize2('openShunCodeBridgeSession', "Switch to Bridge"),
-				shortTitle: localize('openShunCodeBridgeSession.short', "Bridge"),
-				category: CHAT_CATEGORY,
-				icon: Codicon.radioTower,
-				f1: true,
-				menu: [{
-					id: MenuId.ViewTitle,
-					when: ContextKeyExpr.and(ChatContextKeys.enabled, ContextKeyExpr.equals('view', ChatViewId), ChatContextKeys.shunCodeBridgeMode.negate()),
-					group: 'navigation',
-					order: 5,
-				}]
-			});
-		}
-
-		override async run(accessor: ServicesAccessor): Promise<void> {
-			await accessor.get(ICommandService).executeCommand('shuncode.bridge.openSession');
-		}
-	});
-
-	registerAction2(class ReturnToShunCodeChatModeAction extends Action2 {
-		constructor() {
-			super({
-				id: 'workbench.action.chat.returnFromShunCodeBridgeSession',
-				title: localize2('returnFromShunCodeBridgeSession', "Switch to Chat"),
-				shortTitle: localize('returnFromShunCodeBridgeSession.short', "Chat"),
-				category: CHAT_CATEGORY,
-				icon: Codicon.commentDiscussion,
-				f1: true,
-				menu: [{
-					id: MenuId.ViewTitle,
-					when: ContextKeyExpr.and(ChatContextKeys.enabled, ContextKeyExpr.equals('view', ChatViewId), ChatContextKeys.shunCodeBridgeMode),
-					group: 'navigation',
-					order: 5,
-				}]
-			});
-		}
-
-		override async run(accessor: ServicesAccessor): Promise<void> {
-			await accessor.get(ICommandService).executeCommand('_shuncode.bridge.showChat');
-		}
-	});
-
 	MenuRegistry.appendMenuItem(MenuId.ViewTitle, {
 		command: {
 			id: AICustomizationManagementCommands.OpenEditor,
