@@ -115,8 +115,7 @@ interface BridgeHealthReport {
 }
 
 const BRIDGE_GET_STATUS = 'shuncode.bridge.getStatus';
-const BRIDGE_START = 'shuncode.bridge.start';
-const BRIDGE_STOP = 'shuncode.bridge.stop';
+const BRIDGE_OPEN_VIEW = 'shuncode.bridge.openView';
 const BRIDGE_CHECK_HEALTH = 'shuncode.bridge.checkHealth';
 const BRIDGE_CLEAR_ACTIVITY_LOG = 'shuncode.bridge.clearActivityLog';
 const BRIDGE_OPEN_RESOURCE = 'shuncode.bridge.openResource';
@@ -180,7 +179,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 	private readonly healthRow: HTMLElement;
 	private readonly healthDot: HTMLElement;
 	private readonly healthText: HTMLElement;
-	private readonly startStopButton: Button;
+	private readonly bridgeSettingsButton: Button;
 	private readonly healthButton: Button;
 	private readonly clearLogButton: Button;
 	private readonly workSessionsButton: Button;
@@ -237,11 +236,15 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		this._register(this.collapseButton.onDidClick(() => this.toggleFooterCollapsed()));
 
 		// Action buttons live on their own row below the status text so the
-		// narrow sidebar never has to squeeze three buttons next to the heading.
+		// narrow sidebar never has to squeeze controls next to the heading.
 		const actionRow = append(footer, $('.shuncode-bridge-session-action-row'));
-		this.startStopButton = this._register(new Button(actionRow, { ...defaultButtonStyles, supportIcons: true }));
-		this.startStopButton.element.classList.add('shuncode-bridge-session-start-stop-button');
-		this._register(this.startStopButton.onDidClick(() => void this.toggleBridge()));
+		this.bridgeSettingsButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
+		this.bridgeSettingsButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-settings-button');
+		this.bridgeSettingsButton.label = `$(${Codicon.settingsGear.id}) ${localize('shuncodeBridgeSession.bridgeSettingsShort', "Bridge Settings")}`;
+		const bridgeSettingsTitle = localize('shuncodeBridgeSession.bridgeSettings', "Open Bridge connection settings");
+		this.bridgeSettingsButton.setTitle(bridgeSettingsTitle);
+		this.bridgeSettingsButton.element.setAttribute('aria-label', bridgeSettingsTitle);
+		this._register(this.bridgeSettingsButton.onDidClick(() => void this.commandService.executeCommand(BRIDGE_OPEN_VIEW)));
 		this.healthButton = this._register(new Button(actionRow, { ...defaultButtonStyles, secondary: true, supportIcons: true }));
 		this.healthButton.element.classList.add('shuncode-bridge-session-action-button', 'shuncode-bridge-session-health-button');
 		this._register(this.healthButton.onDidClick(() => void this.checkHealth()));
@@ -276,27 +279,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		if (visible) {
 			// Re-showing starts pinned to the latest activity again.
 			this.followTimeline = true;
-			void this.refresh(true);
-		}
-	}
-
-	private async toggleBridge(): Promise<void> {
-		if (this.busy) {
-			return;
-		}
-		this.busy = true;
-		this.renderControls();
-		try {
-			const status = await this.commandService.executeCommand<BridgeStatus>(this.lastStatus?.state === 'running' ? BRIDGE_STOP : BRIDGE_START);
-			if (status) {
-				this.lastStatus = status;
-				this.render(status, true);
-			}
-		} catch (error) {
-			this.connectionDescription.textContent = error instanceof Error ? error.message : String(error);
-		} finally {
-			this.busy = false;
-			this.renderControls();
 			void this.refresh(true);
 		}
 	}
@@ -688,7 +670,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		this.footerMeta.textContent = pieces.join(' · ');
 		this.footerHint.textContent = status.connected
 			? localize('shuncodeBridgeSession.outputOnlyHint', "Task progress is tracked in Work Sessions. Bridge remains output-only here; continue the conversation in the external client.")
-			: localize('shuncodeBridgeSession.connectHint', "Start the Bridge here, then connect the configured MCP URL from the external client. Task progress appears in Work Sessions.");
+			: localize('shuncodeBridgeSession.connectHint', "Open Bridge Settings to start or configure the Bridge, then connect the MCP URL from the external client. Task progress appears in Work Sessions.");
 	}
 
 	private appendStat(label: string, value: string): void {
@@ -759,15 +741,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 	}
 
 	private renderControls(): void {
-		const running = this.lastStatus?.state === 'running';
 		const starting = this.lastStatus?.state === 'starting';
-		this.startStopButton.enabled = !this.busy && !starting;
-		this.startStopButton.label = this.busy || starting
-			? `$(${Codicon.loading.id}) ${localize('shuncodeBridgeSession.starting', "Starting…")}`
-			: running
-				? `$(${Codicon.debugStop.id}) ${localize('shuncodeBridgeSession.stopBridge', "Stop Bridge")}`
-				: `$(${Codicon.plug.id}) ${localize('shuncodeBridgeSession.startBridge', "Start Bridge")}`;
-
 		this.healthButton.enabled = !this.checkingHealth && !starting;
 		this.healthButton.label = this.checkingHealth
 			? `$(${Codicon.loading.id}) ${localize('shuncodeBridgeSession.checkingHealthShort', "Checking…")}`

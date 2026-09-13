@@ -458,6 +458,12 @@ Phase 7.6 已让 Bridge status 永远不再产生 todos/progress presentation，
 
 协议兼容不受影响：extension 的 `BridgeStatus.todos` 仍可暂时返回空数组给其他旧调用方；只是 Chat Bridge Session 不再消费它。`test-shuncode-work-sessions-handoff` 现在同时保护 handoff、显式 diagnostics 入口，以及 Core/CSS 中没有 legacy coordination renderer。
 
+### Phase 7.9 — Move Bridge Mutations to Connection Settings
+
+旧 Chat Bridge Session 不再直接启动或停止 Bridge。first-party extension 新增 `shuncode.bridge.openView`，通过原生 `aiCustomization.openManagementEditor("bridge")` 深链到 AI Customization 的 Bridge section；旧 Session 中原来的 start/stop 按钮改为只读导航性质的 `Bridge Settings` 按钮。断开状态提示也改为引导用户去 Bridge Settings 启动或配置连接。
+
+Bridge 的 mutation ownership 因此进一步收敛到 Connections/AI Customization surface：那里继续拥有 start/stop、MCP address、tunnel provider/setup、persistent background startup 等连接控制。旧 Chat Session 仍暂时保留 health check、activity log 与 rich diff/terminal tool cards，因此 `shuncode.bridge.openSession` 尚未删除。`test-shuncode-work-sessions-handoff` 同时保护 Chat Core 不再引用 `shuncode.bridge.start/stop`，而 Bridge Settings 仍保有 start/stop wiring。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

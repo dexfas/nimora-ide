@@ -316,6 +316,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("shuncode.taskCenter.open", async () => {
       await vscode.commands.executeCommand("workbench.action.chat.history");
     }),
+    vscode.commands.registerCommand("shuncode.bridge.openView", async () => {
+      await vscode.commands.executeCommand("aiCustomization.openManagementEditor", "bridge");
+    }),
     vscode.commands.registerCommand("shuncode.bridge.openSession", async () => {
       await vscode.commands.executeCommand("workbench.action.chat.open");
       await vscode.commands.executeCommand("_shuncode.bridge.showSession");

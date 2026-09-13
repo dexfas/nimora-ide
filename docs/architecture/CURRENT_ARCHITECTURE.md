@@ -169,6 +169,8 @@ Phase 7.7 已把 Bridge 自动启动从 Chat Core 移回 first-party extension�
 
 Phase 7.8 又删除了旧 Bridge Session 中已经无数据来源的 todo/progress renderer 与 CSS。该 view 现在只保留 connection/health、Work Sessions handoff 和普通 rich tool cards；Core-side `BridgeActivity` 不再声明 `progress` variant。extension-level `BridgeStatus.todos: []` 仍短期保留作协议兼容，但 Chat Core 已完全不读取它。
 
+Phase 7.9 进一步把 Bridge mutation control 移出 Chat Core。extension 暴露 `shuncode.bridge.openView`，直接打开 AI Customization 的 `bridge` section；旧 Bridge Session 原 start/stop 控件已替换为 `Bridge Settings` 导航。实际 start/stop、MCP address、tunnel 与 persistent background startup 继续由 Bridge settings/extension 拥有。旧 Session 仍保留 health、activity log 与 rich diff/terminal tool diagnostics，所以当前仍是显式 diagnostics compatibility surface，而不是连接控制面。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

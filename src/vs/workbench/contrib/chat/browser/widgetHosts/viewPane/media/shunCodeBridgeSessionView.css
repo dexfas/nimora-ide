@@ -540,7 +540,6 @@
 	margin-top: 8px;
 }
 
-.shuncode-bridge-session-start-stop-button.monaco-button,
 .shuncode-bridge-session-action-button.monaco-button,
 .shuncode-bridge-session-collapse-button.monaco-button {
 	flex: 0 0 auto;
@@ -549,11 +548,6 @@
 	min-height: 28px;
 	white-space: nowrap;
 	line-height: 26px;
-}
-
-.shuncode-bridge-session-start-stop-button.monaco-button {
-	min-width: 92px;
-	padding: 0 10px;
 }
 
 .shuncode-bridge-session-action-button.monaco-button {
@@ -698,12 +692,6 @@
 @media (max-width: 340px) {
 	.shuncode-bridge-session-connection-description {
 		display: none;
-	}
-
-	.shuncode-bridge-session-start-stop-button.monaco-button {
-		min-width: 86px;
-		padding-left: 8px;
-		padding-right: 8px;
 	}
 
 	.shuncode-bridge-session-stats {
