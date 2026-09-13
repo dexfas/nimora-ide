@@ -161,6 +161,8 @@ Phase 7.2 已建立 UI-independent Task Center read model：`src/task-center-pro
 
 Phase 7.4 已在两个旧 Bridge surface 增加显式 Work Sessions handoff：Chat 内的 Bridge Session footer 与 AI Customization 中的 Bridge 配置/诊断页都可直接执行 `shuncode.taskCenter.open`。Bridge Session 文案同时明确 Task progress 属于 Work Sessions，Bridge 页面保留的是 output-only compatibility、连接状态和尚未迁出的 rich tool presentation。`shuncode.bridge.openSession` 目前仍保留，等待 generic Artifact/diff/terminal surface 完成后再移除。
 
+Phase 7.5 开始把 generic Artifact presentation 放进 Work Sessions：Task `changeset` metadata 会显示 file/addition/deletion/truncation summary，并把经过 workspace-relative sanitization 的文件列表映射为 native file tree；artifact URI 只在 `http/https` 或受 workspace containment 保护的 `file:` 场景下映射为 native anchor。它没有读取 Bridge manager-global activity，也没有把完整 diff 复制进 Task；rich diff/terminal cards 仍暂留旧 Bridge compatibility view。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

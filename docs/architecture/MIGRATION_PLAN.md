@@ -434,6 +434,12 @@ Task Center read model 已开始接入现有 Sessions/Agents Window，而不是�
 
 这一步只迁入口与产品语义，不改变 `shuncode.bridge.openSession`、Bridge execution 或 tunnel contract；旧 Bridge Session 入口继续保留，直到 rich artifact/terminal presentation 有替代方案后再切读/删除。`test-shuncode-work-sessions-handoff` 保护两个 compatibility surface 的 handoff wiring，并同时保护旧 Bridge Session 仍可访问。
 
+### Phase 7.5 — Generic Artifact Summary in Work Sessions
+
+Work Sessions 现在开始直接消费 Task Artifact contract，而不是从 Bridge tool id 猜文件结果。`changeset` artifact 的 `metadata.files/additions/deletions/diffTruncated` 会进入通用 Artifact summary；安全的 workspace-relative changed files 还会投影为 native `ChatResponseFileTreePart`，让用户可从 Work Sessions 打开相关文件。带 `uri` 的 artifact 只允许 `http/https`，或经过 workspace containment 校验的 `file:` URI，再投影为 native anchor；`command:` 等 scheme 与 traversal/absolute changed-file metadata 会被忽略。
+
+这还不是 rich diff/terminal migration：Task journal 当前只保存 bounded changeset metadata，不复制完整 diff，Work Sessions 因此不会伪造 patch 内容。旧 Bridge diff/terminal cards 继续保留，直到对应 Artifact contract 与 generic renderer 成熟。`test-shuncode-task-center-sessions` 现在同时保护 artifact path sanitization、file-tree shape、artifact summary 与 native file-tree/anchor wiring。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

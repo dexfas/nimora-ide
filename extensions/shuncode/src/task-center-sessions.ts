@@ -1,8 +1,9 @@
+import path from "node:path";
 import * as vscode from "vscode";
 import { projectTaskCenterState, type TaskCenterTaskDetail } from "../../../src/task-center-projection.js";
 import type { TaskRuntime } from "../../../src/task-runtime.js";
 import type { TaskShadowRecorder } from "./task-shadow.js";
-import { formatTaskSessionMarkdown, presentTaskSession, type TaskSessionPresentationStatus } from "./task-center-session-presentation.js";
+import { buildTaskSessionFileTree, formatTaskSessionMarkdown, presentTaskSession, presentTaskSessionArtifacts, type TaskSessionPresentationStatus } from "./task-center-session-presentation.js";
 
 export const NIMORA_TASK_SESSION_TYPE = "nimora-task";
 
@@ -30,11 +31,45 @@ function vscodeStatus(status: TaskSessionPresentationStatus): vscode.ChatSession
   }
 }
 
+function safeArtifactUri(value: string | undefined, workspace: string | undefined): vscode.Uri | undefined {
+  if (!value) return undefined;
+  let uri: vscode.Uri;
+  try {
+    uri = vscode.Uri.parse(value, true);
+  } catch {
+    return undefined;
+  }
+  if (uri.scheme === "http" || uri.scheme === "https") return uri;
+  if (uri.scheme !== "file" || !workspace) return undefined;
+  const workspacePath = path.resolve(workspace);
+  const artifactPath = path.resolve(uri.fsPath);
+  const relative = path.relative(workspacePath, artifactPath);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) return undefined;
+  return uri;
+}
+
+function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatResponseMarkdownPart | vscode.ChatResponseFileTreePart | vscode.ChatResponseAnchorPart> {
+  const parts: Array<vscode.ChatResponseMarkdownPart | vscode.ChatResponseFileTreePart | vscode.ChatResponseAnchorPart> = [
+    new vscode.ChatResponseMarkdownPart(new vscode.MarkdownString(formatTaskSessionMarkdown(detail))),
+  ];
+  const artifacts = presentTaskSessionArtifacts(detail);
+  const changedFiles = [...new Set(artifacts.filter(artifact => artifact.kind === "changeset").flatMap(artifact => artifact.files))];
+  if (detail.summary.workspace && changedFiles.length) {
+    const tree = buildTaskSessionFileTree(changedFiles);
+    if (tree.length) parts.push(new vscode.ChatResponseFileTreePart(tree, vscode.Uri.file(detail.summary.workspace)));
+  }
+  for (const artifact of artifacts) {
+    const uri = safeArtifactUri(artifact.uri, detail.summary.workspace);
+    if (uri) parts.push(new vscode.ChatResponseAnchorPart(uri, artifact.title));
+  }
+  return parts;
+}
+
 function createHistory(detail: TaskCenterTaskDetail, participantId: string): Array<vscode.ChatRequestTurn2 | vscode.ChatResponseTurn2> {
   const prompt = detail.summary.goal?.trim() || "Nimora Task";
   const request = new vscode.ChatRequestTurn2(prompt, undefined, [], participantId, [], undefined, `task:${detail.summary.taskId}`, undefined, undefined);
   const response = new vscode.ChatResponseTurn2(
-    [new vscode.ChatResponseMarkdownPart(new vscode.MarkdownString(formatTaskSessionMarkdown(detail)))],
+    createResponseParts(detail),
     {},
     participantId,
   );

@@ -13,6 +13,22 @@ export interface TaskSessionPresentation {
   terminal: boolean;
 }
 
+export interface TaskSessionArtifactPresentation {
+  artifactId: string;
+  kind: TaskCenterTaskDetail["artifacts"][number]["kind"];
+  title: string;
+  uri?: string;
+  files: string[];
+  additions?: number;
+  deletions?: number;
+  diffTruncated: boolean;
+}
+
+export interface TaskSessionFileTreeNode {
+  name: string;
+  children?: TaskSessionFileTreeNode[];
+}
+
 function oneLine(value: string | undefined, maxChars: number): string | undefined {
   const line = value?.replace(/\s+/g, " ").trim();
   if (!line) return undefined;
@@ -65,6 +81,65 @@ function markdownText(value: string | undefined, fallback: string): string {
   return value?.trim() || fallback;
 }
 
+function safeWorkspaceRelativePath(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+  if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)) return undefined;
+  const segments = normalized.split("/").filter(Boolean);
+  if (!segments.length || segments.some(segment => segment === "." || segment === ".." || segment.includes("\0"))) return undefined;
+  return segments.join("/");
+}
+
+function metadataNumber(metadata: Record<string, unknown> | undefined, key: string): number | undefined {
+  const value = metadata?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskSessionArtifactPresentation[] {
+  return detail.artifacts.map(artifact => {
+    const metadata = artifact.metadata;
+    const files = Array.isArray(metadata?.files)
+      ? [...new Set(metadata.files.map(safeWorkspaceRelativePath).filter((value): value is string => Boolean(value)))]
+      : [];
+    const uri = typeof artifact.uri === "string" && artifact.uri.trim() ? artifact.uri.trim() : undefined;
+    return {
+      artifactId: artifact.artifactId,
+      kind: artifact.kind,
+      title: oneLine(artifact.title, 240) ?? artifact.kind,
+      uri,
+      files,
+      additions: metadataNumber(metadata, "additions"),
+      deletions: metadataNumber(metadata, "deletions"),
+      diffTruncated: metadata?.diffTruncated === true,
+    };
+  });
+}
+
+export function buildTaskSessionFileTree(paths: readonly string[]): TaskSessionFileTreeNode[] {
+  interface MutableNode {
+    name: string;
+    children: Map<string, MutableNode>;
+  }
+  const root = new Map<string, MutableNode>();
+  for (const candidate of paths) {
+    const path = safeWorkspaceRelativePath(candidate);
+    if (!path) continue;
+    let children = root;
+    for (const segment of path.split("/")) {
+      let node = children.get(segment);
+      if (!node) {
+        node = { name: segment, children: new Map() };
+        children.set(segment, node);
+      }
+      children = node.children;
+    }
+  }
+  const project = (nodes: Map<string, MutableNode>): TaskSessionFileTreeNode[] => [...nodes.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(node => ({ name: node.name, ...(node.children.size ? { children: project(node.children) } : {}) }));
+  return project(root);
+}
+
 export function formatTaskSessionMarkdown(detail: TaskCenterTaskDetail): string {
   const lines: string[] = [];
   const summary = detail.summary;
@@ -91,6 +166,22 @@ export function formatTaskSessionMarkdown(detail: TaskCenterTaskDetail): string 
     for (const worker of detail.workers) {
       const label = oneLine(worker.model, 120) ?? oneLine(worker.workerId, 120) ?? "AI worker";
       lines.push(`- ${label}${worker.detachedAt ? " · finished" : " · active"}`);
+    }
+  }
+
+  const artifacts = presentTaskSessionArtifacts(detail);
+  if (artifacts.length) {
+    lines.push("", "### Artifacts");
+    for (const artifact of artifacts) {
+      const stats = [
+        artifact.files.length ? `${artifact.files.length} file${artifact.files.length === 1 ? "" : "s"}` : undefined,
+        artifact.additions !== undefined ? `+${artifact.additions}` : undefined,
+        artifact.deletions !== undefined ? `-${artifact.deletions}` : undefined,
+        artifact.diffTruncated ? "diff summary truncated" : undefined,
+      ].filter((value): value is string => Boolean(value));
+      lines.push(`- **${artifact.title}** · ${artifact.kind}${stats.length ? ` · ${stats.join(" · ")}` : ""}`);
+      for (const file of artifact.files.slice(0, 12)) lines.push(`  - \`${file}\``);
+      if (artifact.files.length > 12) lines.push(`  - …and ${artifact.files.length - 12} more`);
     }
   }
 

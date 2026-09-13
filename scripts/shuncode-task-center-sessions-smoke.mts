@@ -12,7 +12,7 @@ const bundlePath = path.join(bundleDirectory, 'task-center-session-presentation.
 
 await esbuild.build({
   stdin: {
-    contents: `export { presentTaskSession, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';`,
+    contents: `export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';`,
     resolveDir: root,
     sourcefile: 'task-center-session-presentation-entry.ts',
     loader: 'ts',
@@ -25,7 +25,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { presentTaskSession, formatTaskSessionMarkdown } = require(bundlePath);
+const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } = require(bundlePath);
 
 const summary = {
   version: 1,
@@ -40,7 +40,7 @@ const summary = {
   workerCount: 2,
   activeWorkerCount: 1,
   executionCounts: { total: 4, running: 0, succeeded: 3, failed: 1, unknown: 0, pendingDelivery: 1 },
-  artifactCount: 1,
+  artifactCount: 3,
 };
 
 const detail = {
@@ -60,13 +60,17 @@ const detail = {
     { id: 'artifact:a', kind: 'artifact', at: '2026-09-13T08:04:00.000Z', title: 'Changed one file', artifactKind: 'changeset' },
     { id: 'progress:p', kind: 'progress', at: '2026-09-13T08:05:00.000Z', title: 'Work Sessions', message: 'Projecting Task state', percent: 60, todoId: 'project' },
   ],
-  artifacts: [],
+  artifacts: [
+    { artifactId: 'changes', kind: 'changeset', title: 'Workspace patch', createdAt: '2026-09-13T08:04:00.000Z', metadata: { files: ['src/b.ts', 'src/a.ts', '../escape.txt', '/absolute.txt'], additions: 10, deletions: 2, diffTruncated: true } },
+    { artifactId: 'report', kind: 'report', title: 'Review report', uri: 'https://example.com/report', createdAt: '2026-09-13T08:04:30.000Z' },
+    { artifactId: 'unsafe', kind: 'other', title: 'Unsafe command URI', uri: 'command:do-not-run', createdAt: '2026-09-13T08:04:40.000Z' },
+  ],
 };
 
 try {
   const presentation = presentTaskSession(summary);
   assert.equal(presentation.label, 'Ship Task-owned Work Sessions', 'session labels must stay single-line');
-  assert.equal(presentation.description, '1/3 todos · 1 active AI · 4 actions · 1 artifact');
+  assert.equal(presentation.description, '1/3 todos · 1 active AI · 4 actions · 3 artifacts');
   assert.equal(presentation.badge, '60%');
   assert.equal(presentation.status, 'in_progress');
   assert.equal(presentation.terminal, false);
@@ -77,16 +81,28 @@ try {
   );
   assert.equal(presentTaskSession({ ...summary, status: 'completed' }).terminal, true);
 
+  const artifacts = presentTaskSessionArtifacts(detail);
+  assert.deepEqual(artifacts[0].files, ['src/b.ts', 'src/a.ts'], 'artifact presentation must drop absolute/traversal paths');
+  assert.deepEqual(buildTaskSessionFileTree(artifacts[0].files), [{ name: 'src', children: [{ name: 'a.ts' }, { name: 'b.ts' }] }]);
+
   const markdown = formatTaskSessionMarkdown(detail);
   assert.match(markdown, /### Todos/);
   assert.match(markdown, /### AI Workers/);
   assert.match(markdown, /### Timeline/);
+  assert.match(markdown, /### Artifacts/);
+  assert.match(markdown, /Workspace patch\*\* · changeset · 2 files · \+10 · -2 · diff summary truncated/);
+  assert.match(markdown, /`src\/a\.ts`/);
+  assert.doesNotMatch(markdown, /escape\.txt|absolute\.txt/, 'unsafe artifact paths must not reach Work Sessions markdown');
   assert.match(markdown, /read_files:\*\* succeeded · result pending delivery/, 'execution and result delivery state must remain separate in presentation');
   assert.doesNotMatch(markdown, /opaque-session-key/, 'Work Sessions presentation must not expose source session keys');
 
   const sessionsSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-center-sessions.ts'), 'utf8');
   assert.match(sessionsSource, /createChatSessionItemController\(NIMORA_TASK_SESSION_TYPE/);
   assert.match(sessionsSource, /registerChatSessionContentProvider\(/);
+  assert.match(sessionsSource, /new vscode\.ChatResponseFileTreePart\(/, 'changeset artifacts must use the native file-tree presentation');
+  assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(/, 'URI artifacts must use native anchors');
+  assert.match(sessionsSource, /uri\.scheme === "http" \|\| uri\.scheme === "https"/);
+  assert.match(sessionsSource, /uri\.scheme !== "file" \|\| !workspace/, 'file anchors require a workspace containment check');
   assert.match(sessionsSource, /requestHandler:\s*undefined/, 'Task content must be read-only; Chat is a projection, not the Task owner');
   assert.match(sessionsSource, /taskShadow\.onDidChangeTask/, 'native Work Sessions must refresh from Task owner changes');
 
