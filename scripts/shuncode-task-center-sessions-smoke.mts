@@ -15,6 +15,7 @@ await esbuild.build({
     contents: `
       export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionEntryTree, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';
       export { taskDiagnosticsArtifact, taskDirectoryArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
+      export { taskTerminalArtifact } from './extensions/shuncode/src/task-terminal-artifacts.ts';
     `,
     resolveDir: root,
     sourcefile: 'task-center-session-presentation-entry.ts',
@@ -28,7 +29,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionEntryTree, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskDirectoryArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact } = require(bundlePath);
+const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionEntryTree, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskDirectoryArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact, taskTerminalArtifact } = require(bundlePath);
 
 const summary = {
   version: 1,
@@ -312,6 +313,63 @@ try {
     ] },
   ], 'directory entry trees must preserve empty-folder semantics with children: []');
 
+  const terminalArtifact = taskTerminalArtifact('run_command', { command: 'npm test', cwd: '.', background: false }, [
+    '=== RUN_COMMAND BEGIN ===',
+    'command_id: cmd_test_1',
+    'terminal_id: terminal-1',
+    'terminal_name: "ShunCode · 1"',
+    'execution: pty',
+    'status: completed',
+    'exit_code: 0',
+    'cwd: "."',
+    'background: false',
+    'next_offset: 8',
+    'total_output_bytes: 8',
+    'output_lost: false',
+    '--- OUTPUT BEGIN ---',
+    'tests ok',
+    '--- OUTPUT END ---',
+    '=== RUN_COMMAND END ===',
+  ].join('\n'));
+  assert.equal(terminalArtifact?.kind, 'terminal');
+  assert.equal(terminalArtifact?.metadata?.command, 'npm test');
+  assert.equal(terminalArtifact?.metadata?.terminalOpenable, true);
+  assert.equal(terminalArtifact?.metadata?.content, 'tests ok');
+  assert.equal(terminalArtifact?.metadata?.contentLanguage, 'text');
+  const directTerminalArtifact = taskTerminalArtifact('run_command', { command: 'npm test', background: false }, [
+    '=== RUN_COMMAND BEGIN ===',
+    'command_id: cmd_direct_1',
+    'terminal_id: direct',
+    'terminal_name: "direct"',
+    'execution: direct',
+    'status: completed',
+    'exit_code: 0',
+    '--- OUTPUT BEGIN ---',
+    'done',
+    '--- OUTPUT END ---',
+    '=== RUN_COMMAND END ===',
+  ].join('\n'));
+  assert.equal(directTerminalArtifact?.metadata?.terminalOpenable, false, 'direct execution must not expose a fake terminal action');
+  const sentInputArtifact = taskTerminalArtifact('send_command_input', { command_id: 'cmd_test_1', input: 'SUPER_SECRET_INPUT' }, [
+    '=== SEND_COMMAND_INPUT BEGIN ===',
+    'command_id: cmd_test_1',
+    'terminal_id: terminal-1',
+    'status: running',
+    'bytes_sent: 18',
+    'append_newline: true',
+    '=== SEND_COMMAND_INPUT END ===',
+  ].join('\n'));
+  assert.equal(sentInputArtifact?.metadata?.bytesSent, 18);
+  assert.doesNotMatch(JSON.stringify(sentInputArtifact), /SUPER_SECRET_INPUT/, 'interactive input text must never be copied into durable Task artifacts');
+
+  const terminalPresentation = presentTaskSessionArtifacts({
+    ...detail,
+    artifacts: [{ artifactId: 'terminal', kind: 'terminal', title: terminalArtifact?.title ?? 'Terminal', createdAt: '2026-09-13T08:05:00.000Z', metadata: terminalArtifact?.metadata }],
+  })[0];
+  assert.equal(terminalPresentation.terminal?.terminalId, 'terminal-1');
+  assert.equal(terminalPresentation.terminal?.openable, true);
+  assert.equal(terminalPresentation.terminal?.command, 'npm test');
+
   const markdown = formatTaskSessionMarkdown(detail);
   assert.match(markdown, /### Todos/);
   assert.match(markdown, /### AI Workers/);
@@ -334,6 +392,9 @@ try {
   assert.match(sessionsSource, /new vscode\.Location\(fileUri, position\)/, 'search artifacts must preserve line-level locations with native Location anchors');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(target,/, 'search locations must render as native anchors');
   assert.match(sessionsSource, /markdown\.appendCodeblock\(artifact\.content, artifact\.contentLanguage\)/, 'durable report/changeset content must render as a bounded native markdown code block');
+  assert.match(sessionsSource, /MANAGED_TERMINAL_OPEN_COMMAND/);
+  assert.match(sessionsSource, /markdown\.isTrusted = \{ enabledCommands: \[MANAGED_TERMINAL_OPEN_COMMAND\] \}/, 'managed terminal links must trust only the exact first-party command');
+  assert.match(sessionsSource, /terminal\.openable && terminal\.terminalId/, 'only real managed PTYs may expose an open-terminal action');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(/, 'URI artifacts must use native anchors');
   assert.match(sessionsSource, /uri\.scheme === "http" \|\| uri\.scheme === "https"/);
   assert.match(sessionsSource, /uri\.scheme !== "file" \|\| !workspace/, 'file anchors require a workspace containment check');
@@ -343,6 +404,8 @@ try {
   const extensionSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'extension.ts'), 'utf8');
   assert.match(extensionSource, /registerTaskCenterSessions\(context, taskShadow, participant, SHUNCODE_PARTICIPANT_ID, output\)/);
   assert.match(extensionSource, /registerCommand\("shuncode\.taskCenter\.open"[\s\S]{0,200}workbench\.action\.chat\.history/);
+  assert.match(extensionSource, /registerCommand\(MANAGED_TERMINAL_OPEN_COMMAND/);
+  assert.doesNotMatch(extensionSource, /registerCommand\("shuncode\.bridge\.openTerminal"/, 'managed terminal reveal must no longer be owned by Bridge UI');
 
   const taskShadowSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-shadow.ts'), 'utf8');
   assert.match(taskShadowSource, /recordChangeset[\s\S]{0,1800}contentLanguage:\s*content \? "diff"[\s\S]{0,300}contentTruncated:/, 'changesets must retain a bounded canonical diff preview as durable Task content');
@@ -350,6 +413,7 @@ try {
   assert.match(taskShadowSource, /recordDiagnosticsArtifact[\s\S]{0,500}taskDiagnosticsArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
   assert.match(taskShadowSource, /recordDirectoryArtifact[\s\S]{0,500}taskDirectoryArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
   assert.match(taskShadowSource, /recordLspArtifact[\s\S]{0,500}taskLspArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
+  assert.match(taskShadowSource, /recordTerminalArtifact[\s\S]{0,500}taskTerminalArtifact\(toolName, args, resultText\)[\s\S]{0,500}recordArtifact/);
   const bridgeSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'bridge-server.ts'), 'utf8');
   assert.match(bridgeSource, /recordFileNavigationArtifact\(execution, toolName, result\.structuredContent\)/, 'successful Bridge file navigation must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "read_files"\)/, 'read_files must no longer have a Bridge-only rich presentation branch');
@@ -363,6 +427,8 @@ try {
   assert.doesNotMatch(bridgeSource, /parseLspItems\(|kind:\s*"symbol"/, 'LSP location operations must no longer depend on Bridge-only symbol item parsing');
   assert.doesNotMatch(bridgeSource, /kind:\s*"lsp"|toolName === "lsp" && args\.operation === "hover"/, 'hover content must no longer require a Bridge-only rich presentation kind');
   assert.doesNotMatch(bridgeSource, /parseUnifiedDiffPreview|diffPreview|kind:\s*"edit"/, 'apply_patch must no longer depend on Bridge-only mini-diff parsing or presentation');
+  assert.match(bridgeSource, /toolName === "run_command" \|\| toolName === "get_command_output" \|\| toolName === "send_command_input"[\s\S]{0,160}recordTerminalArtifact\(execution, toolName, args, resultText\)/, 'successful terminal tools must be durably projected into Task artifacts');
+  assert.doesNotMatch(bridgeSource, /kind:\s*"terminal"|terminalId|parseUnifiedDiffPreview/, 'Bridge presentation must no longer own terminal or diff-specific rich state');
   const bridgeSessionSource = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'shunCodeBridgeSessionView.ts'), 'utf8');
   assert.doesNotMatch(bridgeSessionSource, /case 'search'|item\.kind === 'match'/, 'dead search-specific Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /case 'diagnostics'|item\.kind === 'diagnostic'|item\.severity/, 'dead diagnostics-specific Chat Core rendering must be removed');
@@ -370,9 +436,11 @@ try {
   assert.doesNotMatch(bridgeSessionSource, /case 'lsp'/, 'dead LSP Chat Core presentation kind must be removed after hover migration');
   assert.doesNotMatch(bridgeSessionSource, /renderToolItems|case 'files'|item\.kind === 'folder'/, 'dead directory/generic item rendering must be removed after native file-tree migration');
   assert.doesNotMatch(bridgeSessionSource, /renderMiniDiff|renderEditSummaryItems|case 'edit'|diffPreview/, 'dead apply-patch mini-diff rendering must be removed after durable changeset content migration');
+  assert.doesNotMatch(bridgeSessionSource, /case 'terminal'|BRIDGE_OPEN_TERMINAL|presentation\.terminalId/, 'dead terminal-specific Bridge Session rendering must be removed');
   const bridgeSessionCss = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'media', 'shunCodeBridgeSessionView.css'), 'utf8');
   assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-tool-item/, 'dead generic item CSS must be removed with the directory renderer');
   assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-mini-diff|shuncode-bridge-edit-summary/, 'dead apply-patch mini-diff CSS must be removed');
+  assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-tool-action/, 'dead Bridge terminal action CSS must be removed');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));

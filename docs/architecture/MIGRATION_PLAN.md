@@ -512,6 +512,12 @@ TaskShadow 的 LSP 入口统一为 `recordLspArtifact()`，location operations �
 
 Bridge 的 unified-diff preview parser、`kind=edit`、Core mini-diff/edit-summary renderer 与对应 CSS 已删除。旧 Session 因此不再提供 changeset-specific rich UI；剩余唯一需要迁出的 rich compatibility 是 terminal controls/output。
 
+### Phase 7.18 — Durable Terminal Artifacts
+
+`run_command`、`get_command_output`、`send_command_input` 现在都会写入 durable Task `terminal` artifact。Task 保留 command/command_id、terminal identity、cwd、execution/status/exit code、output paging/loss metadata 与最多 24k 的 output content；`send_command_input` 只记录 bytes/count/status，不复制交互输入正文到 Task journal。`direct` execution 明确标记为不可打开终端，避免把 one-shot child process 伪装成 PTY。
+
+Work Sessions 用原生 Markdown/code block 展示 terminal command/output，并仅对真实 managed PTY 生成受信的 `shuncode.terminal.openManaged` command link；Markdown trust allow-list 只允许这一条第一方命令。通用 Native Chat 的 Open Terminal action 同步切到该非 Bridge command id。Bridge/Core 的 `kind=terminal` presentation、terminal button 和对应 CSS 已删除，因此旧 Chat Bridge Session 已不存在任何不可替代的 rich tool presentation。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

@@ -5,6 +5,7 @@ import { TaskRuntime } from "../../../src/task-runtime.js";
 import type { TaskArtifactRef, TaskInteractionOutcome, TaskProgress, TaskSnapshot, TaskTodo } from "../../../src/task-contract.js";
 import type { WorkerExecutionProjectionStore, WorkerTaskBindingStore } from "../../../src/worker-session-manager.js";
 import { taskDiagnosticsArtifact, taskDirectoryArtifact, taskFileNavigationArtifact, taskLspArtifact } from "./task-file-artifacts.js";
+import { taskTerminalArtifact } from "./task-terminal-artifacts.js";
 
 export interface ShadowExecutionHandle {
   taskId: string;
@@ -198,6 +199,16 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
     const artifact = taskLspArtifact(args, resultText);
     if (!artifact) return undefined;
     return this.safe("record lsp artifact", () => this.runtime.recordArtifact(handle.taskId, {
+      ...artifact,
+      executionId: handle.executionId,
+    }));
+  }
+
+  async recordTerminalArtifact(handle: ShadowExecutionHandle | undefined, toolName: string, args: unknown, resultText: string): Promise<TaskArtifactRef | undefined> {
+    if (!handle) return undefined;
+    const artifact = taskTerminalArtifact(toolName, args, resultText);
+    if (!artifact) return undefined;
+    return this.safe("record terminal artifact", () => this.runtime.recordArtifact(handle.taskId, {
       ...artifact,
       executionId: handle.executionId,
     }));

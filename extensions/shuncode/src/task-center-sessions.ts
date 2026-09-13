@@ -6,6 +6,7 @@ import type { TaskShadowRecorder } from "./task-shadow.js";
 import { buildTaskSessionEntryTree, buildTaskSessionFileTree, formatTaskSessionMarkdown, presentTaskSession, presentTaskSessionArtifacts, type TaskSessionPresentationStatus } from "./task-center-session-presentation.js";
 
 export const NIMORA_TASK_SESSION_TYPE = "nimora-task";
+export const MANAGED_TERMINAL_OPEN_COMMAND = "shuncode.terminal.openManaged";
 
 function taskResource(taskId: string): vscode.Uri {
   return vscode.Uri.from({ scheme: NIMORA_TASK_SESSION_TYPE, path: `/${encodeURIComponent(taskId)}` });
@@ -84,13 +85,46 @@ function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatRes
       const locationLabel = `${location.path}:${location.line}${location.column ? `:${location.column}` : ""}`;
       parts.push(new vscode.ChatResponseAnchorPart(target, location.label ? `${locationLabel} · ${location.label}` : locationLabel));
     }
-    if (artifact.content) {
+    if (artifact.content || artifact.terminal) {
       const markdown = new vscode.MarkdownString();
       markdown.appendMarkdown("### ");
       markdown.appendText(artifact.title);
-      markdown.appendMarkdown("\n\n");
-      markdown.appendCodeblock(artifact.content, artifact.contentLanguage);
-      if (artifact.contentTruncated) markdown.appendMarkdown("\n\n_Content truncated in Work Sessions._");
+      const terminal = artifact.terminal;
+      if (terminal) {
+        const details = [
+          terminal.terminalName,
+          terminal.status,
+          terminal.execution,
+          terminal.exitCode !== undefined ? `exit ${terminal.exitCode}` : undefined,
+          terminal.cwd ? `cwd ${terminal.cwd}` : undefined,
+          terminal.bytesSent !== undefined ? `${terminal.bytesSent} bytes sent` : undefined,
+          terminal.outputLost ? "older output unavailable" : undefined,
+          terminal.hasMore ? "more output available" : undefined,
+        ].filter((value): value is string => Boolean(value));
+        if (details.length) {
+          markdown.appendMarkdown("\n\n");
+          markdown.appendText(details.join(" · "));
+        }
+        if (terminal.command) {
+          markdown.appendMarkdown("\n\n**Command**\n\n");
+          markdown.appendCodeblock(terminal.command, "shell");
+          if (terminal.commandTruncated) markdown.appendMarkdown("\n\n_Command truncated in Task history._");
+        }
+        if (terminal.openable && terminal.terminalId) {
+          const target = vscode.Uri.from({
+            scheme: "command",
+            path: MANAGED_TERMINAL_OPEN_COMMAND,
+            query: JSON.stringify([terminal.terminalId]),
+          });
+          markdown.isTrusted = { enabledCommands: [MANAGED_TERMINAL_OPEN_COMMAND] };
+          markdown.appendMarkdown(`\n\n[Open terminal](${target.toString()})`);
+        }
+      }
+      if (artifact.content) {
+        markdown.appendMarkdown(terminal ? "\n\n**Output**\n\n" : "\n\n");
+        markdown.appendCodeblock(artifact.content, artifact.contentLanguage);
+        if (artifact.contentTruncated) markdown.appendMarkdown("\n\n_Content truncated in Work Sessions._");
+      }
       parts.push(new vscode.ChatResponseMarkdownPart(markdown));
     }
   }

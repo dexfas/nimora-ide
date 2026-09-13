@@ -202,7 +202,7 @@ export class ShunCodeChatToolProgressPart extends BaseChatToolInvocationSubPart 
 		const icon = dom.append(button, dom.$('span'));
 		icon.classList.add(...ThemeIcon.asClassNameArray(Codicon.terminal));
 		dom.append(button, dom.$('span', undefined, localize('shuncodeChatTool.openTerminal', "Open Terminal")));
-		this._register(dom.addDisposableListener(button, dom.EventType.CLICK, () => void this.commandService.executeCommand('shuncode.bridge.openTerminal', data.terminalId)));
+		this._register(dom.addDisposableListener(button, dom.EventType.CLICK, () => void this.commandService.executeCommand('shuncode.terminal.openManaged', data.terminalId)));
 	}
 
 	private renderCodeSection(parent: HTMLElement, label: string, value: string): void {

@@ -187,6 +187,8 @@ Phase 7.16 把 directory exploration 也迁成 durable Task report：`list_direc
 
 Phase 7.17 把 apply-patch mini diff 迁成 durable changeset content：Task journal 保存有界 canonical unified diff preview，并用 `diff` code block 在 Work Sessions 展示，受影响文件仍由 native file tree 承接。因为当前 changeset 没有 durable before-file snapshot，未伪装成 native multi-diff URI。Bridge/Core 的 edit presentation、diff preview parser/renderer/CSS 已删除；旧 Session 的最后一个 rich-only 职责只剩 terminal controls/output。
 
+Phase 7.18 完成 terminal presentation 迁移：`run_command/get_command_output/send_command_input` 现在生成 durable Task terminal artifact，保存 command identity、status、cwd、exit/output paging metadata 与有界 output，但不会持久化 `send_command_input` 的正文。Work Sessions 展示 command/output，并只为真实 managed PTY 提供 allow-listed `shuncode.terminal.openManaged` link；direct execution 没有虚假的 terminal action。Bridge/Core 的 terminal presentation/button/CSS 已删除，旧 Bridge Session 已不再承载任何独有 rich tool UI。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

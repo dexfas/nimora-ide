@@ -20,7 +20,7 @@ import { dispatchHostCapabilityRequest } from "../../../src/host-capability-requ
 import { applyWebWorkerReleaseGate, resolveWebWorkerReleaseGate } from "../../../src/web-worker-release-gate.js";
 import type { WorkerCapabilityResultInput, WorkerInput } from "../../../src/worker-contract.js";
 import { projectTaskCenterState } from "../../../src/task-center-projection.js";
-import { registerTaskCenterSessions } from "./task-center-sessions.js";
+import { MANAGED_TERMINAL_OPEN_COMMAND, registerTaskCenterSessions } from "./task-center-sessions.js";
 
 let activeBridge: BridgeManager | undefined;
 
@@ -394,8 +394,8 @@ export function activate(context: vscode.ExtensionContext): void {
       const after = await vscode.workspace.openTextDocument({ content: snippet.after });
       await vscode.commands.executeCommand("vscode.diff", before.uri, after.uri, `${filePath ?? "Bridge edit"} · Before ↔ After`, { preview: true });
     }),
-    vscode.commands.registerCommand("shuncode.bridge.openTerminal", async (terminalId: unknown) => {
-      if (typeof terminalId !== "string" || !terminalId) throw new Error("Bridge terminal id is required.");
+    vscode.commands.registerCommand(MANAGED_TERMINAL_OPEN_COMMAND, async (terminalId: unknown) => {
+      if (typeof terminalId !== "string" || !terminalId) throw new Error("Managed terminal id is required.");
       if (!ideToolBroker.revealTerminal(terminalId)) {
         await vscode.window.showInformationMessage("That ShunCode terminal is no longer available.");
       }

@@ -14,14 +14,11 @@ import { ICommandService } from '../../../../../../platform/commands/common/comm
 import { defaultButtonStyles } from '../../../../../../platform/theme/browser/defaultStyles.js';
 
 interface BridgeActivityPresentation {
-	readonly kind: 'terminal' | 'generic';
+	readonly kind: 'generic';
 	readonly title: string;
 	readonly subtitle?: string;
 	readonly input?: string;
 	readonly output?: string;
-	readonly terminalId?: string;
-	readonly commandId?: string;
-	readonly exitCode?: number | null;
 }
 
 interface BridgeActivity {
@@ -57,7 +54,6 @@ interface BridgeStatus {
 const BRIDGE_GET_STATUS = 'shuncode.bridge.getStatus';
 const BRIDGE_OPEN_VIEW = 'shuncode.bridge.openView';
 const BRIDGE_CLEAR_ACTIVITY_LOG = 'shuncode.bridge.clearActivityLog';
-const BRIDGE_OPEN_TERMINAL = 'shuncode.bridge.openTerminal';
 const TASK_CENTER_OPEN = 'shuncode.taskCenter.open';
 
 function formatDuration(durationMs: number | undefined): string {
@@ -88,10 +84,7 @@ function activityIcon(activity: BridgeActivity): ThemeIcon {
 	if (activity.status === 'running') {
 		return ThemeIcon.modify(Codicon.loading, 'spin');
 	}
-	switch (activity.presentation?.kind) {
-		case 'terminal': return Codicon.terminal;
-		default: return Codicon.tools;
-	}
+	return Codicon.tools;
 }
 
 export class ShunCodeBridgeSessionView extends Disposable {
@@ -348,17 +341,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 				? localize('shuncodeBridgeSession.failed', "Failed")
 				: formatDuration(activity.durationMs) || localize('shuncodeBridgeSession.completed', "Completed");
 		const body = append(card, $('.shuncode-bridge-tool-body'));
-		if (presentation.terminalId) {
-			const actions = append(body, $('.shuncode-bridge-tool-actions'));
-			const openTerminal = append(actions, $('button.shuncode-bridge-tool-action'));
-			const terminalIcon = append(openTerminal, $('span'));
-			terminalIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.terminal));
-			append(openTerminal, $('span', undefined, localize('shuncodeBridgeSession.openTerminal', "Open Terminal")));
-			openTerminal.addEventListener('click', () => void this.commandService.executeCommand(BRIDGE_OPEN_TERMINAL, presentation.terminalId));
-		}
-
-		const showRawInput = presentation.kind === 'generic' || activity.tool === 'send_command_input';
-		this.renderCodeSection(body, localize('shuncodeBridgeSession.input', "Input"), showRawInput ? presentation.input : undefined);
+		this.renderCodeSection(body, localize('shuncodeBridgeSession.input', "Input"), presentation.input);
 		this.renderCodeSection(body, localize('shuncodeBridgeSession.output', "Output"), presentation.output);
 		if (activity.message && activity.status === 'error' && activity.message !== presentation.output) {
 			const error = append(body, $('.shuncode-bridge-tool-error'));

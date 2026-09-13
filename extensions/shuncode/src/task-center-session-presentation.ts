@@ -31,6 +31,24 @@ export interface TaskSessionArtifactPresentation {
   content?: string;
   contentLanguage?: string;
   contentTruncated: boolean;
+  terminal?: TaskSessionTerminalPresentation;
+}
+
+export interface TaskSessionTerminalPresentation {
+  terminalId?: string;
+  commandId?: string;
+  terminalName?: string;
+  execution?: string;
+  status?: string;
+  cwd?: string;
+  command?: string;
+  commandTruncated: boolean;
+  exitCode?: number;
+  background?: boolean;
+  openable: boolean;
+  outputLost: boolean;
+  hasMore: boolean;
+  bytesSent?: number;
 }
 
 export interface TaskSessionArtifactLocation {
@@ -116,6 +134,34 @@ function metadataNumber(metadata: Record<string, unknown> | undefined, key: stri
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function metadataString(metadata: Record<string, unknown> | undefined, key: string, maxChars: number): string | undefined {
+  const value = metadata?.[key];
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.length <= maxChars ? trimmed : trimmed.slice(0, maxChars);
+}
+
+function artifactTerminal(kind: TaskSessionArtifactPresentation["kind"], metadata: Record<string, unknown> | undefined): TaskSessionTerminalPresentation | undefined {
+  if (kind !== "terminal") return undefined;
+  return {
+    terminalId: oneLine(metadataString(metadata, "terminalId", 240), 240),
+    commandId: oneLine(metadataString(metadata, "commandId", 240), 240),
+    terminalName: oneLine(metadataString(metadata, "terminalName", 240), 240),
+    execution: oneLine(metadataString(metadata, "execution", 32), 32),
+    status: oneLine(metadataString(metadata, "status", 32), 32),
+    cwd: oneLine(metadataString(metadata, "cwd", 1_000), 1_000),
+    command: metadataString(metadata, "command", 4_000),
+    commandTruncated: metadata?.commandTruncated === true,
+    exitCode: metadataNumber(metadata, "exitCode"),
+    background: typeof metadata?.background === "boolean" ? metadata.background : undefined,
+    openable: metadata?.terminalOpenable === true,
+    outputLost: metadata?.outputLost === true,
+    hasMore: metadata?.hasMore === true,
+    bytesSent: metadataNumber(metadata, "bytesSent"),
+  };
+}
+
 function artifactContent(metadata: Record<string, unknown> | undefined): { content?: string; truncated: boolean } {
   const value = typeof metadata?.content === "string" ? metadata.content.trim() : "";
   if (!value) return { content: undefined, truncated: metadata?.contentTruncated === true };
@@ -166,6 +212,7 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
     const locations = artifactLocations(metadata);
     const entries = artifactEntries(metadata);
     const content = artifactContent(metadata);
+    const terminal = artifactTerminal(artifact.kind, metadata);
     return {
       artifactId: artifact.artifactId,
       kind: artifact.kind,
@@ -184,6 +231,7 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       content: content.content,
       contentLanguage: oneLine(typeof metadata?.contentLanguage === "string" ? metadata.contentLanguage : undefined, 32),
       contentTruncated: content.truncated,
+      terminal,
     };
   });
 }

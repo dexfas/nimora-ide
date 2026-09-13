@@ -202,14 +202,11 @@ export interface BridgeTodo {
 }
 
 export interface BridgeActivityPresentation {
-  readonly kind: "terminal" | "generic";
+  readonly kind: "generic";
   readonly title: string;
   readonly subtitle?: string;
   readonly input?: string;
   readonly output?: string;
-  readonly terminalId?: string;
-  readonly commandId?: string;
-  readonly exitCode?: number | null;
 }
 
 export interface BridgeStatus {
@@ -290,38 +287,6 @@ function uniqueStrings(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value?.trim())).map((value) => value.trim()))];
 }
 
-function stringField(text: string | undefined, field: string): string | undefined {
-  if (!text) return undefined;
-  const match = text.match(new RegExp(`^${field}:\\s*(.+)$`, "m"));
-  if (!match) return undefined;
-  const raw = match[1].trim();
-  if (raw === "null") return undefined;
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "string" ? parsed : String(parsed);
-  } catch {
-    return raw;
-  }
-}
-
-function numberField(text: string | undefined, field: string): number | null | undefined {
-  const raw = stringField(text, field);
-  if (raw === undefined) return undefined;
-  if (raw === "null") return null;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : undefined;
-}
-
-function blockBetween(text: string | undefined, begin: string, end: string): string | undefined {
-  if (!text) return undefined;
-  const start = text.indexOf(begin);
-  if (start < 0) return undefined;
-  const contentStart = start + begin.length;
-  const finish = text.indexOf(end, contentStart);
-  const value = text.slice(contentStart, finish >= 0 ? finish : undefined).replace(/^\r?\n/, "").replace(/\r?\n$/, "");
-  return value || undefined;
-}
-
 function bridgePresentation(
   toolName: string,
   args: Record<string, unknown>,
@@ -349,38 +314,6 @@ function bridgePresentation(
       input: undefined,
       output: isError ? output : undefined,
     };
-  }
-
-  if (toolName === "run_command") {
-    const command = typeof args.command === "string" ? args.command.trim() : "Run command";
-    const cwd = typeof args.cwd === "string" && args.cwd.trim() ? args.cwd.trim() : undefined;
-    const terminalId = stringField(resultText, "terminal_id");
-    const terminalName = stringField(resultText, "terminal_name");
-    const commandId = stringField(resultText, "command_id");
-    const exitCode = numberField(resultText, "exit_code");
-    const terminalOutput = blockBetween(resultText, "--- OUTPUT BEGIN ---", "--- OUTPUT END ---");
-    const status = stringField(resultText, "status");
-    const subtitle = [terminalName, cwd, status && status !== "completed" ? status : undefined, exitCode !== undefined && exitCode !== null ? `exit ${exitCode}` : undefined].filter(Boolean).join(" · ") || undefined;
-    return { kind: "terminal", title: command || "Run command", subtitle, input: undefined, output: terminalOutput ?? (isError ? output : undefined), terminalId, commandId, exitCode };
-  }
-
-  if (toolName === "get_command_output") {
-    const commandId = typeof args.command_id === "string" ? args.command_id : undefined;
-    return {
-      kind: "terminal",
-      title: "Read command output",
-      subtitle: [stringField(resultText, "terminal_name"), stringField(resultText, "status") ?? commandId].filter(Boolean).join(" · ") || undefined,
-      input: undefined,
-      output: blockBetween(resultText, "--- OUTPUT BEGIN ---", "--- OUTPUT END ---") ?? output,
-      terminalId: stringField(resultText, "terminal_id"),
-      commandId,
-      exitCode: numberField(resultText, "exit_code"),
-    };
-  }
-
-  if (toolName === "send_command_input") {
-    const commandId = typeof args.command_id === "string" ? args.command_id : undefined;
-    return { kind: "terminal", title: "Sent command input", subtitle: commandId, input: boundedText(args.input, 2_000), terminalId: stringField(resultText, "terminal_id"), commandId, output: isError ? output : undefined };
   }
 
   return { kind: "generic", title: toolName, input, output };
@@ -1764,6 +1697,8 @@ export class BridgeManager implements vscode.Disposable {
             await this.taskShadow.recordDirectoryArtifact(execution, args, resultText);
           } else if (toolName === "lsp") {
             await this.taskShadow.recordLspArtifact(execution, args, resultText);
+          } else if (toolName === "run_command" || toolName === "get_command_output" || toolName === "send_command_input") {
+            await this.taskShadow.recordTerminalArtifact(execution, toolName, args, resultText);
           }
         }
         // At this layer we know a CallToolResult exists, but not whether the
