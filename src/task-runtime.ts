@@ -53,6 +53,7 @@ export interface TaskRuntimeOptions {
   log?: (message: string) => void;
   now?: () => Date;
   newId?: () => string;
+  onDidChange?: (task: TaskSnapshot, event: TaskEvent) => void;
 }
 
 export interface BeginExecutionInput {
@@ -483,6 +484,11 @@ export class TaskRuntime {
       const updated = applyTaskEvent(current, canonicalEvent);
       this.tasks.set(canonicalEvent.taskId, updated);
       this.sourceTaskIds.set(taskSourceIdentity(updated.source), updated.taskId);
+      try {
+        this.options.onDidChange?.(structuredClone(updated), structuredClone(canonicalEvent));
+      } catch (error) {
+        this.log(`task change listener failed for ${canonicalEvent.type} task=${canonicalEvent.taskId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     });
     this.writeChains.set(canonicalEvent.taskId, next);
     try {

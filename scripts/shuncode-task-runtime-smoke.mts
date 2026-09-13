@@ -27,10 +27,22 @@ let tick = 0;
 const now = () => new Date(Date.UTC(2026, 8, 13, 0, 0, tick++));
 
 try {
-  const runtime = new TaskRuntime({ storageDirectory: directory, newId, now });
+  const changeEvents: string[] = [];
+  const runtime = new TaskRuntime({
+    storageDirectory: directory,
+    newId,
+    now,
+    onDidChange: (snapshot: any, event: any) => {
+      changeEvents.push(event.type);
+      if (event.type === 'TaskCreated') snapshot.goal = 'listener must not mutate owner state';
+      if (event.type === 'TaskTodosUpdated') throw new Error('listener failure must not break Task writes');
+    },
+  });
   await runtime.initialize();
   const task = await runtime.ensureTask({ kind: 'bridge', key: 'session-a', workspace: '/workspace' }, 'Refactor Gateway');
   assert.equal(task.goal, 'Refactor Gateway');
+  assert.equal(runtime.getTask(task.taskId)?.goal, 'Refactor Gateway', 'Task change listeners must receive cloned snapshots');
+  assert.deepEqual(changeEvents, ['TaskCreated'], 'Task creation must notify after the live owner state changes');
   await runtime.updateContext(task.taskId, {
     summary: 'Gateway refactor is in progress.',
     constraints: ['No duplicate side effects', 'No duplicate side effects', 'Keep VS Code as foundation'],
@@ -42,6 +54,8 @@ try {
     { id: 'audit', title: 'Audit', status: 'completed' },
     { id: 'code', title: 'Implement', status: 'in_progress' },
   ]);
+  assert.equal(runtime.getTask(task.taskId)?.todos.length, 2, 'listener exceptions must not break committed Task writes');
+  assert.ok(changeEvents.includes('TaskTodosUpdated'));
   await runtime.reportProgress(task.taskId, { message: 'Provider split started', phase: 'Coding', percent: 35, todoId: 'code' });
   await runtime.attachWorkerSession(task.taskId, {
     managedSessionId: 'worker-session-1',
@@ -147,9 +161,11 @@ try {
   const beforeRestartFinal = runtime.getTask(task.taskId)!;
 
   const blockedPath = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-task-runtime-blocked-'));
-  const failClosed = new TaskRuntime({ storageDirectory: blockedPath });
+  const failClosedChanges: string[] = [];
+  const failClosed = new TaskRuntime({ storageDirectory: blockedPath, onDidChange: (_snapshot: any, event: any) => failClosedChanges.push(event.type) });
   await failClosed.initialize();
   const shadowTask = await failClosed.ensureTask({ kind: 'bridge', key: 'fail-open-shadow' }, 'Shadow still loads');
+  assert.deepEqual(failClosedChanges, ['TaskCreated']);
   await fs.rm(blockedPath, { recursive: true, force: true });
   await fs.writeFile(blockedPath, 'file blocks mkdir', 'utf8');
   await assert.rejects(() => failClosed.claimExecution(shadowTask.taskId, {
@@ -158,6 +174,7 @@ try {
     arguments: { command: 'echo must-not-run' },
   }), /Strict task persistence failed/);
   assert.equal(failClosed.getTask(shadowTask.taskId)?.executions['strict:blocked:1'], undefined, 'failed strict claim must not enter the in-memory projection');
+  assert.deepEqual(failClosedChanges, ['TaskCreated'], 'failed strict persistence must not emit a Task change notification');
   await fs.rm(blockedPath, { force: true });
 
   // Simulate a torn final write. Replay must preserve every complete event and

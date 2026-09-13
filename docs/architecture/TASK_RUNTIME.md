@@ -195,7 +195,11 @@ Task Runtime progress state
 
 Phase 3 先建立了双写 shadow；Phase 7.1 已把 `set_todos` / `report_progress` 的 ownership 翻转到 Task Runtime。Bridge MCP session 对应的 Task 必须先 durable 创建，随后 `TaskTodosUpdated` / `TaskProgressUpdated` 使用 strict persistence；只有 Task snapshot 成功更新后才投影到现有 `BridgeManager.todos/activities`。因此旧 Bridge 状态页现在只是最近一次 coordination Task 的兼容展示，不再是 todo/progress Source of Truth。普通 Bridge file/IDE execution 仍保持 fail-open shadow，等待后续 execution/artifact/Task Center 迁移。
 
-Phase 7.2 增加 `task-center-projection.ts` 作为 Task Runtime → product UI 的只读 boundary。它从 snapshot 生成 Task summary/detail 和统一 timeline，并由 extension command `shuncode.taskCenter.getState` 暴露；projection 不携带 `TaskSource.key`，避免把 MCP session id / Chat session key 重新升级成用户概念。当前只是 read model，Work Sessions/Task Center visual surface 仍待接入。
+Phase 7.2 增加 `task-center-projection.ts` 作为 Task Runtime → product UI 的只读 boundary。它从 snapshot 生成 Task summary/detail 和统一 timeline，并由 extension command `shuncode.taskCenter.getState` 暴露；projection 不携带 `TaskSource.key`，避免把 MCP session id / Chat session key 重新升级成用户概念。
+
+Phase 7.3 开始把这个 boundary 接入原生 Sessions/Agents Window。extension 注册 `nimora-task` / `Nimora Work Sessions`，Task summary 映射为 `ChatSessionItem`，Task detail/todos/workers/timeline 映射为只读 session content；`requestHandler` 为 `undefined`，因此这里没有新的 Chat-owned execution path。`shuncode.taskCenter.open` 直接打开现有 Sessions picker，而不是新增 Webview。
+
+为了让 projection 跟随 Task live state 更新，`TaskRuntimeOptions.onDidChange` 在 event 已应用到 live snapshot 后触发，并传递 cloned snapshot/event。listener 自身异常会被隔离。对 strict owner write，journal persistence 失败会在 apply 之前终止，所以不会更新 live state，也不会发送 change notification；普通 fail-open shadow write 仍允许 persistence failure 后保留内存 projection，并因此发送 invalidation。`TaskShadowRecorder.onDidChangeTask` 将这个通知转发到 extension UI adapter。这个通知是 presentation invalidation signal，不是新的状态 owner。
 
 ## 8. Artifact
 

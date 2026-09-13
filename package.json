@@ -22,6 +22,7 @@
 		"test-shuncode-task-runtime": "node scripts/shuncode-task-runtime-smoke.mts",
 		"test-shuncode-bridge-task-coordination": "node scripts/shuncode-bridge-task-coordination-smoke.mts",
 		"test-shuncode-task-center-projection": "node scripts/shuncode-task-center-projection-smoke.mts",
+		"test-shuncode-task-center-sessions": "node scripts/shuncode-task-center-sessions-smoke.mts",
 		"test-shuncode-worker-adapter": "node scripts/shuncode-worker-adapter-smoke.mts",
 		"test-shuncode-agent-host-worker": "node scripts/shuncode-agent-host-worker-smoke.mts",
 		"test-shuncode-worker-session-manager": "node scripts/shuncode-worker-session-manager-smoke.mts",

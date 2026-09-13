@@ -155,7 +155,9 @@ Phase 7.1 已开始翻转 coordination ownership：`set_todos` / `report_progres
 
 现有 Bridge 状态页仍只有 manager-global `todos/activities` 展示，因此它在过渡期只是**最近一次 coordination Task 的兼容投影**，不是多 Task 的 Source of Truth，也不是最终 Task Center。TaskRuntime 中按 MCP session 建立的 Task 才是 todos/progress 的 durable owner。
 
-Phase 7.2 已建立 UI-independent Task Center read model：`src/task-center-projection.ts` 从 Task snapshots 生成 newest-first Task list、selected Task detail、todo/progress、Worker 摘要以及 interaction/execution/artifact/current-progress timeline；extension 通过 `shuncode.taskCenter.getState` 只读暴露。这个 API 已经不依赖 Bridge status，但当前 Core Bridge Session View 还没有切过去，因此不能把它写成 Task Center UI 已完成。
+Phase 7.2 已建立 UI-independent Task Center read model：`src/task-center-projection.ts` 从 Task snapshots 生成 newest-first Task list、selected Task detail、todo/progress、Worker 摘要以及 interaction/execution/artifact/current-progress timeline；extension 通过 `shuncode.taskCenter.getState` 只读暴露。Phase 7.3 开始把这个 read model 接入现有 native Sessions surface：first-party extension 注册 `nimora-task` / `Nimora Work Sessions` provider，每个 Task 投影成 session item，打开后显示只读 Task summary/todos/workers/timeline。session content 没有 request handler，因此 Sessions 不是 owner，也不负责执行。
+
+`TaskRuntime` 现在还提供 live-state change notification：event 应用到 live snapshot 后通知 cloned snapshot；listener 失败不会反向破坏 Task commit。strict owner write 如果 persistence 失败，会在 apply 前终止，因此没有 live-state change，也没有 notification；普通 fail-open shadow write 仍可能在 persistence 失败时更新内存 projection 并通知。extension 借此刷新 Work Sessions list。命令 `shuncode.taskCenter.open` 复用原生 `workbench.action.chat.history`。旧 Core Bridge Session View 尚未删除，因此当前是“新 native Work Sessions + 旧 Bridge compatibility projection”并存阶段，不应描述成 Phase 7 UI migration 已全部完成。
 
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 

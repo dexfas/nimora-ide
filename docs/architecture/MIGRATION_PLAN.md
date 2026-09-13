@@ -420,6 +420,14 @@ first-party extension 暴露只读 command `shuncode.taskCenter.getState(taskId?
 
 `test-shuncode-task-center-projection` 保护 newest-first Task list、explicit selection、todo/worker/execution summaries、execution/result-delivery 分离、timeline 顺序、snapshot immutability、raw source-key 不泄露，以及 extension command wiring。
 
+### Phase 7.3 — Native Work Sessions Projection
+
+Task Center read model 已开始接入现有 Sessions/Agents Window，而不是另造一套 Nimora Webview。first-party extension 通过 proposed `chatSessionsProvider` 注册只读 `nimora-task` session type（显示名 `Nimora Work Sessions`）：每个 Task snapshot 投影成一个 native session item，展示 goal、todo/worker/action/artifact 摘要、状态与 timing；打开后由 `ChatSessionContentProvider` 返回只读 Task detail/timeline。`requestHandler` 明确为 `undefined`，因此 Chat/Sessions 只是 Task 的 presentation surface，不重新获得执行或 durable state ownership。
+
+为让 session list 在 Task 变化后自动更新，`TaskRuntimeOptions.onDidChange` 在 event 已应用到 live snapshot 后收到 cloned snapshot/event；listener 异常只记录日志，不能破坏已经提交的 Task state。对 strict owner writes，persistence 失败会在 apply 之前终止，因此既不改变 live snapshot，也不触发 change notification；普通 fail-open shadow write 仍保持既有语义，即 persistence 失败时可继续更新 live shadow projection 并通知 UI。`TaskShadowRecorder.onDidChangeTask` 只是把该 owner-side invalidation signal 暴露给 extension presentation 层。
+
+命令 `shuncode.taskCenter.open` 复用现有 `workbench.action.chat.history` 入口打开原生 Sessions picker；旧 Bridge Session View 仍保留作为兼容 projection，尚未删除。`test-shuncode-task-center-sessions` 保护 native provider wiring、只读 content、Task-owned presentation、execution/result-delivery 分离和 package/proposal wiring；`test-shuncode-task-runtime` 额外保护 change notification 的 clone、listener fail-open 与 strict-write no-notify contract。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

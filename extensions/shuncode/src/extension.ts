@@ -10,7 +10,7 @@ import { createInteractiveCapabilityGrantResolver, registerCapabilityGrantManage
 import { HostCapabilityExecutionService } from "./host-capability-execution-service.js";
 import { IdeToolBroker } from "./ide-tool-broker.js";
 import { ShunCodeLanguageModelProvider } from "./model-provider.js";
-import { registerShunCodeNativeChat } from "./native-chat.js";
+import { registerShunCodeNativeChat, SHUNCODE_PARTICIPANT_ID } from "./native-chat.js";
 import { RuntimeClient } from "./runtime-client.js";
 import { TaskShadowRecorder } from "./task-shadow.js";
 import { WebMcpCommandTransport } from "./webmcp-worker-transport.js";
@@ -20,6 +20,7 @@ import { dispatchHostCapabilityRequest } from "../../../src/host-capability-requ
 import { applyWebWorkerReleaseGate, resolveWebWorkerReleaseGate } from "../../../src/web-worker-release-gate.js";
 import type { WorkerCapabilityResultInput, WorkerInput } from "../../../src/worker-contract.js";
 import { projectTaskCenterState } from "../../../src/task-center-projection.js";
+import { registerTaskCenterSessions } from "./task-center-sessions.js";
 
 let activeBridge: BridgeManager | undefined;
 
@@ -108,6 +109,7 @@ export function activate(context: vscode.ExtensionContext): void {
     shuncode: apiModelProvider,
     "shuncode-codex": codexModelProvider,
   }, branchStore, taskShadow);
+  registerTaskCenterSessions(context, taskShadow, participant, SHUNCODE_PARTICIPANT_ID, output);
   const customAgents = registerShunCodeCustomAgents(context);
   const customAgentDiscoveryCts = new vscode.CancellationTokenSource();
 
@@ -310,6 +312,9 @@ export function activate(context: vscode.ExtensionContext): void {
       await taskRuntime.initialize();
       const selectedTaskId = typeof taskId === "string" && taskId.trim() ? taskId.trim() : undefined;
       return projectTaskCenterState(taskRuntime.listTasks(), selectedTaskId);
+    }),
+    vscode.commands.registerCommand("shuncode.taskCenter.open", async () => {
+      await vscode.commands.executeCommand("workbench.action.chat.history");
     }),
     vscode.commands.registerCommand("shuncode.bridge.openSession", async () => {
       await vscode.commands.executeCommand("workbench.action.chat.open");

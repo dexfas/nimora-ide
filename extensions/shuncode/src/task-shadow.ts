@@ -16,6 +16,8 @@ export interface ShadowExecutionHandle {
  * never break the established Chat, Bridge, tool execution, or UI path.
  */
 export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingStore, WorkerExecutionProjectionStore {
+  private readonly taskChangeEmitter = new vscode.EventEmitter<TaskSnapshot>();
+  readonly onDidChangeTask = this.taskChangeEmitter.event;
   private readonly runtime: TaskRuntime;
   private readonly ready: Promise<void>;
   private initializationError: Error | undefined;
@@ -24,6 +26,7 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
     this.runtime = new TaskRuntime({
       storageDirectory: path.join(context.globalStorageUri.fsPath, "task-runtime-v1"),
       log: message => this.output.appendLine(message),
+      onDidChange: task => this.taskChangeEmitter.fire(task),
     });
     this.ready = this.runtime.initialize().catch(error => {
       this.initializationError = error instanceof Error ? error : new Error(String(error));
@@ -213,6 +216,7 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
 
   dispose(): void {
     void this.runtime.flush().catch(error => this.logFailure("flush", error));
+    this.taskChangeEmitter.dispose();
   }
 
   private async safe<T>(operation: string, run: () => Promise<T>): Promise<T | undefined> {
