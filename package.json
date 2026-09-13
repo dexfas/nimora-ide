@@ -24,6 +24,7 @@
 		"test-shuncode-agent-host-worker": "node scripts/shuncode-agent-host-worker-smoke.mts",
 		"test-shuncode-worker-session-manager": "node scripts/shuncode-worker-session-manager-smoke.mts",
 		"test-shuncode-context-handoff": "node scripts/shuncode-context-handoff-smoke.mts",
+		"test-shuncode-web-worker-adapter": "node scripts/shuncode-web-worker-adapter-smoke.mts",
 		"check-cyclic-dependencies": "node build/lib/checkCyclicDependencies.ts out",
 		"preinstall": "node build/npm/preinstall.ts",
 		"postinstall": "node build/npm/postinstall.ts",

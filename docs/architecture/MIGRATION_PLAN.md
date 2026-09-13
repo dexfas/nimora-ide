@@ -193,7 +193,7 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 
 ## 6. Phase 4 — Worker Contract
 
-**Status: In progress — Phase 4.1 ApiWorkerAdapter + Phase 4.2 AgentHostWorkerAdapter + Phase 4.3 WorkerSessionManager + Phase 4.4 Context Handoff completed (2026-09-13)**
+**Status: Semantic foundation complete — Phase 4.1–4.5 adapters/session/handoff landed (2026-09-13); real caller cutovers continue in later phases**
 
 ### 目标
 
@@ -205,7 +205,7 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 2. `AgentHostWorkerAdapter` 包装现有 IAgentConnection/AHP；✅ semantic adapter 已落地，现有 Sessions/UI caller 尚未切换
 3. Worker Session Manager；✅ registry / managed session identity / Task binding 已落地
 4. Context handoff package；✅ durable Task context + provider-neutral budgeted handoff 已落地
-5. Web Worker adapter 最后接入。
+5. Web Worker adapter 最后接入。✅ semantic adapter/transport boundary 已落地；真实 WebMCP transport 由 Phase 5 实现
 
 ### 风险
 
@@ -235,6 +235,10 @@ Phase 4.4 已新增 durable `TaskContextUpdated`，Task Snapshot 正式持有 bo
 
 handoff 会保留 execution 的 `status / deliveryStatus`，因此一次 tool 已执行但只到 `delivery=pending` 时，切换 Worker 不会把它误解释为“远端已经收到结果”。这为后续真正的 worker switch/failover 提供了最低限度的 at-most-once 语义基础。
 
+Phase 4.5 已新增 `src/web-worker-adapter.ts`。它只定义 Web Worker 的 semantic adapter 与 `WebWorkerTransport` contract：connect/send/interrupt/health/disconnect，以及 assistant/reasoning/capability/usage/status/terminal transport events。DOM selector、composer、page token、DeepSeek line protocol、result-delivery retry 等仍属于 WebMCP Core/Site Adapter，禁止迁入 Worker domain。
+
+Web adapter 对 capability 采用保守声明：transport 未明确声明的 streaming/reasoning/interruption/image/checkpoint 能力不会被虚报。Transport 若在没有 terminal event 的情况下结束，adapter 会产生 error terminal，避免 Task Runtime 把不完整网页 turn 当作成功。
+
 ### 测试
 
 - API adapter fake-runtime parity（streaming/reasoning/capability/checkpoint/cancel/health/tool invocation context/legacy trace projection）；✅
@@ -244,6 +248,7 @@ handoff 会保留 execution 的 `status / deliveryStatus`，因此一次 tool �
 - cancel/resume/health；API cancel/resume/health ✅，AgentHost cancel/health ✅，AgentHost resume ⏳
 - WorkerSessionManager registry/routing/Task attach-detach/replay；✅
 - Context Handoff package/budget/replay/provider-neutral identity；✅
+- WebWorkerAdapter fake-transport semantic parity / capability honesty / terminal guard；✅
 - worker switch with same Task context；🟡 handoff package 已就绪，待真实 caller switch/failover integration
 
 ### 回滚

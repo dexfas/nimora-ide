@@ -213,6 +213,28 @@ Handoff package 刻意不包含 provider-native `adapterSessionId`、完整 tool
 
 ## 7. Web Worker / WebMCP
 
+### Phase 4.5 Worker boundary
+
+`src/web-worker-adapter.ts` 已建立 Web Worker semantic boundary：
+
+```text
+Worker Contract
+      ↓
+WebWorkerAdapter
+      ↓
+WebWorkerTransport
+      ↓
+Phase 5 WebMCP Core + Site Adapter
+      ↓
+real webpage AI session
+```
+
+`WebWorkerTransport` 只描述稳定语义：transport descriptor、page/session connection、send event stream、optional interrupt、health、disconnect。其 event 可映射 assistant text、reasoning、capability call/result、usage、provider status 与 terminal state。
+
+这一层**不能**包含网页 selector、登录页判断、DeepSeek 行协议、DOM renderer 特判、token reinjection、tool-result delivery retry。那些变化频繁的网页行为全部留给 Phase 5 的 WebMCP Core/Site Adapter。这样 Task/Worker 层不会随着某个网站改版而变化。
+
+当前 Web Worker semantic smoke 使用 fake transport 验证 session ownership、event mapping、allowed capability 透传、interrupt/disconnect、terminal guard 与 capability honesty；它不等于真实 DeepSeek/Arena 网页回归。真实网页接线必须继续使用现有已验证 page agent/Gateway 行为，而不是另造第二套 DOM 自动化。
+
 ### 正式 Adapter Layer
 
 WebMCP 应建立明确分层：

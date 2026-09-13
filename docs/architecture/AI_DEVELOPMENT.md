@@ -115,6 +115,8 @@ npm run compile-shuncode
 
 `Context Handoff` 改动必须运行 `npm run test-shuncode-context-handoff`。至少验证 durable Task context replay、provider-neutral package、provider-native session id 不泄露、execution delivery state 保留、普通预算与极小硬预算、截断 section 显式报告，以及 restart 前后 handoff package/text parity。不要把完整 provider transcript 为了“方便切换”重新塞进 Task journal。
 
+`WebWorkerAdapter` 改动必须运行 `npm run test-shuncode-web-worker-adapter`。Smoke 至少覆盖 transport descriptor/capability 映射、session create/dispose、assistant/reasoning/tool/usage/status/terminal event、allowed capability 透传、interrupt、missing-terminal guard，以及“未声明能力不得虚报”。Fake transport smoke 不能替代真实 WebMCP/DeepSeek roundtrip。
+
 如果改动 Bridge shadow wiring，还要在隔离源码实例中做真实 local MCP roundtrip。由于第一方扩展在普通 source carrier 中仍可能被当作 builtin/Production mode，Bridge local smoke 应显式使用 extension development path：
 
 ```powershell
