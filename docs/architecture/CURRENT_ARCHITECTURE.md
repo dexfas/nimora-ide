@@ -151,9 +151,9 @@ Bridge 还增加：
 - `set_todos`
 - `report_progress`
 
-Phase 7.1 已开始翻转 coordination ownership：`set_todos` / `report_progress` 不再先修改 `BridgeManager.todos/activities` 再 fail-open 双写，而是先通过 TaskRuntime strict journal 写入 per-session Task，成功后再把 Task snapshot 投影回旧 Bridge UI。strict persistence 失败时 Task live snapshot 与 Bridge UI 都不更新。普通 Bridge file/IDE tool execution 仍保持 Phase 3 的 fail-open shadow projection，尚未整体切换 ownership。
+Phase 7.1 已开始翻转 coordination ownership：`set_todos` / `report_progress` 不再先修改 Bridge manager-global state，而是先通过 TaskRuntime strict journal 写入 per-session Task。Phase 7.6 又移除了当时保留的 legacy `BridgeManager.todos/progress activity` projection；现在 strict persistence 失败时 Task live snapshot 不更新，成功后只由 Task Center/Work Sessions presentation 消费。普通 Bridge file/IDE tool execution 仍保持 Phase 3 的 fail-open shadow projection，尚未整体切换 ownership。
 
-现有 Bridge 状态页仍只有 manager-global `todos/activities` 展示，因此它在过渡期只是**最近一次 coordination Task 的兼容投影**，不是多 Task 的 Source of Truth，也不是最终 Task Center。TaskRuntime 中按 MCP session 建立的 Task 才是 todos/progress 的 durable owner。
+现有 Bridge 状态页不再展示 manager-global todos/progress；`BridgeStatus.todos` 只作为 deprecated 兼容字段恒为空。Bridge 页面仍展示连接/health 和普通 tool-call activities。TaskRuntime 中按 MCP session 建立的 Task 是 todos/progress 的 durable owner，Nimora Work Sessions 是对应 presentation surface。
 
 Phase 7.2 已建立 UI-independent Task Center read model：`src/task-center-projection.ts` 从 Task snapshots 生成 newest-first Task list、selected Task detail、todo/progress、Worker 摘要以及 interaction/execution/artifact/current-progress timeline；extension 通过 `shuncode.taskCenter.getState` 只读暴露。Phase 7.3 开始把这个 read model 接入现有 native Sessions surface：first-party extension 注册 `nimora-task` / `Nimora Work Sessions` provider，每个 Task 投影成 session item，打开后显示只读 Task summary/todos/workers/timeline。session content 没有 request handler，因此 Sessions 不是 owner，也不负责执行。
 
@@ -162,6 +162,8 @@ Phase 7.2 已建立 UI-independent Task Center read model：`src/task-center-pro
 Phase 7.4 已在两个旧 Bridge surface 增加显式 Work Sessions handoff：Chat 内的 Bridge Session footer 与 AI Customization 中的 Bridge 配置/诊断页都可直接执行 `shuncode.taskCenter.open`。Bridge Session 文案同时明确 Task progress 属于 Work Sessions，Bridge 页面保留的是 output-only compatibility、连接状态和尚未迁出的 rich tool presentation。`shuncode.bridge.openSession` 目前仍保留，等待 generic Artifact/diff/terminal surface 完成后再移除。
 
 Phase 7.5 开始把 generic Artifact presentation 放进 Work Sessions：Task `changeset` metadata 会显示 file/addition/deletion/truncation summary，并把经过 workspace-relative sanitization 的文件列表映射为 native file tree；artifact URI 只在 `http/https` 或受 workspace containment 保护的 `file:` 场景下映射为 native anchor。它没有读取 Bridge manager-global activity，也没有把完整 diff 复制进 Task；rich diff/terminal cards 仍暂留旧 Bridge compatibility view。
+
+Phase 7.6 已停止 Bridge coordination 双份 presentation：`set_todos/report_progress` 完成 strict Task write 后只返回 MCP acknowledgement，不再写 `BridgeManager.todos`、不再创建 `status=progress` 的 Bridge activity，也不因 coordination-only 更新 Bridge revision。Work Sessions 因 Task change notification 自行刷新；Bridge 普通 tool activity 与 connection/tunnel reliability layer 不受影响。
 
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 

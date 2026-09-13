@@ -109,10 +109,14 @@ try {
   assert.deepEqual(blockedRuntime.getTask(blockedTask.taskId)?.progress, beforeFailure?.progress, 'failed strict progress persistence must not mutate live Task snapshot');
 
   const bridgeSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'bridge-server.ts'), 'utf8');
-  assert.match(bridgeSource, /setTodosOwned\(extra\.taskId, todos\)[\s\S]{0,200}projectTodos\(snapshot\.todos\)/, 'Bridge must persist Task-owned todos before legacy UI projection');
-  assert.match(bridgeSource, /reportProgressOwned\(extra\.taskId, normalized\.progress\)[\s\S]{0,200}projectProgress\(snapshot\.progress!, snapshot\.todos\)/, 'Bridge must persist Task-owned progress before legacy UI projection');
+  assert.match(bridgeSource, /setTodosOwned\(extra\.taskId, todos\)[\s\S]{0,200}acknowledgeTodos\(snapshot\.todos\)/, 'Bridge must persist Task-owned todos before acknowledging the MCP call');
+  assert.match(bridgeSource, /reportProgressOwned\(extra\.taskId, normalized\.progress\)[\s\S]{0,200}acknowledgeProgress\(snapshot\.progress!, snapshot\.todos\)/, 'Bridge must persist Task-owned progress before acknowledging the MCP call');
+  assert.doesNotMatch(bridgeSource, /private todos:\s*BridgeTodo\[\]/, 'Bridge must not retain manager-global Task todo state after Work Sessions owns presentation');
+  assert.match(bridgeSource, /todos:\s*\[\],/, 'BridgeStatus must keep an empty compatibility todos field during the API transition');
+  assert.doesNotMatch(bridgeSource, /status:\s*"progress"/, 'report_progress must not create manager-global Bridge timeline activities');
+  assert.match(bridgeSource, /Progress reported to Nimora Work Sessions/, 'MCP acknowledgement must point users at the Task-owned progress surface');
 
-  console.log('[smoke] Bridge Task-owned todo/progress validation/strict/replay/projection-order contract ok');
+  console.log('[smoke] Bridge Task-owned todo/progress validation/strict/replay/no-legacy-projection contract ok');
 } finally {
   await Promise.all([
     fs.rm(directory, { recursive: true, force: true }),

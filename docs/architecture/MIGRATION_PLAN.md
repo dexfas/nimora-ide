@@ -406,11 +406,11 @@ web model → request → Nimora tool → result delivery → final model respon
 
 `set_todos` / `report_progress` 已从“Bridge state first + fail-open Task shadow”切为“Task strict owner first + legacy UI projection”。`TaskRuntime` 新增 `setTodosStrict` / `reportProgressStrict`，且 `TaskCreated` 本身也必须先 durable append 成功才进入 live Task map，避免出现只有 coordination event、没有创建事件的不可 replay journal；`TaskShadowRecorder` 提供 fail-closed `getTaskOwned / setTodosOwned / reportProgressOwned`，不会经过 shadow-mode `safe()`。Bridge coordination 输入校验移到纯 `bridge-task-coordination.ts`：todo id/title/status/数量/唯一性/单一 in-progress 与 progress message/percent/todo link contract 保持原语义。
 
-执行顺序现在是：`validate → strict Task append → read returned Task snapshot → project to BridgeManager.todos/progress activity`。如果 journal append 失败，Task live snapshot 不变化，legacy Bridge UI 也不会变化。`report_progress` 的 explicit/implicit todo linkage 从当前 Task 的 todos 解析，不再从 manager-global `this.todos` 解析，因此不同 MCP session 不会拿另一个 session 的 todo 做权限式关联。
+Phase 7.1 当时的执行顺序是：`validate → strict Task append → read returned Task snapshot → project to BridgeManager.todos/progress activity`。如果 journal append 失败，Task live snapshot 不变化，legacy Bridge UI 也不会变化。`report_progress` 的 explicit/implicit todo linkage 从当前 Task 的 todos 解析，不再从 manager-global `this.todos` 解析，因此不同 MCP session 不会拿另一个 session 的 todo 做权限式关联。Phase 7.6 已移除末尾的 legacy coordination projection，见下文。
 
-旧 Bridge status UI 仍是 manager-global presentation surface，只显示最近一次 coordination Task 的投影；这只是兼容层。真正的多 Task 选择/时间线要等 Task Center。普通 Bridge file/IDE execution 仍保持 fail-open shadow，本阶段不把所有 Bridge 工具突然变成 TaskRuntime 硬依赖。
+Phase 7.1 时旧 Bridge status UI 仍是 manager-global presentation surface，只显示最近一次 coordination Task 的投影；这只是当时的兼容层。普通 Bridge file/IDE execution 仍保持 fail-open shadow，本阶段不把所有 Bridge 工具突然变成 TaskRuntime 硬依赖。
 
-`test-shuncode-bridge-task-coordination` 保护 validation、strict write fail-closed、restart replay，以及源码级 “Task owner write before legacy projection” 顺序。
+`test-shuncode-bridge-task-coordination` 保护 validation、strict write fail-closed 与 restart replay；Phase 7.6 又把源码 contract 更新为 “Task owner write before MCP acknowledgement，并且不再产生 legacy coordination projection”。
 
 ### Phase 7.2 — Task Center Read Model
 
@@ -439,6 +439,12 @@ Task Center read model 已开始接入现有 Sessions/Agents Window，而不是�
 Work Sessions 现在开始直接消费 Task Artifact contract，而不是从 Bridge tool id 猜文件结果。`changeset` artifact 的 `metadata.files/additions/deletions/diffTruncated` 会进入通用 Artifact summary；安全的 workspace-relative changed files 还会投影为 native `ChatResponseFileTreePart`，让用户可从 Work Sessions 打开相关文件。带 `uri` 的 artifact 只允许 `http/https`，或经过 workspace containment 校验的 `file:` URI，再投影为 native anchor；`command:` 等 scheme 与 traversal/absolute changed-file metadata 会被忽略。
 
 这还不是 rich diff/terminal migration：Task journal 当前只保存 bounded changeset metadata，不复制完整 diff，Work Sessions 因此不会伪造 patch 内容。旧 Bridge diff/terminal cards 继续保留，直到对应 Artifact contract 与 generic renderer 成熟。`test-shuncode-task-center-sessions` 现在同时保护 artifact path sanitization、file-tree shape、artifact summary 与 native file-tree/anchor wiring。
+
+### Phase 7.6 — Remove Legacy Bridge Coordination Projection
+
+Work Sessions 已经能稳定展示 per-Task todos/progress 后，Bridge 不再把 `set_todos` / `report_progress` 复制到 manager-global `BridgeManager.todos` 或 `BridgeActivity(status=progress)`。当前顺序简化为 `validate → strict Task append → acknowledge MCP call`；`report_progress` 的 todo linkage 仍从当前 Task snapshot 解析。`BridgeStatus.todos` 为兼容旧调用方暂时保留，但恒为空，并标记 deprecated；普通 tool-call activities、Bridge start/stop/health/tunnel 状态完全不变。
+
+因此 coordination presentation 现在只有一条正式路径：`TaskRuntime → task-center-projection → Nimora Work Sessions`。MCP acknowledgement 文案也明确指向 Work Sessions。`test-shuncode-bridge-task-coordination` 继续保护 strict fail-closed/replay/linkage，并新增“没有 manager-global todos/progress activity”的源码 contract。
 
 ### 风险
 

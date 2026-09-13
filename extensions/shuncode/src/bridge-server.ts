@@ -154,7 +154,7 @@ export const SET_TODOS_TOOL = {
 
 export const REPORT_PROGRESS_TOOL = {
   name: "report_progress",
-  description: "Report concise transient progress from the remote MCP agent to the ShunCode Bridge UI. For multi-step work, maintain durable task state with set_todos and use report_progress for what you are doing right now. todo_id is optional: when omitted, ShunCode automatically associates progress with the sole in_progress todo. This tool does not modify workspace files.",
+  description: "Report concise transient progress for the current Task. Progress is durably owned by Task Runtime and shown in Nimora Work Sessions. For multi-step work, maintain durable task state with set_todos and use report_progress for what you are doing right now. todo_id is optional: when omitted, ShunCode automatically associates progress with the sole in_progress todo. This tool does not modify workspace files.",
   inputSchema: {
     type: "object",
     required: ["message"],
@@ -281,6 +281,7 @@ export interface BridgeStatus {
     readonly lastTool?: string;
     readonly lastToolAt?: string;
   };
+  /** @deprecated Task coordination is presented by Nimora Work Sessions. Kept empty for compatibility. */
   readonly todos: BridgeTodo[];
   readonly activities: BridgeActivity[];
   readonly health?: BridgeHealthReport;
@@ -807,7 +808,6 @@ export class BridgeManager implements vscode.Disposable {
   private ngrokExecutable = "ngrok";
   private activeRequests = 0;
   private readonly activities: BridgeActivity[] = [];
-  private todos: BridgeTodo[] = [];
   private nextActivityId = 1;
   private revision = 0;
   private toolCalls = 0;
@@ -887,7 +887,7 @@ export class BridgeManager implements vscode.Disposable {
         lastTool: this.lastTool,
         lastToolAt: this.lastToolAt,
       },
-      todos: this.todos.map((todo) => ({ ...todo })),
+      todos: [],
       activities: this.activities.slice(-MAX_ACTIVITY),
       health: this.lastHealth,
     };
@@ -1087,7 +1087,7 @@ export class BridgeManager implements vscode.Disposable {
   /**
    * Clears the tool-call timeline and resets the call statistics. Calls that are
    * still running are kept so their completion is still recorded consistently.
-   * Todos are the remote agent's task list and are intentionally left untouched.
+   * Task coordination lives in Task Runtime / Work Sessions and is unaffected.
    */
   clearActivityLog(): BridgeStatus {
     const running = this.activities.filter((item) => item.status === "running");
@@ -2072,13 +2072,13 @@ export class BridgeManager implements vscode.Disposable {
     if (toolName === SET_TODOS_TOOL.name) {
       const todos = normalizeBridgeTodos(args);
       const snapshot = await this.taskShadow.setTodosOwned(extra.taskId, todos);
-      return this.projectTodos(snapshot.todos);
+      return this.acknowledgeTodos(snapshot.todos);
     }
     if (toolName === REPORT_PROGRESS_TOOL.name) {
       const current = await this.taskShadow.getTaskOwned(extra.taskId);
       const normalized = normalizeBridgeProgress(args, current.todos);
       const snapshot = await this.taskShadow.reportProgressOwned(extra.taskId, normalized.progress);
-      return this.projectProgress(snapshot.progress!, snapshot.todos);
+      return this.acknowledgeProgress(snapshot.progress!, snapshot.todos);
     }
 
     const activityId = this.pushActivity({
@@ -2180,25 +2180,13 @@ export class BridgeManager implements vscode.Disposable {
     this.output.appendLine(`[bridge] session destroyed: ${sessionId}`);
   }
 
-  private projectProgress(progress: TaskProgress, todos: readonly TaskTodo[]): { content: Array<{ type: "text"; text: string }> } {
-    this.todos = todos.map(todo => ({ ...todo }));
+  private acknowledgeProgress(progress: TaskProgress, todos: readonly TaskTodo[]): { content: Array<{ type: "text"; text: string }> } {
     const linkedTodo = progress.todoId ? todos.find(todo => todo.id === progress.todoId) : undefined;
-    this.pushActivity({
-      tool: REPORT_PROGRESS_TOOL.name,
-      status: "progress",
-      message: progress.message,
-      phase: progress.phase,
-      percent: progress.percent,
-      todoId: progress.todoId,
-      todoTitle: linkedTodo?.title,
-    });
     this.output.appendLine(`[bridge-progress]${linkedTodo ? ` [${linkedTodo.id}]` : ""}${progress.phase ? ` ${progress.phase}:` : ""} ${progress.message}${progress.percent !== undefined ? ` (${progress.percent}%)` : ""}`);
-    return { content: [{ type: "text", text: linkedTodo ? `Progress reported to ShunCode for todo ${linkedTodo.id}.` : "Progress reported to ShunCode." }] };
+    return { content: [{ type: "text", text: linkedTodo ? `Progress reported to Nimora Work Sessions for todo ${linkedTodo.id}.` : "Progress reported to Nimora Work Sessions." }] };
   }
 
-  private projectTodos(todos: readonly TaskTodo[]): { content: Array<{ type: "text"; text: string }> } {
-    this.todos = todos.map(todo => ({ ...todo }));
-    this.revision += 1;
+  private acknowledgeTodos(todos: readonly TaskTodo[]): { content: Array<{ type: "text"; text: string }> } {
     const completed = todos.filter((todo) => todo.status === "completed").length;
     const current = todos.find((todo) => todo.status === "in_progress");
     this.output.appendLine(todos.length
@@ -2208,8 +2196,8 @@ export class BridgeManager implements vscode.Disposable {
       content: [{
         type: "text",
         text: todos.length
-          ? `Todo state updated in ShunCode: ${completed}/${todos.length} completed${current ? `; current todo ${current.id}: ${current.title}` : ""}.`
-          : "Todo state cleared in ShunCode.",
+          ? `Todo state updated in Nimora Work Sessions: ${completed}/${todos.length} completed${current ? `; current todo ${current.id}: ${current.title}` : ""}.`
+          : "Todo state cleared in Nimora Work Sessions.",
       }],
     };
   }
