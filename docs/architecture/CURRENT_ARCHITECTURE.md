@@ -155,6 +155,8 @@ Phase 7.1 已开始翻转 coordination ownership：`set_todos` / `report_progres
 
 现有 Bridge 状态页仍只有 manager-global `todos/activities` 展示，因此它在过渡期只是**最近一次 coordination Task 的兼容投影**，不是多 Task 的 Source of Truth，也不是最终 Task Center。TaskRuntime 中按 MCP session 建立的 Task 才是 todos/progress 的 durable owner。
 
+Phase 7.2 已建立 UI-independent Task Center read model：`src/task-center-projection.ts` 从 Task snapshots 生成 newest-first Task list、selected Task detail、todo/progress、Worker 摘要以及 interaction/execution/artifact/current-progress timeline；extension 通过 `shuncode.taskCenter.getState` 只读暴露。这个 API 已经不依赖 Bridge status，但当前 Core Bridge Session View 还没有切过去，因此不能把它写成 Task Center UI 已完成。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

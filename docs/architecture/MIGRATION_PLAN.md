@@ -412,6 +412,14 @@ web model → request → Nimora tool → result delivery → final model respon
 
 `test-shuncode-bridge-task-coordination` 保护 validation、strict write fail-closed、restart replay，以及源码级 “Task owner write before legacy projection” 顺序。
 
+### Phase 7.2 — Task Center Read Model
+
+Task Center 的第一步不是重写 Sessions/Agents Window，而是先建立 UI-independent read model。`src/task-center-projection.ts` 现在从 TaskRuntime snapshot 投影：Task 列表/选择、todo/progress counts、WorkerSession 摘要、execution counts，以及按时间排序的 interaction/execution/artifact/current-progress timeline。projection 明确保留 `execution.status` 与 `deliveryStatus` 两个维度，同时不向 UI 暴露 Bridge/Chat 的 raw source session key。
+
+first-party extension 暴露只读 command `shuncode.taskCenter.getState(taskId?)`，它直接读取 `TaskRuntime.listTasks()` 并返回该 projection。现阶段**尚未**宣称 Task Center UI 已完成：旧 Bridge Session View 仍读 `shuncode.bridge.getStatus`，下一小步才是让新的/迁移中的 Work Sessions surface 消费这个 read model。这样可以先固定 product/domain boundary，再迁 UI，而不是继续让 Core 根据 Bridge manager-global state 猜 Task。
+
+`test-shuncode-task-center-projection` 保护 newest-first Task list、explicit selection、todo/worker/execution summaries、execution/result-delivery 分离、timeline 顺序、snapshot immutability、raw source-key 不泄露，以及 extension command wiring。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

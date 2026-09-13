@@ -19,6 +19,7 @@ import { WorkerSessionManager } from "../../../src/worker-session-manager.js";
 import { dispatchHostCapabilityRequest } from "../../../src/host-capability-request-dispatcher.js";
 import { applyWebWorkerReleaseGate, resolveWebWorkerReleaseGate } from "../../../src/web-worker-release-gate.js";
 import type { WorkerCapabilityResultInput, WorkerInput } from "../../../src/worker-contract.js";
+import { projectTaskCenterState } from "../../../src/task-center-projection.js";
 
 let activeBridge: BridgeManager | undefined;
 
@@ -303,6 +304,12 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("shuncode.openChat", async () => {
       await vscode.commands.executeCommand("workbench.action.chat.open");
       await vscode.commands.executeCommand("_shuncode.bridge.showChat");
+    }),
+    vscode.commands.registerCommand("shuncode.taskCenter.getState", async (taskId?: unknown) => {
+      const taskRuntime = taskShadow.executionRuntime();
+      await taskRuntime.initialize();
+      const selectedTaskId = typeof taskId === "string" && taskId.trim() ? taskId.trim() : undefined;
+      return projectTaskCenterState(taskRuntime.listTasks(), selectedTaskId);
     }),
     vscode.commands.registerCommand("shuncode.bridge.openSession", async () => {
       await vscode.commands.executeCommand("workbench.action.chat.open");

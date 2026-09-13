@@ -195,6 +195,8 @@ Task Runtime progress state
 
 Phase 3 先建立了双写 shadow；Phase 7.1 已把 `set_todos` / `report_progress` 的 ownership 翻转到 Task Runtime。Bridge MCP session 对应的 Task 必须先 durable 创建，随后 `TaskTodosUpdated` / `TaskProgressUpdated` 使用 strict persistence；只有 Task snapshot 成功更新后才投影到现有 `BridgeManager.todos/activities`。因此旧 Bridge 状态页现在只是最近一次 coordination Task 的兼容展示，不再是 todo/progress Source of Truth。普通 Bridge file/IDE execution 仍保持 fail-open shadow，等待后续 execution/artifact/Task Center 迁移。
 
+Phase 7.2 增加 `task-center-projection.ts` 作为 Task Runtime → product UI 的只读 boundary。它从 snapshot 生成 Task summary/detail 和统一 timeline，并由 extension command `shuncode.taskCenter.getState` 暴露；projection 不携带 `TaskSource.key`，避免把 MCP session id / Chat session key 重新升级成用户概念。当前只是 read model，Work Sessions/Task Center visual surface 仍待接入。
+
 ## 8. Artifact
 
 Artifact 是 Task 的一等结果引用：
