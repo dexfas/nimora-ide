@@ -226,7 +226,9 @@ Phase 6.2 已进一步把 Integrated Browser provider 的 HTTP bridge 实现物�
 
 Phase 6.3 又把 upstream MCP client 物理拆到 `upstream-mcp-provider.mjs`：MCP Client/transport lifecycle、connect/reset、tool-list cache/retry、capability metadata retry policy 与旧 Bridge read-only compatibility fallback 都由 upstream provider 自治。`server.mjs` 不再 import MCP Client SDK，只在 composition root 注册 fallback provider，并由 `/healthz` 调用其 `probeTools()`。
 
-Managed Browser、Personal Edge、WebMCP browser control 等实现目前仍物理位于 `server.mjs`，Gateway monolith 尚未完成拆分。
+Phase 6.4 再把 Managed Browser provider 物理拆到 `managed-browser-provider.mjs`。persistent Edge context lifecycle、`browser_open/pages/click/fill/get_text/dom/evaluate/screenshot` 八个 capability、page selection、screenshot artifact path，以及 `start/status/open/stop` 本地 control surface 都由 provider 持有；`server.mjs` 只保留 HTTP route 适配和 WebMCP page-agent 注入。现有 `/control/start-browser`、`/control/status`、`/control/open`、`/control/stop-browser` response shape 保持不变，真实 Edge shared-agent smoke 继续通过。
+
+Personal Edge long-poll broker 与 WebMCP browser control/session 注入目前仍物理位于 `server.mjs`，Gateway monolith 尚未完成拆分。
 
 默认 WebMCP control/gateway 端口仍保持 48322/48321 以兼容现有安装版；源码/测试实例可通过 `SHUNCODE_WEBMCP_CONTROL_PORT` / `SHUNCODE_WEBMCP_GATEWAY_PORT` 隔离运行。动态 discovery/多 workspace handshake 尚未完成。
 

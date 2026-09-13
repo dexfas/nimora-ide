@@ -354,6 +354,12 @@ web model → request → Nimora tool → result delivery → final model respon
 
 `upstream-mcp-provider.mjs` 现在独立拥有 Gateway → Bridge MCP client：连接/关闭/reset、稳定 listTools cache、4-step list reconnect、tool metadata lookup 与 call retry 都已从 `server.mjs` 移出。安全语义保持不变：`retry=automatic` 可以在 transport failure 后重连并调用一次；`retry=never/verify-before-retry` 的副作用 capability reset transport 后直接报错，不自动重跑；旧 Bridge 没 metadata 时仅历史 read-only allowlist 保留一次 compatibility retry。`test-shuncode-gateway-upstream-provider` 用注入 fake clients 明确保护这三条分支，真实 Gateway federation smoke 继续保护标准 `/mcp` compatibility。
 
+### Phase 6.4 — Managed Browser Provider Extraction
+
+`managed-browser-provider.mjs` 独立拥有 Gateway-managed persistent Edge 的 launch/reuse/close 生命周期、page selection、page metadata 与八个 browser capabilities。原有 `browser_open/pages/click/fill/get_text/dom/evaluate/screenshot` metadata 和 result shape 保持不变；`start/status/open/stop/currentPage/pages/pageInfo` 作为 Gateway 内部 control surface 提供给现有 `/control/*` routes 与 WebMCP page-agent host。`server.mjs` 不再直接 import Playwright `chromium`，也不再持有 `browserContext/browserConnectPromise`。`test-shuncode-gateway-managed-browser-provider` 使用 fake Playwright context 保护 lifecycle/control/tool/metadata；真实 Edge `test-shuncode-webmcp-gateway-shared-agent` 继续验证 page-agent binding transport。
+
+当前 `server.mjs` 仍持有 WebMCP page-agent session/injection 与 Personal Edge long-poll broker；下一物理拆分优先 Personal Edge，page-agent host 最后处理，避免一次改变 browser provider 和 WebMCP session ownership。
+
 ### 风险
 
 公网 endpoint、MCP session、external clients compatibility。

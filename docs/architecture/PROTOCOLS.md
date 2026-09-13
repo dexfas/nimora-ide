@@ -165,6 +165,8 @@ Phase 6.2 起，Integrated Browser provider transport 自身也成为独立模�
 
 Phase 6.3 起，Gateway → Bridge 的 MCP client 也成为独立 `upstream-mcp` provider。Provider 是 federation 的 fallback owner，并独立持有 MCP session lifecycle 与 reconnect state。Transport failure 时先 reset stale client；只有 canonical metadata `retry=automatic`（或旧 Bridge 的有限只读 compatibility allowlist）才允许自动发起第二次 tool call。副作用 capability 即使 transport 已断开也只 reset connection，不重发 tool request。`/healthz` 的 upstream probe 同样通过 provider，不再绕过其 connection lifecycle。
 
+Phase 6.4 起，Managed Browser 的 Playwright lifecycle 也成为独立 provider protocol boundary。Gateway HTTP control route 不再直接操作 `BrowserContext`；它调用 provider 的 `start/status/open/stop`，WebMCP host 则只通过 `currentPage/pages/pageInfo` 取得当前 managed page。标准 browser tool contract 与 `/control/*` response shape 不变，因此这是 module ownership 迁移，不是外部协议版本升级。
+
 重要安全语义：只有明确的 read-only upstream tools 可以在 transport failure 后自动 retry；side-effecting tools 不自动 retry，而是要求 caller 核实状态。
 
 这条语义与 WebMCP execution ledger 是同一个更高层问题，未来应统一到 Tool metadata + execution policy。

@@ -2,12 +2,12 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
-import { chromium } from 'playwright-core';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { defineGatewayCapability } from './capability-contract.mjs';
 import { createIntegratedBrowserProvider } from './integrated-browser-provider.mjs';
+import { createManagedBrowserProvider } from './managed-browser-provider.mjs';
 import { defineGatewayProvider, GatewayProviderRegistry } from './provider-registry.mjs';
 import { createUpstreamMcpProvider } from './upstream-mcp-provider.mjs';
 
@@ -24,40 +24,13 @@ const SHARED_PAGE_AGENT_PATH = process.env.SHUNCODE_WEBMCP_PAGE_AGENT_PATH || ''
 const PERSONAL_EDGE_BRIDGE_TOKEN = process.env.SHUNCODE_PERSONAL_EDGE_TOKEN || 'shuncode-local-development';
 const integratedBrowserProvider = createIntegratedBrowserProvider({ bridgeUrl: INTEGRATED_BROWSER_BRIDGE });
 const upstreamMcpProvider = createUpstreamMcpProvider({ url: UPSTREAM_URL });
-let browserContext;
-let browserConnectPromise;
+const managedBrowserProvider = createManagedBrowserProvider({ edgePath: EDGE_PATH, profileDir: PROFILE_DIR, screenshotDir: SCREENSHOT_DIR });
 const pageAgentSessions = new WeakMap();
 let chatAgentFactorySource;
 let personalEdgeClient = { clientId: '', shared: false, lastSeen: 0, tab: null };
 const personalEdgeCommandQueue = [];
 const personalEdgePendingResults = new Map();
 const personalEdgePollWaiters = [];
-
-const gatewayMetadata = (id, title, risk, idempotency, retry, approval, { destructive = false, openWorld = true, tags = [] } = {}) => ({
-  id,
-  version: 1,
-  title,
-  category: 'browser',
-  tags,
-  environment: 'gateway',
-  risk,
-  idempotency,
-  retry,
-  approval,
-  destructive,
-  openWorld,
-});
-
-const browserTools = [
-  defineGatewayCapability({ name: 'browser_open', description: 'EXTERNAL COMPUTER BROWSER: open a URL in the gateway-managed persistent Microsoft Edge. This browser is outside ShunCode Integrated Browser and keeps its own persistent profile/session across calls.', inputSchema: { type: 'object', required: ['url'], properties: { url: { type: 'string' }, new_tab: { type: 'boolean', default: false } }, additionalProperties: false } }, gatewayMetadata('browser.managed.open', 'Open Managed Browser URL', 'external-side-effect', 'unknown', 'never', 'none', { tags: ['browser', 'managed', 'navigate'] })),
-  defineGatewayCapability({ name: 'browser_pages', description: 'EXTERNAL COMPUTER BROWSER: list tabs in the gateway-managed persistent Edge with page_id, title and URL.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } }, gatewayMetadata('browser.managed.pages', 'List Managed Browser Pages', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'managed', 'read'] })),
-  defineGatewayCapability({ name: 'browser_click', description: 'EXTERNAL COMPUTER BROWSER: click a DOM element in the gateway-managed Edge by CSS selector.', inputSchema: { type: 'object', required: ['selector'], properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, timeout_ms: { type: 'integer', minimum: 100, maximum: 120000, default: 15000 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.click', 'Click Managed Browser Element', 'external-side-effect', 'non-idempotent', 'never', 'none', { destructive: true, tags: ['browser', 'managed', 'interaction'] })),
-  defineGatewayCapability({ name: 'browser_fill', description: 'EXTERNAL COMPUTER BROWSER: fill an input, textarea, or contenteditable element in the gateway-managed Edge.', inputSchema: { type: 'object', required: ['selector', 'value'], properties: { selector: { type: 'string' }, value: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, timeout_ms: { type: 'integer', minimum: 100, maximum: 120000, default: 15000 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.fill', 'Fill Managed Browser Field', 'external-side-effect', 'non-idempotent', 'never', 'none', { destructive: true, tags: ['browser', 'managed', 'interaction'] })),
-  defineGatewayCapability({ name: 'browser_get_text', description: 'EXTERNAL COMPUTER BROWSER: read visible text from a selector or full page body in the gateway-managed Edge.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, max_chars: { type: 'integer', minimum: 1, maximum: 100000, default: 20000 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.read-text', 'Read Managed Browser Text', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'managed', 'read'] })),
-  defineGatewayCapability({ name: 'browser_dom', description: 'EXTERNAL COMPUTER BROWSER: read DOM HTML from a selector or full document in the gateway-managed Edge.', inputSchema: { type: 'object', properties: { selector: { type: 'string' }, page_id: { type: 'integer', minimum: 0 }, max_chars: { type: 'integer', minimum: 1, maximum: 200000, default: 50000 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.dom', 'Read Managed Browser DOM', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'managed', 'dom', 'read'] })),
-  defineGatewayCapability({ name: 'browser_evaluate', description: 'EXTERNAL COMPUTER BROWSER: evaluate JavaScript in the gateway-managed Edge page and return a JSON-serializable result.', inputSchema: { type: 'object', required: ['expression'], properties: { expression: { type: 'string' }, page_id: { type: 'integer', minimum: 0 } }, additionalProperties: false } }, gatewayMetadata('browser.managed.evaluate', 'Evaluate Managed Browser JavaScript', 'external-side-effect', 'unknown', 'never', 'none', { destructive: true, tags: ['browser', 'managed', 'javascript'] })),
-  defineGatewayCapability({ name: 'browser_screenshot', description: 'EXTERNAL COMPUTER BROWSER: take a screenshot of a gateway-managed Edge page and save it under this MCP project.', inputSchema: { type: 'object', properties: { page_id: { type: 'integer', minimum: 0 }, full_page: { type: 'boolean', default: false }, filename: { type: 'string' } }, additionalProperties: false } }, gatewayMetadata('browser.managed.screenshot', 'Capture Managed Browser Screenshot', 'write', 'unknown', 'never', 'none', { openWorld: false, tags: ['browser', 'managed', 'artifact'] })),
-];
 
 const personalEdgeMetadata = (id, title, risk, idempotency, retry, approval, { destructive = false, tags = [] } = {}) => ({
   id,
@@ -242,12 +215,7 @@ function gatewayProviders() {
   providerRegistry = new GatewayProviderRegistry([
     upstreamMcpProvider,
     integratedBrowserProvider,
-    defineGatewayProvider({
-      id: 'managed-browser',
-      listTools: async () => browserTools,
-      owns: name => browserTools.some(tool => tool.name === name),
-      callTool: (name, args) => callBrowserTool(name, args),
-    }),
+    managedBrowserProvider,
     defineGatewayProvider({
       id: 'personal-edge',
       listTools: async () => personalEdgeTools,
@@ -256,23 +224,6 @@ function gatewayProviders() {
     }),
   ]);
   return providerRegistry;
-}
-
-async function getBrowser() {
-  if (browserContext) return browserContext;
-  if (!browserConnectPromise) {
-    browserConnectPromise = (async () => {
-      browserContext = await chromium.launchPersistentContext(PROFILE_DIR, {
-        executablePath: EDGE_PATH,
-        headless: false,
-        viewport: null,
-        args: ['--start-maximized'],
-      });
-      browserContext.on('close', () => { browserContext = undefined; });
-      return browserContext;
-    })().finally(() => { browserConnectPromise = undefined; });
-  }
-  return browserConnectPromise;
 }
 
 async function getChatAgentFactorySource() {
@@ -294,25 +245,6 @@ async function getChatAgentFactorySource() {
     }
   }
   return chatAgentFactorySource;
-}
-
-async function pageInfoWithTitle(page, page_id = -1) {
-  let title = '';
-  try { title = await page.title(); } catch {}
-  return { page_id, title, url: page.url() };
-}
-
-async function currentBrowserPage() {
-  const context = await getBrowser();
-  const pages = context.pages().filter(page => !page.isClosed());
-  if (!pages.length) return await context.newPage();
-  for (let i = pages.length - 1; i >= 0; i--) {
-    const page = pages[i];
-    try {
-      if (await page.evaluate(() => document.visibilityState === 'visible')) return page;
-    } catch {}
-  }
-  return pages.findLast(page => /^https?:/i.test(page.url())) || pages.at(-1);
 }
 
 function serializeForPage(value) {
@@ -358,9 +290,8 @@ async function ensureChatAgent(page) {
 }
 
 async function connectCurrentChatPage({ prime = true } = {}) {
-  const context = await getBrowser();
-  const page = await currentBrowserPage();
-  const pages = context.pages();
+  const page = await managedBrowserProvider.currentPage();
+  const pages = await managedBrowserProvider.pages();
   await ensureChatAgent(page);
 
   let status = null;
@@ -375,77 +306,8 @@ async function connectCurrentChatPage({ prime = true } = {}) {
     try { status = await page.evaluate(() => window.__shuncodeWebMcp?.status?.() || null); } catch {}
   }
 
-  const info = await pageInfoWithTitle(page, pages.indexOf(page));
+  const info = await managedBrowserProvider.pageInfo(page, pages.indexOf(page));
   return { ok: true, page: info, chatDetected: !!status?.composerFound, status, primeResult };
-}
-
-async function pageFor(args = {}) {
-  const context = await getBrowser();
-  let pages = context.pages();
-  if (!pages.length) pages = [await context.newPage()];
-  const id = Number.isInteger(args.page_id) ? args.page_id : pages.length - 1;
-  if (!pages[id]) throw new Error(`page_id ${id} does not exist; available page ids: 0..${pages.length - 1}`);
-  return pages[id];
-}
-
-function textResult(text, structuredContent) {
-  return { content: [{ type: 'text', text }], ...(structuredContent ? { structuredContent } : {}) };
-}
-
-async function callBrowserTool(name, args) {
-  if (name === 'browser_open') {
-    const context = await getBrowser();
-    let pages = context.pages();
-    const page = args.new_tab || !pages.length ? await context.newPage() : pages[pages.length - 1];
-    await page.goto(String(args.url), { waitUntil: 'domcontentloaded', timeout: 60000 });
-    pages = context.pages();
-    const data = { page_id: pages.indexOf(page), title: await page.title(), url: page.url() };
-    return textResult(JSON.stringify(data, null, 2), data);
-  }
-  if (name === 'browser_pages') {
-    const context = await getBrowser();
-    const pages = context.pages();
-    const data = await Promise.all(pages.map(async (page, page_id) => ({ page_id, title: await page.title(), url: page.url() })));
-    return textResult(JSON.stringify(data, null, 2), { pages: data });
-  }
-  if (name === 'browser_click') {
-    const page = await pageFor(args);
-    await page.locator(String(args.selector)).click({ timeout: Number(args.timeout_ms || 15000) });
-    return textResult(`Clicked ${args.selector}\nURL: ${page.url()}`);
-  }
-  if (name === 'browser_fill') {
-    const page = await pageFor(args);
-    await page.locator(String(args.selector)).fill(String(args.value), { timeout: Number(args.timeout_ms || 15000) });
-    return textResult(`Filled ${args.selector}`);
-  }
-  if (name === 'browser_get_text') {
-    const page = await pageFor(args);
-    const selector = args.selector ? String(args.selector) : 'body';
-    const max = Number(args.max_chars || 20000);
-    const value = (await page.locator(selector).innerText()).slice(0, max);
-    return textResult(value, { selector, text: value });
-  }
-  if (name === 'browser_dom') {
-    const page = await pageFor(args);
-    const max = Number(args.max_chars || 50000);
-    const html = args.selector ? await page.locator(String(args.selector)).evaluate(el => el.outerHTML) : await page.locator('html').evaluate(el => el.outerHTML);
-    const value = String(html).slice(0, max);
-    return textResult(value, { html: value, truncated: String(html).length > max });
-  }
-  if (name === 'browser_evaluate') {
-    const page = await pageFor(args);
-    const value = await page.evaluate(expression => (0, eval)(expression), String(args.expression));
-    return textResult(JSON.stringify(value ?? null, null, 2), { result: value ?? null });
-  }
-  if (name === 'browser_screenshot') {
-    const page = await pageFor(args);
-    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    const safe = String(args.filename || `shot-${Date.now()}.png`).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const output = path.join(SCREENSHOT_DIR, safe.endsWith('.png') ? safe : `${safe}.png`);
-    await page.screenshot({ path: output, fullPage: Boolean(args.full_page) });
-    return textResult(output, { path: output });
-  }
-  throw new Error(`Unknown browser tool: ${name}`);
 }
 
 function createServer() {
@@ -468,7 +330,7 @@ app.use(express.json({ limit: '8mb' }));
 const sessions = new Map();
 
 app.get('/control/healthz', (_req, res) => {
-  res.json({ ok: true, integratedWebMcp: true, controlVersion: 2, browserRunning: !!browserContext, profile: PROFILE_DIR, personalEdge: personalEdgeStatusData() });
+  res.json({ ok: true, integratedWebMcp: true, controlVersion: 2, browserRunning: managedBrowserProvider.isRunning(), profile: managedBrowserProvider.profileDir, personalEdge: personalEdgeStatusData() });
 });
 
 app.post('/control/personal-edge/register', (req, res) => {
@@ -551,10 +413,7 @@ app.post('/control/personal-edge/result', (req, res) => {
 
 app.get('/control/status', async (_req, res) => {
   try {
-    if (!browserContext) return res.json({ ok: true, browserRunning: false, pages: [] });
-    const pages = browserContext.pages();
-    const infos = await Promise.all(pages.map((page, index) => pageInfoWithTitle(page, index)));
-    res.json({ ok: true, browserRunning: true, pages: infos });
+    res.json({ ok: true, ...await managedBrowserProvider.status() });
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -589,11 +448,7 @@ app.post('/control/invoke-shuncode', async (req, res) => {
 
 app.post('/control/start-browser', async (_req, res) => {
   try {
-    const context = await getBrowser();
-    let pages = context.pages();
-    if (!pages.length) pages = [await context.newPage()];
-    const infos = await Promise.all(pages.map((page, index) => pageInfoWithTitle(page, index)));
-    res.json({ ok: true, browserRunning: true, pages: infos });
+    res.json({ ok: true, ...await managedBrowserProvider.start() });
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -603,10 +458,7 @@ app.post('/control/open', async (req, res) => {
   try {
     const url = String(req.body?.url || '').trim();
     if (!url) return res.status(400).json({ ok: false, error: 'url is required' });
-    const page = await currentBrowserPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    const pages = (await getBrowser()).pages();
-    res.json({ ok: true, page: await pageInfoWithTitle(page, pages.indexOf(page)) });
+    res.json({ ok: true, page: await managedBrowserProvider.open(url) });
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -622,9 +474,7 @@ app.post('/control/connect-current', async (req, res) => {
 
 app.post('/control/stop-browser', async (_req, res) => {
   try {
-    if (browserContext) await browserContext.close();
-    browserContext = undefined;
-    res.json({ ok: true, browserRunning: false });
+    res.json({ ok: true, ...await managedBrowserProvider.stop() });
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
@@ -634,6 +484,7 @@ app.get('/healthz', async (_req, res) => {
   try {
     const tools = await upstreamMcpProvider.probeTools();
     const integratedTools = await integratedBrowserProvider.refreshTools();
+    const browserTools = await managedBrowserProvider.listTools();
     res.json({ ok: true, upstream: UPSTREAM_URL, upstream_tools: tools.length, integrated_browser_tools: integratedTools.length, browser_tools: browserTools.length });
   } catch (error) {
     res.status(503).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
