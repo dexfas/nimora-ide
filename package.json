@@ -31,6 +31,7 @@
 		"test-shuncode-webmcp-command-transport": "node scripts/shuncode-webmcp-command-transport-smoke.mts",
 		"test-shuncode-web-worker-stack": "node scripts/shuncode-web-worker-stack-smoke.mts",
 		"test-shuncode-host-capability-execution": "node scripts/shuncode-host-capability-execution-smoke.mts",
+		"test-shuncode-host-capability-durable": "node scripts/shuncode-host-capability-durable-smoke.mts",
 		"check-cyclic-dependencies": "node build/lib/checkCyclicDependencies.ts out",
 		"preinstall": "node build/npm/preinstall.ts",
 		"postinstall": "node build/npm/postinstall.ts",

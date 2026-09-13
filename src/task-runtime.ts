@@ -9,6 +9,7 @@ import {
   type TaskContextState,
   type TaskEvent,
   type TaskExecution,
+  type TaskExecutionResultPayload,
   type TaskInteractionOutcome,
   type TaskProgress,
   type TaskSnapshot,
@@ -19,6 +20,7 @@ import {
 
 const MAX_GOAL_CHARS = 8_000;
 const MAX_RESULT_SUMMARY_CHARS = 2_000;
+const MAX_EXECUTION_RESULT_CHARS = 64_000;
 const MAX_CONTEXT_SUMMARY_CHARS = 12_000;
 const MAX_CONTEXT_ITEM_CHARS = 1_500;
 const MAX_CONTEXT_ITEMS = 64;
@@ -56,6 +58,15 @@ export interface BeginExecutionInput {
   risk?: string;
   arguments?: unknown;
   origin?: TaskExecution["origin"];
+}
+
+function executionIdentityMatches(current: TaskExecution, input: BeginExecutionInput): boolean {
+  const argumentsDigest = input.arguments === undefined ? undefined : taskArgumentsDigest(input.arguments);
+  return current.toolName === input.toolName
+    && current.capabilityId === input.capabilityId
+    && current.risk === input.risk
+    && current.argumentsDigest === argumentsDigest
+    && stableJson(current.origin) === stableJson(input.origin);
 }
 
 function boundText(value: string | undefined, maxChars: number): string | undefined {
@@ -231,10 +242,31 @@ export class TaskRuntime {
   }
 
   async beginExecution(taskId: string, input: BeginExecutionInput): Promise<{ duplicate: boolean; execution: TaskExecution | undefined }> {
+    return this.beginExecutionWithDurability(taskId, input, false, false);
+  }
+
+  /**
+   * Durable fail-closed execution claim for future host-owned side effects.
+   * Unlike shadow beginExecution(), persistence failure is fatal and an
+   * existing execution id must have exactly the same semantic identity.
+   */
+  async claimExecution(taskId: string, input: BeginExecutionInput): Promise<{ duplicate: boolean; execution: TaskExecution | undefined }> {
+    return this.beginExecutionWithDurability(taskId, input, true, true);
+  }
+
+  private async beginExecutionWithDurability(
+    taskId: string,
+    input: BeginExecutionInput,
+    strictPersistence: boolean,
+    validateDuplicateIdentity: boolean,
+  ): Promise<{ duplicate: boolean; execution: TaskExecution | undefined }> {
     return this.exclusive(taskId, async () => {
       const current = this.tasks.get(taskId)?.executions[input.executionId];
       if (current) {
-        await this.append(taskId, "TaskExecutionDuplicateObserved", { executionId: input.executionId });
+        if (validateDuplicateIdentity && !executionIdentityMatches(current, input)) {
+          throw new Error(`Execution identity mismatch for ${input.executionId}.`);
+        }
+        await this.append(taskId, "TaskExecutionDuplicateObserved", { executionId: input.executionId }, strictPersistence);
         return { duplicate: true, execution: this.tasks.get(taskId)?.executions[input.executionId] };
       }
       const requestedAt = this.now();
@@ -251,13 +283,21 @@ export class TaskRuntime {
           requestedAt,
           duplicateObservations: 0,
         },
-      });
-      await this.append(taskId, "TaskExecutionStarted", { executionId: input.executionId, startedAt: this.now() });
+      }, strictPersistence);
+      await this.append(taskId, "TaskExecutionStarted", { executionId: input.executionId, startedAt: this.now() }, strictPersistence);
       return { duplicate: false, execution: this.tasks.get(taskId)?.executions[input.executionId] };
     });
   }
 
   async finishExecution(taskId: string, executionId: string, status: "succeeded" | "failed" | "unknown", options: { durationMs?: number; error?: string; resultSummary?: string } = {}): Promise<void> {
+    await this.finishExecutionWithDurability(taskId, executionId, status, options, false);
+  }
+
+  async finishExecutionStrict(taskId: string, executionId: string, status: "succeeded" | "failed" | "unknown", options: { durationMs?: number; error?: string; resultSummary?: string } = {}): Promise<void> {
+    await this.finishExecutionWithDurability(taskId, executionId, status, options, true);
+  }
+
+  private async finishExecutionWithDurability(taskId: string, executionId: string, status: "succeeded" | "failed" | "unknown", options: { durationMs?: number; error?: string; resultSummary?: string }, strictPersistence: boolean): Promise<void> {
     await this.append(taskId, "TaskExecutionFinished", {
       executionId,
       status,
@@ -265,15 +305,34 @@ export class TaskRuntime {
       durationMs: options.durationMs,
       error: boundText(options.error, MAX_RESULT_SUMMARY_CHARS),
       resultSummary: boundText(options.resultSummary, MAX_RESULT_SUMMARY_CHARS),
-    });
+    }, strictPersistence);
   }
 
-  async markResultPrepared(taskId: string, executionId: string): Promise<void> {
-    await this.append(taskId, "TaskExecutionResultPrepared", { executionId });
+  async markResultPrepared(taskId: string, executionId: string, result?: TaskExecutionResultPayload): Promise<void> {
+    await this.markResultPreparedWithDurability(taskId, executionId, result, false);
+  }
+
+  async markResultPreparedStrict(taskId: string, executionId: string, result?: TaskExecutionResultPayload): Promise<void> {
+    await this.markResultPreparedWithDurability(taskId, executionId, result, true);
+  }
+
+  private async markResultPreparedWithDurability(taskId: string, executionId: string, result: TaskExecutionResultPayload | undefined, strictPersistence: boolean): Promise<void> {
+    const durableResult = result ? {
+      ...result,
+      text: boundText(result.text, MAX_EXECUTION_RESULT_CHARS),
+      durationMs: typeof result.durationMs === "number" && Number.isFinite(result.durationMs) && result.durationMs >= 0
+        ? result.durationMs
+        : undefined,
+    } : undefined;
+    await this.append(taskId, "TaskExecutionResultPrepared", { executionId, result: durableResult }, strictPersistence);
   }
 
   async markDelivered(taskId: string, executionId: string): Promise<void> {
     await this.append(taskId, "TaskExecutionDelivered", { executionId });
+  }
+
+  async markDeliveredStrict(taskId: string, executionId: string): Promise<void> {
+    await this.append(taskId, "TaskExecutionDelivered", { executionId }, true);
   }
 
   async recordArtifact(taskId: string, artifact: Omit<TaskArtifactRef, "artifactId" | "createdAt"> & { artifactId?: string; createdAt?: string }): Promise<TaskArtifactRef> {
@@ -326,13 +385,13 @@ export class TaskRuntime {
     this.log(`loaded ${this.tasks.size} shadow task(s)`);
   }
 
-  private async append<T extends TaskEvent["type"]>(taskId: string, type: T, payload: Extract<TaskEvent, { type: T }>["payload"]): Promise<void> {
+  private async append<T extends TaskEvent["type"]>(taskId: string, type: T, payload: Extract<TaskEvent, { type: T }>["payload"], strictPersistence = false): Promise<void> {
     await this.initialize();
     if (!this.tasks.has(taskId)) throw new Error(`Unknown task: ${taskId}`);
-    await this.commit({ version: 1, eventId: this.newId(), taskId, at: this.now(), type, payload } as TaskEvent);
+    await this.commit({ version: 1, eventId: this.newId(), taskId, at: this.now(), type, payload } as TaskEvent, strictPersistence);
   }
 
-  private async commit(event: TaskEvent): Promise<void> {
+  private async commit(event: TaskEvent, strictPersistence = false): Promise<void> {
     // Apply exactly the representation that is durable on disk. JSON drops
     // optional properties whose value is undefined; canonicalizing before both
     // persistence and projection keeps the live snapshot replay-equivalent.
@@ -346,6 +405,7 @@ export class TaskRuntime {
         // Shadow mode must never break the existing Chat/Bridge path. Keep the
         // in-memory projection useful and make persistence failure observable.
         this.log(`failed to persist ${canonicalEvent.type} task=${canonicalEvent.taskId}: ${error instanceof Error ? error.message : String(error)}`);
+        if (strictPersistence) throw new Error(`Strict task persistence failed for ${canonicalEvent.type}: ${error instanceof Error ? error.message : String(error)}`);
       }
       const current = this.tasks.get(canonicalEvent.taskId);
       const updated = applyTaskEvent(current, canonicalEvent);

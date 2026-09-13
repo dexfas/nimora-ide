@@ -12,7 +12,7 @@
 | 优先级 | 债务 | 事实依据 | 风险 | 处理方向 |
 | --- | --- | --- | --- | --- |
 | P0 | Personal Edge 使用开发 pairing token | MV3/Gateway hard-coded local-development token | 发布环境本地恶意进程冒充/劫持 | per-install/session pairing secret + origin binding |
-| P0 | execution ownership 尚未全链路统一 | Phase 5.3 已有 durable Task shadow record，5.4.1/5.4.2 已有显式 dispatch/result-return contract，5.4.3 已有内存态 execute-once/delivery coordinator；但 WebMCP page Core 仍是实际 owner，coordinator 也没有 crash-restart durable claim | 双 owner 或进程崩溃恢复处理错误可能造成 side-effect 重放/状态漂移 | 下一步把 host execution claim/result/delivery durable 化到 TaskRuntime；完成恢复协议前不接生产 dispatch，不删除 page at-most-once ledger |
+| P0 | execution ownership 尚未全链路统一 | Phase 5.3 有 durable shadow ledger，5.4.1/5.4.2 有 dispatch/result-return contract，5.4.3 有 coordinator，5.4.4 已有 strict Task-backed claim/result/delivery 与 crash recovery；但 WebMCP page Core 仍是生产 dispatch owner，真实 IdeToolBroker 尚未由 coordinator 执行 | 双 owner 切换错误仍可能造成副作用重放/状态漂移 | 下一步接 opt-in IdeToolBroker executor + policy authorizer；在 release gate 通过前不切 WebMCP `observed`，不删除 page at-most-once ledger |
 | P1 | 两套 Agent runtime 无统一 domain | Core AgentHost + first-party Runtime | session/task/worker 重复建模 | Worker Contract + Task Runtime |
 | P1 | Nimora product logic 进入 Chat Core | Bridge/branch/model/tool renderer patches | 上游升级成本、AI 误改 | Thin Core migration |
 | P1 | Bridge 职责过宽 | `bridge-server.ts` 同时 MCP/tunnel/state/UI | 修改牵连大、难测试 | split exposure/tunnel/task state |

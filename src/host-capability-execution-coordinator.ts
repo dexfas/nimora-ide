@@ -31,15 +31,30 @@ export interface HostCapabilityResultSink {
   submitCapabilityResult(managedSessionId: string, result: WorkerCapabilityResultInput): Promise<void>;
 }
 
+export type HostCapabilityDurableRecovery =
+  | { state: "absent" }
+  | { state: "claimed" }
+  | { state: "executed"; result: WorkerCapabilityResultInput }
+  | { state: "delivered"; result: WorkerCapabilityResultInput }
+  | { state: "ambiguous"; reason: string };
+
+export interface HostCapabilityExecutionDurableStore {
+  recover(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata): Promise<HostCapabilityDurableRecovery>;
+  claim(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata): Promise<HostCapabilityDurableRecovery>;
+  recordResult(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata, result: WorkerCapabilityResultInput): Promise<void>;
+  markDelivered(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata): Promise<void>;
+}
+
 export interface HostCapabilityExecutionCoordinatorOptions {
   executor: HostCapabilityExecutor;
   authorizer: HostCapabilityAuthorizer;
+  durableStore?: HostCapabilityExecutionDurableStore;
   now?: () => number;
 }
 
 export interface HostCapabilityExecutionState {
   executionId: string;
-  phase: "authorizing" | "executing" | "executed" | "delivered";
+  phase: "authorizing" | "executing" | "executed" | "delivered" | "ambiguous";
   deliveryAttempts: number;
   result?: WorkerCapabilityResultInput;
 }
@@ -78,7 +93,8 @@ export class HostCapabilityExecutionCoordinator {
     const existing = this.records.get(request.executionId);
     if (existing) {
       if (existing.identityDigest !== identityDigest) throw new Error(`Execution identity mismatch for ${request.executionId}.`);
-      if (existing.result) return structuredClone(existing.result);
+      if (existing.phase === "ambiguous") throw new Error(`Execution ${request.executionId} is ambiguous and automatic continuation is forbidden.`);
+      if (existing.result && (existing.phase === "executed" || existing.phase === "delivered")) return structuredClone(existing.result);
       if (existing.executionPromise) return structuredClone(await existing.executionPromise);
       throw new Error(`Execution ${request.executionId} is in an invalid coordinator state.`);
     }
@@ -89,12 +105,12 @@ export class HostCapabilityExecutionCoordinator {
       deliveryAttempts: 0,
     };
     this.records.set(request.executionId, record);
-    record.executionPromise = this.authorizeAndExecute(request, capability, record);
+    record.executionPromise = this.recoverAuthorizeAndExecute(request, capability, record);
     try {
       const result = await record.executionPromise;
       record.result = result;
       record.executionPromise = undefined;
-      record.phase = "executed";
+      if (record.phase !== "delivered") record.phase = "executed";
       return structuredClone(result);
     } catch (error) {
       if (this.records.get(request.executionId) === record && record.phase === "authorizing") {
@@ -117,6 +133,16 @@ export class HostCapabilityExecutionCoordinator {
     record.deliveryPromise = sink.submitCapabilityResult(request.managedSessionId, result);
     try {
       await record.deliveryPromise;
+      if (this.options.durableStore) {
+        try {
+          const capability = getCapabilityMetadata(request.name);
+          if (!capability) throw new Error(`Host-managed execution requires registered capability metadata: ${request.name}`);
+          await this.options.durableStore.markDelivered(request, capability);
+        } catch (error) {
+          record.phase = "ambiguous";
+          throw new Error(`Capability result was submitted but durable delivery confirmation failed for ${request.executionId}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
       record.phase = "delivered";
       return structuredClone(result);
     } finally {
@@ -139,17 +165,30 @@ export class HostCapabilityExecutionCoordinator {
     };
   }
 
-  private async authorizeAndExecute(
+  private async recoverAuthorizeAndExecute(
     request: HostCapabilityExecutionRequest,
     capability: CapabilityMetadata,
     record: ExecutionRecord,
   ): Promise<WorkerCapabilityResultInput> {
+    if (this.options.durableStore) {
+      const recovery = await this.options.durableStore.recover(request, capability);
+      const recovered = this.consumeRecovery(request, record, recovery);
+      if (recovered) return recovered;
+    }
+
     await this.options.authorizer.authorize(request, capability);
+    if (this.options.durableStore) {
+      const claim = await this.options.durableStore.claim(request, capability);
+      const recovered = this.consumeRecovery(request, record, claim);
+      if (recovered) return recovered;
+      if (claim.state !== "claimed") throw new Error(`Durable execution claim did not enter claimed state for ${request.executionId}.`);
+    }
     record.phase = "executing";
     const startedAt = this.now();
+    let result: WorkerCapabilityResultInput;
     try {
       const executed = await this.options.executor.execute(request, capability);
-      return {
+      result = {
         inputId: request.inputId,
         callId: request.callId,
         name: request.name,
@@ -159,7 +198,7 @@ export class HostCapabilityExecutionCoordinator {
         data: executed.data,
       };
     } catch (error) {
-      return {
+      result = {
         inputId: request.inputId,
         callId: request.callId,
         name: request.name,
@@ -168,6 +207,31 @@ export class HostCapabilityExecutionCoordinator {
         durationMs: Math.max(0, this.now() - startedAt),
       };
     }
+    record.result = result;
+    if (this.options.durableStore) {
+      try {
+        await this.options.durableStore.recordResult(request, capability, result);
+      } catch (error) {
+        record.phase = "ambiguous";
+        throw new Error(`Capability executed but durable result persistence failed for ${request.executionId}; automatic re-execution is forbidden: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return result;
+  }
+
+  private consumeRecovery(
+    request: HostCapabilityExecutionRequest,
+    record: ExecutionRecord,
+    recovery: HostCapabilityDurableRecovery,
+  ): WorkerCapabilityResultInput | undefined {
+    if (recovery.state === "absent" || recovery.state === "claimed") return undefined;
+    if (recovery.state === "ambiguous") {
+      record.phase = "ambiguous";
+      throw new Error(`Durable execution ${request.executionId} is ambiguous and will not be automatically re-executed: ${recovery.reason}`);
+    }
+    record.result = structuredClone(recovery.result);
+    record.phase = recovery.state === "delivered" ? "delivered" : "executed";
+    return structuredClone(recovery.result);
   }
 
   private validateRequest(request: HostCapabilityExecutionRequest): void {

@@ -285,6 +285,8 @@ Phase 5.4.2 已补齐 dormant result-return contract：Worker/Transport 可选 `
 
 Phase 5.4.3 新增未接生产 caller 的 `HostCapabilityExecutionCoordinator`。它要求 capability 已注册 metadata 且必须提供 authorizer；同一 execution identity 的并发请求只执行一次，executor 抛错会缓存为 error/ambiguous 结果而不会盲目重跑，result delivery 独立记账并可在失败后安全重试。该 coordinator 当前是内存态实验基础层，**尚不具备进程崩溃后的 durable execution claim/recovery，因此不能成为生产 execution owner**。下一步要先把 claim/result/delivery 状态落进 TaskRuntime，再考虑接真实 `IdeToolBroker` 和 host-requested WebMCP。
 
+Phase 5.4.4 已把 Host execution claim/result/delivery 接到 TaskRuntime 的严格持久化路径。普通 Chat/Bridge shadow journal 仍保持 fail-open；未来 execution owner 使用 `claimExecution / finishExecutionStrict / markResultPreparedStrict / markDeliveredStrict`，任何落盘失败都会 fail-closed。Task execution 现在可持久化 bounded Worker result envelope，用于进程重启后只恢复结果而不重跑 capability。`TaskHostCapabilityExecutionStore` 的恢复规则是：`finished + matching result payload` 可恢复为 executed/delivered；`requested|executing`、finished 但缺 result、identity 不一致都视为 ambiguous/拒绝自动继续。自动 smoke 已覆盖 restart recovery、delivered 去重、strict claim 持久化失败和“执行后 result 落盘失败不得再次执行”。**这提供 crash-safe at-most-once，而不是对任意外部副作用宣称 impossible 的 exactly-once。**
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

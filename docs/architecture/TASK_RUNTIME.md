@@ -119,6 +119,8 @@ TaskSnapshot.workerSessions
 
 Worker capability projection 当前遵循：`capability_call → requested/executing`，`capability_result → succeeded|failed + result prepared(pending)`，显式 delivery ack → delivered；若 terminal 到达但没有 capability result，则写 `unknown/pending`。这已经提供跨 Worker 的 durable execution audit/replay，但仍是 shadow ownership：WebMCP page Core 继续负责真正 dispatch/dedupe/retry，后续 Execution Service 接管必须有明确 ownership handoff。
 
+Phase 5.4.4 额外建立 future execution-owner 的 strict persistence contract。`TaskRuntime.beginExecution()` 等现有 shadow API 继续 fail-open，避免 Task journal 故障破坏 Chat/Bridge；Host-owned side effect 必须使用 strict API，journal append 失败即拒绝 claim/finish/result/delivery 状态推进。`TaskExecutionResultPrepared` 现在可保存 bounded `worker-capability` result payload（inputId/callId/name/text/error/duration），使重启后能恢复待投递结果。恢复时 `requested/executing` 或没有匹配 payload 的 finished execution 都是 ambiguous，禁止自动重新执行。
+
 ## 5. Context Engine
 
 Context Engine 属于 Task Runtime，负责：

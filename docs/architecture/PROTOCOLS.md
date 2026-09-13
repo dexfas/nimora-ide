@@ -137,6 +137,8 @@ Phase 5.4.2 建立反向 result-return contract：`WorkerAdapter/WebWorkerTransp
 
 Phase 5.4.3 的 opt-in Host execution coordinator 进一步把 `execute once` 与 `deliver result` 分成两个状态。execution identity 重用但参数/Worker/call identity 不同会直接报错；同一 identity 并发共享同一个 execution promise；delivery failure 不会清除已经执行的 result。当前实现故意不自动订阅 WorkerEvent，也不接生产 Broker，因为内存态 coordinator 还不能提供 crash-restart at-most-once 保证。
 
+Phase 5.4.4 为 Host execution 增加 Task-backed durable contract。execution claim 必须先严格写入 `TaskExecutionRequested/Started`，成功返回后 caller 才允许启动 executor；执行结束后必须严格写入 `TaskExecutionFinished + TaskExecutionResultPrepared(resultPayload)`，delivery 确认再写 `TaskExecutionDelivered`。进程重启看到 `executing` 时不能推断“没执行”，必须按 ambiguous 处理；只有已经存在 matching durable result payload 时才能跳过 authorization/executor 并恢复 result。这样恢复策略是 conservative at-most-once：不重复副作用优先于自动重试。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

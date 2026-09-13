@@ -67,7 +67,18 @@ export interface TaskExecution {
   durationMs?: number;
   error?: string;
   resultSummary?: string;
+  resultPayload?: TaskExecutionResultPayload;
   duplicateObservations: number;
+}
+
+export interface TaskExecutionResultPayload {
+  kind: "worker-capability";
+  inputId: string;
+  callId: string;
+  name: string;
+  text?: string;
+  isError: boolean;
+  durationMs?: number;
 }
 
 export interface TaskArtifactRef {
@@ -132,7 +143,7 @@ export type TaskEvent =
   | TaskEventBase<"TaskExecutionStarted", { executionId: string; startedAt: string }>
   | TaskEventBase<"TaskExecutionDuplicateObserved", { executionId: string }>
   | TaskEventBase<"TaskExecutionFinished", { executionId: string; status: "succeeded" | "failed" | "unknown"; finishedAt: string; durationMs?: number; error?: string; resultSummary?: string }>
-  | TaskEventBase<"TaskExecutionResultPrepared", { executionId: string }>
+  | TaskEventBase<"TaskExecutionResultPrepared", { executionId: string; result?: TaskExecutionResultPayload }>
   | TaskEventBase<"TaskExecutionDelivered", { executionId: string }>
   | TaskEventBase<"TaskArtifactProduced", { artifact: TaskArtifactRef }>;
 
@@ -297,7 +308,11 @@ export function applyTaskEvent(snapshot: TaskSnapshot | undefined, event: TaskEv
         ...base,
         executions: {
           ...base.executions,
-          [event.payload.executionId]: { ...current, deliveryStatus: "pending" },
+          [event.payload.executionId]: {
+            ...current,
+            deliveryStatus: "pending",
+            resultPayload: event.payload.result ? { ...event.payload.result } : current.resultPayload,
+          },
         },
       };
     }

@@ -79,6 +79,23 @@ try {
   await runtime.finishExecution(task.taskId, 'mcp:session-a:8', 'succeeded', { durationMs: 5, resultSummary: 'ok' });
   await runtime.markResultPrepared(task.taskId, 'mcp:session-a:8');
 
+  await runtime.beginExecution(task.taskId, {
+    executionId: 'worker:managed-1:turn-1:1',
+    toolName: 'read_files',
+    arguments: { files: [{ path: 'README.md' }] },
+    origin: { kind: 'worker', managedSessionId: 'managed-1', workerId: 'nimora.web-worker', inputId: 'turn-1', callId: 'call-1' },
+  });
+  await runtime.finishExecution(task.taskId, 'worker:managed-1:turn-1:1', 'succeeded', { durationMs: 9, resultSummary: 'README contents' });
+  await runtime.markResultPrepared(task.taskId, 'worker:managed-1:turn-1:1', {
+    kind: 'worker-capability',
+    inputId: 'turn-1',
+    callId: 'call-1',
+    name: 'read_files',
+    text: 'README contents',
+    isError: false,
+    durationMs: 9,
+  });
+
   await runtime.recordArtifact(task.taskId, {
     kind: 'changeset',
     title: 'Workspace patch',
@@ -96,7 +113,52 @@ try {
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.status, 'succeeded');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.deliveryStatus, 'pending');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.duplicateObservations, 1);
+  assert.deepEqual(beforeRestart.executions['worker:managed-1:turn-1:1']?.resultPayload, {
+    kind: 'worker-capability', inputId: 'turn-1', callId: 'call-1', name: 'read_files', text: 'README contents', isError: false, durationMs: 9,
+  });
   assert.equal(beforeRestart.artifacts.length, 1);
+
+  const strictClaim = await runtime.claimExecution(task.taskId, {
+    executionId: 'strict:claim:1',
+    toolName: 'read_files',
+    capabilityId: 'workspace.read-files',
+    risk: 'read',
+    arguments: { files: [{ path: 'README.md' }] },
+    origin: { kind: 'worker', managedSessionId: 'managed-strict', workerId: 'nimora.web-worker', inputId: 'strict-turn', callId: 'strict-call' },
+  });
+  assert.equal(strictClaim.duplicate, false);
+  const strictDuplicate = await runtime.claimExecution(task.taskId, {
+    executionId: 'strict:claim:1',
+    toolName: 'read_files',
+    capabilityId: 'workspace.read-files',
+    risk: 'read',
+    arguments: { files: [{ path: 'README.md' }] },
+    origin: { kind: 'worker', managedSessionId: 'managed-strict', workerId: 'nimora.web-worker', inputId: 'strict-turn', callId: 'strict-call' },
+  });
+  assert.equal(strictDuplicate.duplicate, true);
+  await assert.rejects(() => runtime.claimExecution(task.taskId, {
+    executionId: 'strict:claim:1',
+    toolName: 'read_files',
+    capabilityId: 'workspace.read-files',
+    risk: 'read',
+    arguments: { files: [{ path: 'OTHER.md' }] },
+    origin: { kind: 'worker', managedSessionId: 'managed-strict', workerId: 'nimora.web-worker', inputId: 'strict-turn', callId: 'strict-call' },
+  }), /Execution identity mismatch/);
+  const beforeRestartFinal = runtime.getTask(task.taskId)!;
+
+  const blockedPath = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-task-runtime-blocked-'));
+  const failClosed = new TaskRuntime({ storageDirectory: blockedPath });
+  await failClosed.initialize();
+  const shadowTask = await failClosed.ensureTask({ kind: 'bridge', key: 'fail-open-shadow' }, 'Shadow still loads');
+  await fs.rm(blockedPath, { recursive: true, force: true });
+  await fs.writeFile(blockedPath, 'file blocks mkdir', 'utf8');
+  await assert.rejects(() => failClosed.claimExecution(shadowTask.taskId, {
+    executionId: 'strict:blocked:1',
+    toolName: 'run_command',
+    arguments: { command: 'echo must-not-run' },
+  }), /Strict task persistence failed/);
+  assert.equal(failClosed.getTask(shadowTask.taskId)?.executions['strict:blocked:1'], undefined, 'failed strict claim must not enter the in-memory projection');
+  await fs.rm(blockedPath, { force: true });
 
   // Simulate a torn final write. Replay must preserve every complete event and
   // ignore only the corrupt suffix.
@@ -107,13 +169,13 @@ try {
   await restarted.initialize();
   const afterRestart = restarted.findTaskBySource({ kind: 'bridge', key: 'session-a', workspace: '/workspace' });
   assert.ok(afterRestart, 'task must replay after process restart');
-  assert.equal(afterRestart.taskId, beforeRestart.taskId);
-  assert.deepEqual(afterRestart.todos, beforeRestart.todos);
-  assert.deepEqual(afterRestart.progress, beforeRestart.progress);
-  assert.deepEqual(afterRestart.context, beforeRestart.context);
-  assert.deepEqual(afterRestart.workerSessions, beforeRestart.workerSessions);
-  assert.deepEqual(afterRestart.executions, beforeRestart.executions);
-  assert.deepEqual(afterRestart.artifacts, beforeRestart.artifacts);
+  assert.equal(afterRestart.taskId, beforeRestartFinal.taskId);
+  assert.deepEqual(afterRestart.todos, beforeRestartFinal.todos);
+  assert.deepEqual(afterRestart.progress, beforeRestartFinal.progress);
+  assert.deepEqual(afterRestart.context, beforeRestartFinal.context);
+  assert.deepEqual(afterRestart.workerSessions, beforeRestartFinal.workerSessions);
+  assert.deepEqual(afterRestart.executions, beforeRestartFinal.executions);
+  assert.deepEqual(afterRestart.artifacts, beforeRestartFinal.artifacts);
 
   console.log(`[smoke] task runtime replay + execution ledger ok (events=${afterRestart.eventCount})`);
 } finally {
