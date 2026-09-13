@@ -9,6 +9,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { defineGatewayCapability, retryPolicyForTool } from './capability-contract.mjs';
+import { createIntegratedBrowserProvider } from './integrated-browser-provider.mjs';
 import { defineGatewayProvider, GatewayProviderRegistry } from './provider-registry.mjs';
 
 const PORT = Number(process.env.PORT || 48321);
@@ -22,6 +23,7 @@ const SHARED_PAGE_CORE_PATH = process.env.SHUNCODE_WEBMCP_PAGE_CORE_PATH || '';
 const SHARED_SITE_ADAPTERS_PATH = process.env.SHUNCODE_WEBMCP_SITE_ADAPTERS_PATH || '';
 const SHARED_PAGE_AGENT_PATH = process.env.SHUNCODE_WEBMCP_PAGE_AGENT_PATH || '';
 const PERSONAL_EDGE_BRIDGE_TOKEN = process.env.SHUNCODE_PERSONAL_EDGE_TOKEN || 'shuncode-local-development';
+const integratedBrowserProvider = createIntegratedBrowserProvider({ bridgeUrl: INTEGRATED_BROWSER_BRIDGE });
 
 let upstreamClient;
 let upstreamConnectPromise;
@@ -217,42 +219,6 @@ async function callPersonalEdgeTool(name, args = {}) {
 // dialogs while "verifying" files they had just created.
 const webMcpHiddenIntegratedTools = new Set(['open_browser_page']);
 
-let integratedToolsCache = [];
-let integratedToolsCacheAt = 0;
-
-async function getIntegratedBrowserTools(force = false) {
-  if (!force && Date.now() - integratedToolsCacheAt < 2000) return integratedToolsCache;
-  try {
-    const response = await fetch(`${INTEGRATED_BROWSER_BRIDGE}/tools`, { signal: AbortSignal.timeout(3000) });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const body = await response.json();
-    integratedToolsCache = Array.isArray(body.tools) ? body.tools : [];
-    integratedToolsCacheAt = Date.now();
-  } catch {
-    integratedToolsCache = [];
-    integratedToolsCacheAt = Date.now();
-  }
-  return integratedToolsCache;
-}
-
-async function callIntegratedBrowserTool(name, args) {
-  const response = await fetch(`${INTEGRATED_BROWSER_BRIDGE}/invoke`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name, input: args }),
-    signal: AbortSignal.timeout(120000),
-  });
-  const body = await response.json();
-  if (!response.ok || !body.ok) throw new Error(body.error || `Integrated Browser Bridge HTTP ${response.status}`);
-  const content = Array.isArray(body.result?.content) ? body.result.content : [];
-  const mcpContent = content.flatMap(part => {
-    if (part?.type === 'text') return [{ type: 'text', text: String(part.text ?? '') }];
-    if (part?.type === 'data' && part.base64) return [{ type: 'text', text: `[binary browser result omitted: ${String(part.base64).length} base64 chars]` }];
-    return [{ type: 'text', text: JSON.stringify(part) }];
-  });
-  return { content: mcpContent.length ? mcpContent : [{ type: 'text', text: 'Browser tool completed.' }] };
-}
-
 async function listAllTools() {
   return await gatewayProviders().listTools();
 }
@@ -383,12 +349,7 @@ function gatewayProviders() {
       listTools: () => listUpstreamToolsStable(),
       callTool: (name, args) => callUpstreamToolStable(name, args),
     }),
-    defineGatewayProvider({
-      id: 'integrated-browser',
-      listTools: () => getIntegratedBrowserTools(),
-      owns: async name => (await getIntegratedBrowserTools()).some(tool => tool.name === name),
-      callTool: (name, args) => callIntegratedBrowserTool(name, args),
-    }),
+    integratedBrowserProvider,
     defineGatewayProvider({
       id: 'managed-browser',
       listTools: async () => browserTools,
@@ -780,7 +741,7 @@ app.post('/control/stop-browser', async (_req, res) => {
 app.get('/healthz', async (_req, res) => {
   try {
     const tools = await (await getUpstream()).listTools();
-    const integratedTools = await getIntegratedBrowserTools(true);
+    const integratedTools = await integratedBrowserProvider.refreshTools();
     res.json({ ok: true, upstream: UPSTREAM_URL, upstream_tools: tools.tools.length, integrated_browser_tools: integratedTools.length, browser_tools: browserTools.length });
   } catch (error) {
     res.status(503).json({ ok: false, error: error instanceof Error ? error.message : String(error) });

@@ -346,6 +346,10 @@ web model → request → Nimora tool → result delivery → final model respon
 
 当前仍只是路由模块化；provider implementation 尚未从 `server.mjs` 物理拆出，Bridge reposition 也未开始切换 endpoint owner。
 
+### Phase 6.2 — Integrated Browser Provider Extraction
+
+第一块 provider implementation 已物理拆出：`integrated-browser-provider.mjs` 现在独立拥有 Integrated Browser localhost bridge 的 tool cache、`/tools` refresh、`/invoke` transport 与 MCP result normalization；Gateway composition root 只注入 bridge URL 并注册 provider。`test-shuncode-gateway-providers` 同时验证 cache TTL、强制 refresh、invoke payload 与 binary omission，真实 `test-shuncode-gateway-federation` / shared-agent smoke 继续保护外部行为。这个阶段仍不改 control endpoint，也不改变 Integrated Browser Extension 本身。
+
 ### 风险
 
 公网 endpoint、MCP session、external clients compatibility。
