@@ -149,6 +149,8 @@ Phase 5.4.8 建立 durable grant protocol。Task journal 新增 `TaskCapabilityG
 
 Phase 5.4.9 增加 approval request/delivery contract。缺 grant 的 `session` / `task-grant` capability 先进入 UI prompt；批准只有在 strict grant append 成功后才返回 authorized。拒绝由 `HostCapabilityAuthorizationError` 表示，并在 Worker dispatch 边界转换成正常的 error capability result，而不是 execution failure：这条路径发生在 durable claim 之前，因此拒绝不会生成 execution ledger，也不会触发 executor。并发相同 scope/capability approval 共享一个 pending prompt，避免多弹窗造成竞态授权。
 
+Phase 5.5 增加 release-gate contract。Web Worker caller 提供的 `extensions.hostManagedCapabilities` 不再拥有最终决定权；第一方 Extension 在发送 turn 前根据 application-scoped `shuncode.webWorker.hostManagedCapabilities` 与 VS Code Workspace Trust 计算 authoritative ownership，并把最终值写回 WorkerInput。未开启设置或 untrusted workspace 都必须产生 `hostManagedCapabilities=false`，从而继续 `dispatch=observed`；只有 trusted + enabled 才允许 page runtime 发 `host-requested`。Release gate 与 approval grant 是正交状态：开启 host-managed 不等于批准任何 capability。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

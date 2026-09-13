@@ -17,6 +17,7 @@ import { WebMcpCommandTransport } from "./webmcp-worker-transport.js";
 import { WebWorkerAdapter, type WebWorkerSessionOptions } from "../../../src/web-worker-adapter.js";
 import { WorkerSessionManager } from "../../../src/worker-session-manager.js";
 import { dispatchHostCapabilityRequest } from "../../../src/host-capability-request-dispatcher.js";
+import { applyWebWorkerReleaseGate, resolveWebWorkerReleaseGate } from "../../../src/web-worker-release-gate.js";
 import type { WorkerCapabilityResultInput, WorkerInput } from "../../../src/worker-contract.js";
 
 let activeBridge: BridgeManager | undefined;
@@ -474,9 +475,14 @@ export function activate(context: vscode.ExtensionContext): void {
       const workerInput = input.input as Partial<WorkerInput>;
       if (typeof workerInput.inputId !== "string" || !workerInput.inputId) throw new Error("Web worker inputId is required.");
       if (typeof workerInput.prompt !== "string" || !workerInput.prompt.trim()) throw new Error("Web worker prompt is required.");
-      const hostManagedCapabilities = workerInput.extensions?.hostManagedCapabilities === true;
+      const releaseGate = resolveWebWorkerReleaseGate(
+        vscode.workspace.getConfiguration("shuncode.webWorker").get<boolean>("hostManagedCapabilities", false),
+        vscode.workspace.isTrusted,
+      );
+      const effectiveWorkerInput = applyWebWorkerReleaseGate(workerInput as WorkerInput, releaseGate);
+      const hostManagedCapabilities = releaseGate.effective;
       const events = [];
-      for await (const event of webWorkerSessions.send(input.managedSessionId, workerInput as WorkerInput)) {
+      for await (const event of webWorkerSessions.send(input.managedSessionId, effectiveWorkerInput)) {
         events.push(event);
         if (!hostManagedCapabilities || event.type !== "capability_call" || event.dispatch !== "host-requested") continue;
         const executionId = typeof event.extensions?.executionId === "string" ? event.extensions.executionId : "";
@@ -524,6 +530,49 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("_shuncode.worker.web.listSessions", async () => {
       await webWorkerReady;
       return webWorkerSessions.listSessions({ workerId: "nimora.web-worker" });
+    }),
+    vscode.commands.registerCommand("shuncode.webWorker.releaseStatus", async () => {
+      await webWorkerReady;
+      const configuration = vscode.workspace.getConfiguration("shuncode.webWorker");
+      const gate = resolveWebWorkerReleaseGate(
+        configuration.get<boolean>("hostManagedCapabilities", false),
+        vscode.workspace.isTrusted,
+      );
+      const sessions = webWorkerSessions.listSessions({ workerId: "nimora.web-worker" });
+      const healthRows = await Promise.all(sessions.map(async session => ({
+        session,
+        health: await webWorkerSessions.health(session.managedSessionId),
+      })));
+      const healthy = healthRows.filter(row => row.health.status === "healthy").length;
+      const detail = [
+        `Tool ownership: ${gate.ownership}`,
+        `Experimental gate: ${gate.configured ? "enabled" : "disabled"}`,
+        `Workspace trust: ${gate.workspaceTrusted ? "trusted" : "untrusted"}`,
+        `Web Worker sessions: ${sessions.length} (${healthy} healthy)`,
+      ].join("\n");
+      const action = gate.configured ? "Use Page-Local Tools" : "Enable Host-Managed Tools";
+      const selected = await vscode.window.showInformationMessage("Nimora Web AI Worker", { modal: true, detail }, action);
+      if (selected !== action) return { gate, sessions: healthRows };
+      if (!gate.configured) {
+        const confirm = await vscode.window.showWarningMessage(
+          "Enable experimental host-managed Web AI tools?",
+          {
+            modal: true,
+            detail: "Web AI tool calls will be executed by Nimora's durable Task execution service. Risky capabilities still require separate user approval. You can switch back to page-local tools at any time.",
+          },
+          "Enable Experimental Mode",
+        );
+        if (confirm !== "Enable Experimental Mode") return { gate, sessions: healthRows };
+        await configuration.update("hostManagedCapabilities", true, vscode.ConfigurationTarget.Global);
+      } else {
+        await configuration.update("hostManagedCapabilities", false, vscode.ConfigurationTarget.Global);
+      }
+      const updated = resolveWebWorkerReleaseGate(
+        vscode.workspace.getConfiguration("shuncode.webWorker").get<boolean>("hostManagedCapabilities", false),
+        vscode.workspace.isTrusted,
+      );
+      void vscode.window.showInformationMessage(`Nimora Web AI tool ownership: ${updated.ownership}.`);
+      return { gate: updated, sessions: healthRows };
     }),
     vscode.commands.registerCommand("_shuncode.worker.web.dispose", async (managedSessionId: unknown) => {
       await webWorkerReady;

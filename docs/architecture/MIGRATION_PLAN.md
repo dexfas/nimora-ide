@@ -297,6 +297,8 @@ Phase 5.4.8 已把 capability approval grant 纳入 TaskRuntime durable state。
 
 Phase 5.4.9 已把 durable grant 接到明确的用户审批 surface。第一方 Extension 使用 `PromptingTaskCapabilityGrantResolver`：只有缺少匹配 task/session grant 时才弹 modal approval；同一 Task/Session/Capability 的并发请求共享一个 pending prompt，批准后必须先 strict 写入 TaskRuntime 才算授权，拒绝/关闭不写 grant。`dispatchHostCapabilityRequest` 把 authorization denial 转成 `isError=true` 的 Worker capability result，使网页 AI 可以继续当前 turn，同时保证 denied request 不 claim execution、不调用 provider executor。Command Palette 新增 `Nimora: Manage AI Permissions`，只允许查看并撤销 active grants，不提供脱离具体 capability request 的“直接授权”入口。`approval=always` 仍 fail-closed。**默认/live WebMCP ownership 仍未切换；下一 gate 是用户已登录 provider 的 opt-in live roundtrip。**
 
+Phase 5.5 已建立 live ownership 的**显式 release gate**，但仍保持默认 page-local。`shuncode.webWorker.hostManagedCapabilities` 是 application-scoped、默认 `false` 的实验设置；`_shuncode.worker.web.run` 不再信任 caller 自带的 ownership flag，而由该设置与 `workspace.isTrusted` 共同决定最终 `hostManagedCapabilities`。设置关闭或 workspace 未受信任时都强制 `page-local`；只有“设置开启 + trusted workspace”才进入 `host-managed`。`Nimora: Web AI Worker Status & Tool Ownership` 显示当前 ownership、workspace trust、Web Worker session/health，并可显式启用实验模式或一键退回 page-local。这个 release gate **不授予 capability permission**，`session/task-grant` 仍必须经过 Phase 5.4.9 的独立 modal approval。当前 automated/synthetic gate 已通过；**用户已登录 live DeepSeek roundtrip 仍是发布前 gate，未验证前不能把默认值改成 true，也不能删除 page-local ledger。**
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

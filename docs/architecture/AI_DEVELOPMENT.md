@@ -147,6 +147,7 @@ npm run test-shuncode-host-capability-durable
 npm run test-shuncode-host-capability-policy
 npm run test-shuncode-capability-grants
 npm run test-shuncode-capability-approval
+npm run test-shuncode-web-worker-release-gate
 ```
 
 `test-shuncode-webmcp-core` 必须保护 JSON/DeepSeek line protocol、nested args/heredoc、streaming incomplete-call guard、bounded repair、dedupe persistence/migration 与 pending-delivery bookkeeping。`test-shuncode-webmcp-browser` 使用真实 Edge 和 synthetic DeepSeek DOM 验证 HTTP/binding transport、result delivery、worker plain/tool/host-managed/host-result/interrupt lifecycle、host-managed 不调用 page-local invoke、host-result idempotency 与 repeated-scan no-reexecution；`test-shuncode-webmcp-gateway-shared-agent` 启动真实 Gateway process/managed Edge，确认 Gateway 使用 canonical v25 Core/Site/Agent；`test-shuncode-webmcp-command-transport` 保护 command bridge event cursor/terminal/host-result/interrupt/health/disconnect；`test-shuncode-web-worker-stack` 保护 command transport → adapter → manager → TaskRuntime，并额外验证 opt-in host-requested → strict Host execution service → Broker → result-return → terminal 闭环。以上都是自动 integration baseline，**不能写成 live DeepSeek 服务 E2E**；涉及发布级 DeepSeek 兼容时仍需要用户已登录网页上的真实 roundtrip。
@@ -158,6 +159,8 @@ npm run test-shuncode-capability-approval
 `test-shuncode-host-capability-policy` 保护 metadata approval 的 fail-closed 语义和 Host Capability Router：`approval=none` 可以继续，`session` 等需要显式 grant；IDE capability 必须走 IdeToolBroker，Runtime/file capability 必须走 canonical file provider，0 owner/多 owner 都拒绝。`test-shuncode-web-worker-stack` 还必须证明 host-requested `read_files` 不调用 IdeToolBroker。以上仍不代表 live/default Worker dispatch 已切换。
 
 `test-shuncode-capability-grants` 保护 TaskRuntime strict grant/revoke、restart replay、task/session scope 隔离、session attach-generation binding、detach/re-attach 不复活旧授权、`always` fail-closed 以及 persistence failure 不产生内存授权。任何 approval UI/command 的后续实现都必须调用这些 strict APIs，禁止另建一份 UI-only permission state。
+
+`test-shuncode-web-worker-release-gate` 保护 live ownership 的最后一道软件 gate：manifest 设置必须保持 application scope + default false；caller flag 不能绕过 disabled gate；untrusted workspace 必须强制 page-local；只有 trusted + enabled 才能得到 host-managed。修改 release status/settings 或 Web Worker run command 时必须运行此 smoke。它仍**不能代替**用户已登录 live provider roundtrip。
 
 `test-shuncode-capability-approval` 保护 interactive resolver 的 prompt dedupe、批准后 durable grant、拒绝不落盘、重启后复用 grant 与 `always` 不进入 task/session prompt。`test-shuncode-web-worker-stack` 还保护 denied Host capability 不 claim execution、不调用 Broker、但会通过 dispatch boundary 返回 permission-denied Worker result。权限管理 UI 只能 revoke；禁止新增无需具体 capability request 就能静默 grant 的命令。
 
