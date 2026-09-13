@@ -202,7 +202,7 @@ export interface BridgeTodo {
 }
 
 export interface BridgeActivityPresentation {
-  readonly kind: "files" | "edit" | "terminal" | "lsp" | "generic";
+  readonly kind: "files" | "edit" | "terminal" | "generic";
   readonly title: string;
   readonly subtitle?: string;
   readonly input?: string;
@@ -528,12 +528,6 @@ function bridgePresentation(
   if (toolName === "send_command_input") {
     const commandId = typeof args.command_id === "string" ? args.command_id : undefined;
     return { kind: "terminal", title: "Sent command input", subtitle: commandId, input: boundedText(args.input, 2_000), terminalId: stringField(resultText, "terminal_id"), commandId, output: isError ? output : undefined };
-  }
-
-  if (toolName === "lsp" && args.operation === "hover") {
-    const subject = typeof args.path === "string" && args.path.trim() ? args.path.trim() : undefined;
-    const hoverOutput = blockBetween(resultText, "--- CONTENT BEGIN ---", "--- CONTENT END ---");
-    return { kind: "lsp", title: "LSP · hover", subtitle: subject, input: undefined, output: isError ? output : hoverOutput };
   }
 
   return { kind: "generic", title: toolName, input, output };
@@ -1914,7 +1908,7 @@ export class BridgeManager implements vscode.Disposable {
           if (toolName === "get_diagnostics") {
             await this.taskShadow.recordDiagnosticsArtifact(execution, args, resultText);
           } else if (toolName === "lsp") {
-            await this.taskShadow.recordLspLocationArtifact(execution, args, resultText);
+            await this.taskShadow.recordLspArtifact(execution, args, resultText);
           }
         }
         // At this layer we know a CallToolResult exists, but not whether the

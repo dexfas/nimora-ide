@@ -6,6 +6,7 @@ export type TaskFileNavigationArtifactInput = Omit<TaskArtifactRef, "artifactId"
 
 const MAX_SEARCH_LOCATIONS = 40;
 const MAX_SEARCH_LABEL_CHARS = 240;
+const MAX_LSP_HOVER_ARTIFACT_CONTENT_CHARS = 24_000;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
@@ -60,6 +61,20 @@ function resultJsonString(text: string, field: string): string | undefined {
   } catch {
     return raw;
   }
+}
+
+function resultBlock(text: string, begin: string, end: string): string | undefined {
+  const start = text.indexOf(begin);
+  if (start < 0) return undefined;
+  const contentStart = start + begin.length;
+  const finish = text.indexOf(end, contentStart);
+  const value = text.slice(contentStart, finish >= 0 ? finish : undefined).replace(/^\r?\n/, "").replace(/\r?\n$/, "");
+  return value || undefined;
+}
+
+function boundedContent(value: string, maxChars: number): { content: string; truncated: boolean } {
+  if (value.length <= maxChars) return { content: value, truncated: false };
+  return { content: `${value.slice(0, maxChars)}\n…[truncated]`, truncated: true };
 }
 
 export function taskDiagnosticsArtifact(args: unknown, resultText: string): TaskFileNavigationArtifactInput | undefined {
@@ -140,6 +155,50 @@ export function taskLspLocationArtifact(args: unknown, resultText: string): Task
       semanticResultInconclusive: resultBoolean(resultText, "semantic_result_inconclusive"),
     },
   };
+}
+
+export function taskLspHoverArtifact(args: unknown, resultText: string): TaskFileNavigationArtifactInput | undefined {
+  if (!resultText.includes("=== LSP BEGIN ===")) return undefined;
+  const input = asRecord(args);
+  const operation = typeof input?.operation === "string" ? input.operation : resultField(resultText, "operation");
+  if (operation !== "hover") return undefined;
+
+  const source = resultJsonString(resultText, "source");
+  const position = resultField(resultText, "position")?.match(/^(\d+):(\d+)$/);
+  const line = position ? positiveInteger(Number(position[1])) : undefined;
+  const column = position ? positiveInteger(Number(position[2])) : undefined;
+  const workspaceSource = source && !/^[a-z]+:\/\//i.test(source) ? source : undefined;
+  const locations = workspaceSource && line !== undefined ? [{ path: workspaceSource, line, column, label: "Hover source" }] : [];
+  const files = workspaceSource ? [workspaceSource] : [];
+  const blocks = resultText.split(/--- RESULT \d+ ---/).slice(1);
+  const rawContent = blocks
+    .map(block => resultBlock(block, "--- CONTENT BEGIN ---", "--- CONTENT END ---"))
+    .filter((value): value is string => Boolean(value))
+    .join("\n\n");
+  const bounded = boundedContent(rawContent, MAX_LSP_HOVER_ARTIFACT_CONTENT_CHARS);
+  const total = resultInteger(resultText, "total_results") ?? resultInteger(resultText, "returned_results") ?? blocks.length;
+  const sourceLabel = workspaceSource && line !== undefined ? `${workspaceSource}:${line}:${column ?? 1}` : undefined;
+  return {
+    kind: "report",
+    title: sourceLabel ? `LSP · hover · ${sourceLabel}` : `LSP · hover · ${total} result${total === 1 ? "" : "s"}`,
+    metadata: {
+      files,
+      locations,
+      locationCount: locations.length,
+      sourceTool: "lsp",
+      operation,
+      resultCount: total,
+      resultTruncated: resultBoolean(resultText, "truncated"),
+      content: bounded.content,
+      contentTruncated: bounded.truncated || resultBoolean(resultText, "content_truncated"),
+      providerState: resultField(resultText, "provider_state"),
+      semanticResultInconclusive: resultBoolean(resultText, "semantic_result_inconclusive"),
+    },
+  };
+}
+
+export function taskLspArtifact(args: unknown, resultText: string): TaskFileNavigationArtifactInput | undefined {
+  return taskLspLocationArtifact(args, resultText) ?? taskLspHoverArtifact(args, resultText);
 }
 
 export function taskFileNavigationArtifact(

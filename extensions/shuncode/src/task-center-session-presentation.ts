@@ -26,6 +26,8 @@ export interface TaskSessionArtifactPresentation {
   locations: TaskSessionArtifactLocation[];
   locationCount?: number;
   locationsTruncated: boolean;
+  content?: string;
+  contentTruncated: boolean;
 }
 
 export interface TaskSessionArtifactLocation {
@@ -106,6 +108,16 @@ function metadataNumber(metadata: Record<string, unknown> | undefined, key: stri
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function artifactContent(metadata: Record<string, unknown> | undefined): { content?: string; truncated: boolean } {
+  const value = typeof metadata?.content === "string" ? metadata.content.trim() : "";
+  if (!value) return { content: undefined, truncated: metadata?.contentTruncated === true };
+  const maxChars = 24_000;
+  return {
+    content: value.length <= maxChars ? value : `${value.slice(0, maxChars)}\n…[truncated for Work Sessions]`,
+    truncated: metadata?.contentTruncated === true || value.length > maxChars,
+  };
+}
+
 function artifactLocations(metadata: Record<string, unknown> | undefined): TaskSessionArtifactLocation[] {
   if (!Array.isArray(metadata?.locations)) return [];
   return metadata.locations.flatMap(value => {
@@ -132,6 +144,7 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       : [];
     const uri = typeof artifact.uri === "string" && artifact.uri.trim() ? artifact.uri.trim() : undefined;
     const locations = artifactLocations(metadata);
+    const content = artifactContent(metadata);
     return {
       artifactId: artifact.artifactId,
       kind: artifact.kind,
@@ -145,6 +158,8 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       locations,
       locationCount: metadataNumber(metadata, "locationCount"),
       locationsTruncated: metadata?.locationsTruncated === true,
+      content: content.content,
+      contentTruncated: content.truncated,
     };
   });
 }
@@ -215,6 +230,7 @@ export function formatTaskSessionMarkdown(detail: TaskCenterTaskDetail): string 
         artifact.resultTruncated ? "results truncated" : undefined,
         artifact.locationCount !== undefined ? `${artifact.locationCount} location${artifact.locationCount === 1 ? "" : "s"}` : undefined,
         artifact.locationsTruncated ? "location links truncated" : undefined,
+        artifact.contentTruncated ? "content truncated" : undefined,
       ].filter((value): value is string => Boolean(value));
       lines.push(`- **${artifact.title}** · ${artifact.kind}${stats.length ? ` · ${stats.join(" · ")}` : ""}`);
       for (const file of artifact.files.slice(0, 12)) lines.push(`  - \`${file}\``);

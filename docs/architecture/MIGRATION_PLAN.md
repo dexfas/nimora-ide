@@ -494,6 +494,12 @@ LSP 先按结果形态拆迁：`workspace_symbols`、`document_symbols`、`defin
 
 Work Sessions 继续复用 native `Location` anchors；旧 Bridge 的 `parseLspItems()` 与 Core `symbol` item renderer 已删除。`hover` 明确保留在 compatibility rich card，因为它返回的是有界 Markdown content block，而不是一组 workspace locations；这一阶段不把 hover 文本伪装成 location artifact，也不丢弃其内容。后续可以单独给 hover 引入 durable report/content artifact。
 
+### Phase 7.15 — Durable LSP Hover Reports
+
+`hover` 现在也脱离 Bridge-only presentation：Task artifact 记录 hover source path/position、provider/semantic metadata、结果截断状态，以及有界的多结果 content block。artifact 使用 `report` kind，同时附 source `Location`，因此 Work Sessions 既能跳回触发 hover 的代码位置，也能用独立 `ChatResponseMarkdownPart` + code block 展示原始 hover 内容；presentation 层再次执行 24k 防御性上限并显式标记 content truncation。
+
+TaskShadow 的 LSP 入口统一为 `recordLspArtifact()`，location operations 与 hover 由 artifact parser 分流。Bridge 的最后一个 `kind=lsp` / hover rich branch 和 Core `case 'lsp'` icon branch 已删除；LSP 已不再是旧 Chat Bridge Session 的不可替代职责。剩余 rich compatibility 收敛到 apply-patch mini diff、terminal 与 directory exploration。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

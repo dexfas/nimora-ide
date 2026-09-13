@@ -14,7 +14,7 @@ import { ICommandService } from '../../../../../../platform/commands/common/comm
 import { defaultButtonStyles } from '../../../../../../platform/theme/browser/defaultStyles.js';
 
 interface BridgeActivityPresentation {
-	readonly kind: 'files' | 'edit' | 'terminal' | 'lsp' | 'generic';
+	readonly kind: 'files' | 'edit' | 'terminal' | 'generic';
 	readonly title: string;
 	readonly subtitle?: string;
 	readonly input?: string;
@@ -131,7 +131,6 @@ function activityIcon(activity: BridgeActivity): ThemeIcon {
 		case 'files': return Codicon.files;
 		case 'edit': return Codicon.edit;
 		case 'terminal': return Codicon.terminal;
-		case 'lsp': return Codicon.symbolMethod;
 		default: return Codicon.tools;
 	}
 }

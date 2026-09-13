@@ -14,7 +14,7 @@ await esbuild.build({
   stdin: {
     contents: `
       export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';
-      export { taskDiagnosticsArtifact, taskFileNavigationArtifact, taskLspLocationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
+      export { taskDiagnosticsArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
     `,
     resolveDir: root,
     sourcefile: 'task-center-session-presentation-entry.ts',
@@ -28,7 +28,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskFileNavigationArtifact, taskLspLocationArtifact } = require(bundlePath);
+const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact } = require(bundlePath);
 
 const summary = {
   version: 1,
@@ -218,7 +218,63 @@ try {
   ].join('\n'));
   assert.equal(emptyLspArtifact?.kind, 'report', 'empty semantic results must remain durable because provider state can be inconclusive');
   assert.equal(emptyLspArtifact?.metadata?.semanticResultInconclusive, true);
-  assert.equal(taskLspLocationArtifact({ operation: 'hover' }, '=== LSP BEGIN ===\noperation: hover\n=== LSP END ==='), undefined, 'hover content stays on the legacy rich path until content blocks have a native durable replacement');
+  assert.equal(taskLspLocationArtifact({ operation: 'hover' }, '=== LSP BEGIN ===\noperation: hover\n=== LSP END ==='), undefined, 'hover remains distinct from location-result parsing');
+  const hoverArtifact = taskLspHoverArtifact({ operation: 'hover' }, [
+    '=== LSP BEGIN ===',
+    'operation: hover',
+    'source: "src/hover.ts"',
+    'position: 7:5',
+    'provider_state: ready',
+    'semantic_result_inconclusive: false',
+    'content_truncated: false',
+    'total_results: 2',
+    'max_results: 10',
+    'returned_results: 2',
+    'truncated: false',
+    '--- RESULTS ---',
+    '--- RESULT 1 ---',
+    'range: 7:1-7:12',
+    '--- CONTENT BEGIN ---',
+    'const hoverValue: string',
+    '--- CONTENT END ---',
+    '--- RESULT 2 ---',
+    '--- CONTENT BEGIN ---',
+    'Documentation for hoverValue.',
+    '--- CONTENT END ---',
+    '=== LSP END ===',
+  ].join('\n'));
+  assert.equal(hoverArtifact?.kind, 'report');
+  assert.equal(hoverArtifact?.title, 'LSP · hover · src/hover.ts:7:5');
+  assert.deepEqual(hoverArtifact?.metadata?.files, ['src/hover.ts']);
+  assert.deepEqual(hoverArtifact?.metadata?.locations, [{ path: 'src/hover.ts', line: 7, column: 5, label: 'Hover source' }]);
+  assert.equal(hoverArtifact?.metadata?.content, 'const hoverValue: string\n\nDocumentation for hoverValue.');
+  assert.equal(hoverArtifact?.metadata?.contentTruncated, false);
+  assert.equal(taskLspArtifact({ operation: 'hover' }, [
+    '=== LSP BEGIN ===',
+    'operation: hover',
+    'source: "src/hover.ts"',
+    'position: 7:5',
+    'total_results: 0',
+    'returned_results: 0',
+    'truncated: false',
+    'content_truncated: false',
+    '--- RESULTS ---',
+    '=== LSP END ===',
+  ].join('\n'))?.kind, 'report', 'generic LSP artifact routing must include hover reports');
+
+  const hoverPresentation = presentTaskSessionArtifacts({
+    ...detail,
+    artifacts: [{
+      artifactId: 'hover',
+      kind: 'report',
+      title: 'Hover content',
+      createdAt: '2026-09-13T08:04:25.000Z',
+      metadata: { files: ['src/hover.ts'], locations: [{ path: 'src/hover.ts', line: 7, column: 5, label: 'Hover source' }], content: 'type Hover = string;', contentTruncated: true },
+    }],
+  })[0];
+  assert.equal(hoverPresentation.content, 'type Hover = string;');
+  assert.equal(hoverPresentation.contentTruncated, true);
+  assert.deepEqual(hoverPresentation.locations, [{ path: 'src/hover.ts', line: 7, column: 5, label: 'Hover source' }]);
 
   const markdown = formatTaskSessionMarkdown(detail);
   assert.match(markdown, /### Todos/);
@@ -240,6 +296,7 @@ try {
   assert.match(sessionsSource, /new vscode\.ChatResponseFileTreePart\(/, 'workspace file artifacts must use the native file-tree presentation');
   assert.match(sessionsSource, /new vscode\.Location\(fileUri, position\)/, 'search artifacts must preserve line-level locations with native Location anchors');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(target,/, 'search locations must render as native anchors');
+  assert.match(sessionsSource, /markdown\.appendCodeblock\(artifact\.content\)/, 'durable hover/report content must render as a bounded native markdown part');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(/, 'URI artifacts must use native anchors');
   assert.match(sessionsSource, /uri\.scheme === "http" \|\| uri\.scheme === "https"/);
   assert.match(sessionsSource, /uri\.scheme !== "file" \|\| !workspace/, 'file anchors require a workspace containment check');
@@ -253,7 +310,7 @@ try {
   const taskShadowSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-shadow.ts'), 'utf8');
   assert.match(taskShadowSource, /recordFileNavigationArtifact[\s\S]{0,500}taskFileNavigationArtifact\(toolName, structuredContent\)[\s\S]{0,500}recordArtifact/);
   assert.match(taskShadowSource, /recordDiagnosticsArtifact[\s\S]{0,500}taskDiagnosticsArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
-  assert.match(taskShadowSource, /recordLspLocationArtifact[\s\S]{0,500}taskLspLocationArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
+  assert.match(taskShadowSource, /recordLspArtifact[\s\S]{0,500}taskLspArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
   const bridgeSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'bridge-server.ts'), 'utf8');
   assert.match(bridgeSource, /recordFileNavigationArtifact\(execution, toolName, result\.structuredContent\)/, 'successful Bridge file navigation must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "read_files"\)/, 'read_files must no longer have a Bridge-only rich presentation branch');
@@ -261,13 +318,14 @@ try {
   assert.doesNotMatch(bridgeSource, /if \(toolName === "search_files"\)/, 'search_files must no longer have a Bridge-only rich presentation branch after native Location anchors exist');
   assert.match(bridgeSource, /toolName === "get_diagnostics"[\s\S]{0,200}recordDiagnosticsArtifact\(execution, args, resultText\)/, 'successful Bridge diagnostics must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /kind:\s*"diagnostics"|parseDiagnosticsItems\(/, 'get_diagnostics must no longer have a Bridge-only rich presentation branch');
-  assert.match(bridgeSource, /toolName === "lsp"[\s\S]{0,200}recordLspLocationArtifact\(execution, args, resultText\)/, 'successful Bridge LSP location operations must be durably projected into Task artifacts');
+  assert.match(bridgeSource, /toolName === "lsp"[\s\S]{0,200}recordLspArtifact\(execution, args, resultText\)/, 'successful Bridge LSP calls must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /parseLspItems\(|kind:\s*"symbol"/, 'LSP location operations must no longer depend on Bridge-only symbol item parsing');
-  assert.match(bridgeSource, /toolName === "lsp" && args\.operation === "hover"/, 'hover content must retain its compatibility rich presentation until its content block is migrated');
+  assert.doesNotMatch(bridgeSource, /kind:\s*"lsp"|toolName === "lsp" && args\.operation === "hover"/, 'hover content must no longer require a Bridge-only rich presentation kind');
   const bridgeSessionSource = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'shunCodeBridgeSessionView.ts'), 'utf8');
   assert.doesNotMatch(bridgeSessionSource, /case 'search'|item\.kind === 'match'/, 'dead search-specific Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /case 'diagnostics'|item\.kind === 'diagnostic'|item\.severity/, 'dead diagnostics-specific Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /item\.kind === 'symbol'/, 'dead LSP symbol-item Chat Core rendering must be removed');
+  assert.doesNotMatch(bridgeSessionSource, /case 'lsp'/, 'dead LSP Chat Core presentation kind must be removed after hover migration');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));

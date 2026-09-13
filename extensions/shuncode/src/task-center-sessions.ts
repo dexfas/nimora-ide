@@ -80,6 +80,15 @@ function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatRes
       const locationLabel = `${location.path}:${location.line}${location.column ? `:${location.column}` : ""}`;
       parts.push(new vscode.ChatResponseAnchorPart(target, location.label ? `${locationLabel} · ${location.label}` : locationLabel));
     }
+    if (artifact.content) {
+      const markdown = new vscode.MarkdownString();
+      markdown.appendMarkdown("### ");
+      markdown.appendText(artifact.title);
+      markdown.appendMarkdown("\n\n");
+      markdown.appendCodeblock(artifact.content);
+      if (artifact.contentTruncated) markdown.appendMarkdown("\n\n_Content truncated in Work Sessions._");
+      parts.push(new vscode.ChatResponseMarkdownPart(markdown));
+    }
   }
   return parts;
 }
