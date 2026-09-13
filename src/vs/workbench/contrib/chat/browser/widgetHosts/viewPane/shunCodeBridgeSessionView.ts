@@ -51,7 +51,7 @@ interface BridgeDiffLinePreview {
 }
 
 interface BridgeActivityItem {
-	readonly kind: 'file' | 'folder' | 'symbol';
+	readonly kind: 'file' | 'folder';
 	readonly path: string;
 	readonly line?: number;
 	readonly column?: number;
@@ -518,7 +518,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 			row.setAttribute('title', item.line ? `${item.path}:${item.line}:${item.column ?? 1}` : item.path);
 			const icon = append(row, $('span.shuncode-bridge-tool-item-icon'));
 			const itemIcon = item.kind === 'folder' ? Codicon.folder
-				: item.kind === 'symbol' ? Codicon.symbolMethod : Codicon.file;
+				: Codicon.file;
 			icon.classList.add(...ThemeIcon.asClassNameArray(itemIcon));
 			const labels = append(row, $('.shuncode-bridge-tool-item-labels'));
 			append(labels, $('span.shuncode-bridge-tool-item-primary', undefined, item.label || item.path));

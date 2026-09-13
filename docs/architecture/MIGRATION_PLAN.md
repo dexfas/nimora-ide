@@ -488,6 +488,12 @@ Work Sessions 使用 `ChatResponseAnchorPart(new vscode.Location(...))` 渲染�
 
 Work Sessions 直接复用 Phase 7.12 的 native `Location` anchors 与 file-tree 安全边界。旧 Bridge `parseDiagnosticsItems()` / `kind=diagnostics` presentation、Core `diagnostic` item/severity renderer 和对应 CSS 已删除。LSP 暂时保留旧 rich presentation，因为 `hover` 除 location 外还有内容块，必须先按 operation 拆分再迁；`list_directory` 的 folder semantics 也继续留待单独处理。
 
+### Phase 7.14 — Split LSP Location Results from Hover Content
+
+LSP 先按结果形态拆迁：`workspace_symbols`、`document_symbols`、`definition`、`references`、`implementation` 都会把 workspace path、1-based range 起点与 symbol label 持久化为 Task `file/report` artifact，并保留 `total_results`、provider state、semantic inconclusive 和 truncation metadata。空 semantic result 仍记录 `report`，因为 provider 的 `unknown/inconclusive` 本身就是需要保留的执行证据。
+
+Work Sessions 继续复用 native `Location` anchors；旧 Bridge 的 `parseLspItems()` 与 Core `symbol` item renderer 已删除。`hover` 明确保留在 compatibility rich card，因为它返回的是有界 Markdown content block，而不是一组 workspace locations；这一阶段不把 hover 文本伪装成 location artifact，也不丢弃其内容。后续可以单独给 hover 引入 durable report/content artifact。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

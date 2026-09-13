@@ -51,6 +51,17 @@ function resultBoolean(text: string, field: string): boolean {
   return resultField(text, field) === "true";
 }
 
+function resultJsonString(text: string, field: string): string | undefined {
+  const raw = resultField(text, field);
+  if (raw === undefined || raw === "null") return undefined;
+  try {
+    const value = JSON.parse(raw);
+    return typeof value === "string" ? value : undefined;
+  } catch {
+    return raw;
+  }
+}
+
 export function taskDiagnosticsArtifact(args: unknown, resultText: string): TaskFileNavigationArtifactInput | undefined {
   if (!resultText.includes("=== GET_DIAGNOSTICS BEGIN ===")) return undefined;
   const input = asRecord(args);
@@ -82,6 +93,51 @@ export function taskDiagnosticsArtifact(args: unknown, resultText: string): Task
       locationsTruncated: entries.length > locations.length,
       sourceTool: "get_diagnostics",
       resultTruncated: resultBoolean(resultText, "truncated"),
+    },
+  };
+}
+
+export function taskLspLocationArtifact(args: unknown, resultText: string): TaskFileNavigationArtifactInput | undefined {
+  if (!resultText.includes("=== LSP BEGIN ===")) return undefined;
+  const input = asRecord(args);
+  const operation = typeof input?.operation === "string" ? input.operation : resultField(resultText, "operation");
+  if (!operation || operation === "hover") return undefined;
+  const supported = new Set(["workspace_symbols", "document_symbols", "definition", "references", "implementation"]);
+  if (!supported.has(operation)) return undefined;
+
+  const blocks = resultText.split(/--- RESULT \d+ ---/).slice(1);
+  const entries = blocks.flatMap(block => {
+    const path = resultJsonString(block, "path");
+    if (!path || /^[a-z]+:\/\//i.test(path)) return [];
+    const range = resultField(block, "selection_range") ?? resultField(block, "range");
+    const position = range?.match(/^(\d+):(\d+)/);
+    if (!position) return [];
+    const line = positiveInteger(Number(position[1]));
+    const column = positiveInteger(Number(position[2]));
+    if (line === undefined) return [];
+    const name = resultJsonString(block, "name");
+    const kind = resultField(block, "kind");
+    const container = resultJsonString(block, "container");
+    const label = oneLine([name, kind, container].filter(Boolean).join(" · "), MAX_SEARCH_LABEL_CHARS);
+    return [{ path, line, column, label }];
+  });
+  const files = [...new Set(entries.map(entry => entry.path))];
+  const total = resultInteger(resultText, "total_results") ?? resultInteger(resultText, "returned_results") ?? entries.length;
+  const locations = entries.slice(0, MAX_SEARCH_LOCATIONS);
+  const operationLabel = operation.replace(/_/g, " ");
+  return {
+    kind: files.length ? "file" : "report",
+    title: total === 0 ? `LSP · ${operationLabel} · no results` : `LSP · ${operationLabel} · ${total} result${total === 1 ? "" : "s"}`,
+    metadata: {
+      files,
+      locations,
+      locationCount: total,
+      locationsTruncated: entries.length > locations.length,
+      sourceTool: "lsp",
+      operation,
+      resultTruncated: resultBoolean(resultText, "truncated"),
+      providerState: resultField(resultText, "provider_state"),
+      semanticResultInconclusive: resultBoolean(resultText, "semantic_result_inconclusive"),
     },
   };
 }

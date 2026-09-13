@@ -179,6 +179,8 @@ Phase 7.12 补齐了 search 的无损 native 表达：`search_files` Task artifa
 
 Phase 7.13 又把 `get_diagnostics` 从 Bridge rich card 迁成 durable Task location/report artifact：诊断 location 复用 Work Sessions 的 native `Location` anchors，clean result 也保留为 report。Bridge/Core 的 diagnostics-specific parser/kind/severity renderer 与 CSS 已删除。LSP 仍保留，因为 hover content 需要独立承接；旧 Session 的剩余不可替代部分现在主要是 apply-patch mini diff、terminal、LSP 和 directory exploration。
 
+Phase 7.14 把 LSP 再按结果形态拆开：symbols/definition/references/implementation 现在持久化为 Task location/report artifact，并复用 Work Sessions 的 native Location anchors；Bridge-only `parseLspItems()` 与 Core symbol-item rendering 已移除。`hover` 仍保留旧 rich card，因为它的核心产物是 Markdown content block。旧 Session 的 LSP 依赖因此已缩到 hover 单点，剩余兼容职责主要是 apply-patch mini diff、terminal、hover content 和 directory exploration。
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

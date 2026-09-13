@@ -14,7 +14,7 @@ await esbuild.build({
   stdin: {
     contents: `
       export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';
-      export { taskDiagnosticsArtifact, taskFileNavigationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
+      export { taskDiagnosticsArtifact, taskFileNavigationArtifact, taskLspLocationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
     `,
     resolveDir: root,
     sourcefile: 'task-center-session-presentation-entry.ts',
@@ -28,7 +28,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskFileNavigationArtifact } = require(bundlePath);
+const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskFileNavigationArtifact, taskLspLocationArtifact } = require(bundlePath);
 
 const summary = {
   version: 1,
@@ -171,6 +171,55 @@ try {
   assert.equal(cleanDiagnosticsArtifact?.kind, 'report', 'a successful no-diagnostics result should remain durable instead of disappearing');
   assert.equal(cleanDiagnosticsArtifact?.title, 'No diagnostics · workspace');
 
+  const lspArtifact = taskLspLocationArtifact({ operation: 'workspace_symbols' }, [
+    '=== LSP BEGIN ===',
+    'operation: workspace_symbols',
+    'provider_state: ready',
+    'semantic_result_inconclusive: false',
+    'total_results: 2',
+    'max_results: 20',
+    'returned_results: 2',
+    'truncated: false',
+    '--- RESULTS ---',
+    '--- RESULT 1 ---',
+    'name: "TaskRuntime"',
+    'kind: class',
+    'container: "runtime"',
+    'path: "src/task-runtime.ts"',
+    'workspace: true',
+    'range: 20:3-120:4',
+    '--- RESULT 2 ---',
+    'name: "External"',
+    'kind: class',
+    'container: null',
+    'path: "https://example.com/external.ts"',
+    'workspace: false',
+    'range: 1:1-1:8',
+    '=== LSP END ===',
+  ].join('\n'));
+  assert.equal(lspArtifact?.kind, 'file');
+  assert.equal(lspArtifact?.title, 'LSP · workspace symbols · 2 results');
+  assert.deepEqual(lspArtifact?.metadata?.files, ['src/task-runtime.ts'], 'LSP artifact must only persist workspace-style paths');
+  assert.deepEqual(lspArtifact?.metadata?.locations, [{ path: 'src/task-runtime.ts', line: 20, column: 3, label: 'TaskRuntime · class · runtime' }]);
+  assert.equal(lspArtifact?.metadata?.locationCount, 2, 'LSP total result count remains distinct from safe native links');
+  assert.equal(lspArtifact?.metadata?.providerState, 'ready');
+  assert.equal(lspArtifact?.metadata?.semanticResultInconclusive, false);
+  const emptyLspArtifact = taskLspLocationArtifact({ operation: 'references' }, [
+    '=== LSP BEGIN ===',
+    'operation: references',
+    'provider_state: unknown',
+    'semantic_result_inconclusive: true',
+    'total_results: 0',
+    'max_results: 100',
+    'returned_results: 0',
+    'truncated: false',
+    '--- RESULTS ---',
+    '=== LSP END ===',
+  ].join('\n'));
+  assert.equal(emptyLspArtifact?.kind, 'report', 'empty semantic results must remain durable because provider state can be inconclusive');
+  assert.equal(emptyLspArtifact?.metadata?.semanticResultInconclusive, true);
+  assert.equal(taskLspLocationArtifact({ operation: 'hover' }, '=== LSP BEGIN ===\noperation: hover\n=== LSP END ==='), undefined, 'hover content stays on the legacy rich path until content blocks have a native durable replacement');
+
   const markdown = formatTaskSessionMarkdown(detail);
   assert.match(markdown, /### Todos/);
   assert.match(markdown, /### AI Workers/);
@@ -204,6 +253,7 @@ try {
   const taskShadowSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-shadow.ts'), 'utf8');
   assert.match(taskShadowSource, /recordFileNavigationArtifact[\s\S]{0,500}taskFileNavigationArtifact\(toolName, structuredContent\)[\s\S]{0,500}recordArtifact/);
   assert.match(taskShadowSource, /recordDiagnosticsArtifact[\s\S]{0,500}taskDiagnosticsArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
+  assert.match(taskShadowSource, /recordLspLocationArtifact[\s\S]{0,500}taskLspLocationArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
   const bridgeSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'bridge-server.ts'), 'utf8');
   assert.match(bridgeSource, /recordFileNavigationArtifact\(execution, toolName, result\.structuredContent\)/, 'successful Bridge file navigation must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "read_files"\)/, 'read_files must no longer have a Bridge-only rich presentation branch');
@@ -211,9 +261,13 @@ try {
   assert.doesNotMatch(bridgeSource, /if \(toolName === "search_files"\)/, 'search_files must no longer have a Bridge-only rich presentation branch after native Location anchors exist');
   assert.match(bridgeSource, /toolName === "get_diagnostics"[\s\S]{0,200}recordDiagnosticsArtifact\(execution, args, resultText\)/, 'successful Bridge diagnostics must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /kind:\s*"diagnostics"|parseDiagnosticsItems\(/, 'get_diagnostics must no longer have a Bridge-only rich presentation branch');
+  assert.match(bridgeSource, /toolName === "lsp"[\s\S]{0,200}recordLspLocationArtifact\(execution, args, resultText\)/, 'successful Bridge LSP location operations must be durably projected into Task artifacts');
+  assert.doesNotMatch(bridgeSource, /parseLspItems\(|kind:\s*"symbol"/, 'LSP location operations must no longer depend on Bridge-only symbol item parsing');
+  assert.match(bridgeSource, /toolName === "lsp" && args\.operation === "hover"/, 'hover content must retain its compatibility rich presentation until its content block is migrated');
   const bridgeSessionSource = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'shunCodeBridgeSessionView.ts'), 'utf8');
   assert.doesNotMatch(bridgeSessionSource, /case 'search'|item\.kind === 'match'/, 'dead search-specific Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /case 'diagnostics'|item\.kind === 'diagnostic'|item\.severity/, 'dead diagnostics-specific Chat Core rendering must be removed');
+  assert.doesNotMatch(bridgeSessionSource, /item\.kind === 'symbol'/, 'dead LSP symbol-item Chat Core rendering must be removed');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));

@@ -239,7 +239,7 @@ export interface BridgeDiffLinePreview {
 }
 
 export interface BridgeActivityItem {
-  readonly kind: "file" | "folder" | "symbol";
+  readonly kind: "file" | "folder";
   readonly path: string;
   readonly line?: number;
   readonly column?: number;
@@ -366,27 +366,6 @@ function parseListDirectoryItems(text: string | undefined): BridgeActivityItem[]
     const match = line.match(/^\[(DIR|FILE|LINK|OTHER)\]\s+(.+)$/);
     if (!match) continue;
     items.push({ kind: match[1] === "DIR" ? "folder" : "file", path: match[2] });
-  }
-  return items;
-}
-
-function parseLspItems(text: string | undefined): BridgeActivityItem[] {
-  if (!text) return [];
-  const items: BridgeActivityItem[] = [];
-  const blocks = text.split(/--- RESULT \d+ ---/).slice(1);
-  for (const block of blocks) {
-    const pathValue = stringField(block, "path");
-    if (!pathValue || /^[a-z]+:\/\//i.test(pathValue)) continue;
-    const range = stringField(block, "selection_range") ?? stringField(block, "range");
-    const position = range?.match(/^(\d+):(\d+)/);
-    items.push({
-      kind: "symbol",
-      path: pathValue,
-      line: position ? Number(position[1]) : undefined,
-      column: position ? Number(position[2]) : undefined,
-      label: stringField(block, "name"),
-      description: stringField(block, "kind") ?? stringField(block, "container"),
-    });
   }
   return items;
 }
@@ -551,18 +530,10 @@ function bridgePresentation(
     return { kind: "terminal", title: "Sent command input", subtitle: commandId, input: boundedText(args.input, 2_000), terminalId: stringField(resultText, "terminal_id"), commandId, output: isError ? output : undefined };
   }
 
-  if (toolName === "lsp") {
-    const operationId = typeof args.operation === "string" ? args.operation : "";
-    const operation = operationId ? operationId.replace(/_/g, " ") : "code intelligence";
-    const subject = typeof args.query === "string" && args.query.trim()
-      ? args.query.trim()
-      : typeof args.path === "string" && args.path.trim()
-        ? args.path.trim()
-        : undefined;
-    const items = parseLspItems(resultText);
-    const resultSummary = items.length ? `${items.length} result${items.length === 1 ? "" : "s"}` : subject;
-    const hoverOutput = operationId === "hover" ? blockBetween(resultText, "--- CONTENT BEGIN ---", "--- CONTENT END ---") : undefined;
-    return { kind: "lsp", title: `LSP · ${operation}`, subtitle: resultSummary, items, input: undefined, output: isError ? output : hoverOutput };
+  if (toolName === "lsp" && args.operation === "hover") {
+    const subject = typeof args.path === "string" && args.path.trim() ? args.path.trim() : undefined;
+    const hoverOutput = blockBetween(resultText, "--- CONTENT BEGIN ---", "--- CONTENT END ---");
+    return { kind: "lsp", title: "LSP · hover", subtitle: subject, input: undefined, output: isError ? output : hoverOutput };
   }
 
   return { kind: "generic", title: toolName, input, output };
@@ -1942,6 +1913,8 @@ export class BridgeManager implements vscode.Disposable {
           await this.taskShadow.recordFileNavigationArtifact(execution, toolName, result.structuredContent);
           if (toolName === "get_diagnostics") {
             await this.taskShadow.recordDiagnosticsArtifact(execution, args, resultText);
+          } else if (toolName === "lsp") {
+            await this.taskShadow.recordLspLocationArtifact(execution, args, resultText);
           }
         }
         // At this layer we know a CallToolResult exists, but not whether the
