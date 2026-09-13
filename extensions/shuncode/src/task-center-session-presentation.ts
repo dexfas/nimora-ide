@@ -29,6 +29,7 @@ export interface TaskSessionArtifactPresentation {
   entries: TaskSessionArtifactEntry[];
   entryCount?: number;
   content?: string;
+  contentLanguage?: string;
   contentTruncated: boolean;
 }
 
@@ -181,6 +182,7 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       entries,
       entryCount: metadataNumber(metadata, "entryCount"),
       content: content.content,
+      contentLanguage: oneLine(typeof metadata?.contentLanguage === "string" ? metadata.contentLanguage : undefined, 32),
       contentTruncated: content.truncated,
     };
   });

@@ -64,7 +64,7 @@ const detail = {
     { id: 'progress:p', kind: 'progress', at: '2026-09-13T08:05:00.000Z', title: 'Work Sessions', message: 'Projecting Task state', percent: 60, todoId: 'project' },
   ],
   artifacts: [
-    { artifactId: 'changes', kind: 'changeset', title: 'Workspace patch', createdAt: '2026-09-13T08:04:00.000Z', metadata: { files: ['src/b.ts', 'src/a.ts', '../escape.txt', '/absolute.txt'], additions: 10, deletions: 2, diffTruncated: true } },
+    { artifactId: 'changes', kind: 'changeset', title: 'Workspace patch', createdAt: '2026-09-13T08:04:00.000Z', metadata: { files: ['src/b.ts', 'src/a.ts', '../escape.txt', '/absolute.txt'], additions: 10, deletions: 2, diffTruncated: true, content: '--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-old\n+new', contentLanguage: 'diff', contentTruncated: true } },
     { artifactId: 'read', kind: 'file', title: 'Read source files', createdAt: '2026-09-13T08:04:10.000Z', metadata: { files: ['src/c.ts', '../outside.ts'], sourceTool: 'read_files', resultTruncated: true } },
     { artifactId: 'search', kind: 'file', title: 'Search needle', createdAt: '2026-09-13T08:04:20.000Z', metadata: { files: ['src/search.ts', '../outside.ts'], locations: [{ path: 'src/search.ts', line: 12, column: 7, label: ' needle here ' }, { path: '../outside.ts', line: 1, column: 1, label: 'unsafe' }, { path: 'src/invalid.ts', line: 0, column: 1, label: 'invalid' }], locationCount: 3, locationsTruncated: false } },
     { artifactId: 'report', kind: 'report', title: 'Review report', uri: 'https://example.com/report', createdAt: '2026-09-13T08:04:30.000Z' },
@@ -89,6 +89,9 @@ try {
   const artifacts = presentTaskSessionArtifacts(detail);
   assert.deepEqual(artifacts[0].files, ['src/b.ts', 'src/a.ts'], 'artifact presentation must drop absolute/traversal paths');
   assert.deepEqual(buildTaskSessionFileTree(artifacts[0].files), [{ name: 'src', children: [{ name: 'a.ts' }, { name: 'b.ts' }] }]);
+  assert.match(artifacts[0].content ?? '', /^--- a\/src\/a\.ts/);
+  assert.equal(artifacts[0].contentLanguage, 'diff');
+  assert.equal(artifacts[0].contentTruncated, true);
   assert.deepEqual(artifacts[1].files, ['src/c.ts'], 'file-navigation artifacts use the same workspace-relative path safety boundary');
   assert.equal(artifacts[1].resultTruncated, true);
   assert.deepEqual(artifacts[2].files, ['src/search.ts'], 'search artifact files must drop traversal paths before native presentation');
@@ -330,7 +333,7 @@ try {
   assert.match(sessionsSource, /buildTaskSessionEntryTree\(artifact\.entries\)/, 'directory artifacts must use the native file tree while preserving folder nodes');
   assert.match(sessionsSource, /new vscode\.Location\(fileUri, position\)/, 'search artifacts must preserve line-level locations with native Location anchors');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(target,/, 'search locations must render as native anchors');
-  assert.match(sessionsSource, /markdown\.appendCodeblock\(artifact\.content\)/, 'durable hover/report content must render as a bounded native markdown part');
+  assert.match(sessionsSource, /markdown\.appendCodeblock\(artifact\.content, artifact\.contentLanguage\)/, 'durable report/changeset content must render as a bounded native markdown code block');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(/, 'URI artifacts must use native anchors');
   assert.match(sessionsSource, /uri\.scheme === "http" \|\| uri\.scheme === "https"/);
   assert.match(sessionsSource, /uri\.scheme !== "file" \|\| !workspace/, 'file anchors require a workspace containment check');
@@ -342,6 +345,7 @@ try {
   assert.match(extensionSource, /registerCommand\("shuncode\.taskCenter\.open"[\s\S]{0,200}workbench\.action\.chat\.history/);
 
   const taskShadowSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-shadow.ts'), 'utf8');
+  assert.match(taskShadowSource, /recordChangeset[\s\S]{0,1800}contentLanguage:\s*content \? "diff"[\s\S]{0,300}contentTruncated:/, 'changesets must retain a bounded canonical diff preview as durable Task content');
   assert.match(taskShadowSource, /recordFileNavigationArtifact[\s\S]{0,500}taskFileNavigationArtifact\(toolName, structuredContent\)[\s\S]{0,500}recordArtifact/);
   assert.match(taskShadowSource, /recordDiagnosticsArtifact[\s\S]{0,500}taskDiagnosticsArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
   assert.match(taskShadowSource, /recordDirectoryArtifact[\s\S]{0,500}taskDirectoryArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
@@ -358,14 +362,17 @@ try {
   assert.match(bridgeSource, /toolName === "lsp"[\s\S]{0,200}recordLspArtifact\(execution, args, resultText\)/, 'successful Bridge LSP calls must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /parseLspItems\(|kind:\s*"symbol"/, 'LSP location operations must no longer depend on Bridge-only symbol item parsing');
   assert.doesNotMatch(bridgeSource, /kind:\s*"lsp"|toolName === "lsp" && args\.operation === "hover"/, 'hover content must no longer require a Bridge-only rich presentation kind');
+  assert.doesNotMatch(bridgeSource, /parseUnifiedDiffPreview|diffPreview|kind:\s*"edit"/, 'apply_patch must no longer depend on Bridge-only mini-diff parsing or presentation');
   const bridgeSessionSource = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'shunCodeBridgeSessionView.ts'), 'utf8');
   assert.doesNotMatch(bridgeSessionSource, /case 'search'|item\.kind === 'match'/, 'dead search-specific Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /case 'diagnostics'|item\.kind === 'diagnostic'|item\.severity/, 'dead diagnostics-specific Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /item\.kind === 'symbol'/, 'dead LSP symbol-item Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /case 'lsp'/, 'dead LSP Chat Core presentation kind must be removed after hover migration');
   assert.doesNotMatch(bridgeSessionSource, /renderToolItems|case 'files'|item\.kind === 'folder'/, 'dead directory/generic item rendering must be removed after native file-tree migration');
+  assert.doesNotMatch(bridgeSessionSource, /renderMiniDiff|renderEditSummaryItems|case 'edit'|diffPreview/, 'dead apply-patch mini-diff rendering must be removed after durable changeset content migration');
   const bridgeSessionCss = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'media', 'shunCodeBridgeSessionView.css'), 'utf8');
   assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-tool-item/, 'dead generic item CSS must be removed with the directory renderer');
+  assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-mini-diff|shuncode-bridge-edit-summary/, 'dead apply-patch mini-diff CSS must be removed');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));

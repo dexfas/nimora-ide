@@ -14,46 +14,14 @@ import { ICommandService } from '../../../../../../platform/commands/common/comm
 import { defaultButtonStyles } from '../../../../../../platform/theme/browser/defaultStyles.js';
 
 interface BridgeActivityPresentation {
-	readonly kind: 'edit' | 'terminal' | 'generic';
+	readonly kind: 'terminal' | 'generic';
 	readonly title: string;
 	readonly subtitle?: string;
 	readonly input?: string;
 	readonly output?: string;
-	readonly items?: BridgeActivityItem[];
-	readonly diff?: string;
-	readonly diffPreview?: BridgeDiffFilePreview[];
 	readonly terminalId?: string;
 	readonly commandId?: string;
 	readonly exitCode?: number | null;
-}
-
-interface BridgeDiffFilePreview {
-	readonly path: string;
-	readonly oldPath?: string;
-	readonly newPath?: string;
-	readonly hunks: BridgeDiffHunkPreview[];
-	readonly truncated?: boolean;
-}
-
-interface BridgeDiffHunkPreview {
-	readonly oldStart: number;
-	readonly newStart: number;
-	readonly lines: BridgeDiffLinePreview[];
-	readonly truncated?: boolean;
-}
-
-interface BridgeDiffLinePreview {
-	readonly kind: 'context' | 'add' | 'delete';
-	readonly oldLine?: number;
-	readonly newLine?: number;
-	readonly text: string;
-}
-
-interface BridgeActivityItem {
-	readonly kind: 'file';
-	readonly path: string;
-	readonly additions?: number;
-	readonly deletions?: number;
 }
 
 interface BridgeActivity {
@@ -89,8 +57,6 @@ interface BridgeStatus {
 const BRIDGE_GET_STATUS = 'shuncode.bridge.getStatus';
 const BRIDGE_OPEN_VIEW = 'shuncode.bridge.openView';
 const BRIDGE_CLEAR_ACTIVITY_LOG = 'shuncode.bridge.clearActivityLog';
-const BRIDGE_OPEN_RESOURCE = 'shuncode.bridge.openResource';
-const BRIDGE_OPEN_DIFF = 'shuncode.bridge.openDiff';
 const BRIDGE_OPEN_TERMINAL = 'shuncode.bridge.openTerminal';
 const TASK_CENTER_OPEN = 'shuncode.taskCenter.open';
 
@@ -123,7 +89,6 @@ function activityIcon(activity: BridgeActivity): ThemeIcon {
 		return ThemeIcon.modify(Codicon.loading, 'spin');
 	}
 	switch (activity.presentation?.kind) {
-		case 'edit': return Codicon.edit;
 		case 'terminal': return Codicon.terminal;
 		default: return Codicon.tools;
 	}
@@ -382,14 +347,7 @@ export class ShunCodeBridgeSessionView extends Disposable {
 			: activity.status === 'error'
 				? localize('shuncodeBridgeSession.failed', "Failed")
 				: formatDuration(activity.durationMs) || localize('shuncodeBridgeSession.completed', "Completed");
-		if (presentation.kind === 'edit') {
-			this.renderEditSummaryItems(summary, presentation);
-		}
-
 		const body = append(card, $('.shuncode-bridge-tool-body'));
-		if (presentation.kind === 'edit') {
-			this.renderMiniDiff(body, presentation);
-		}
 		if (presentation.terminalId) {
 			const actions = append(body, $('.shuncode-bridge-tool-actions'));
 			const openTerminal = append(actions, $('button.shuncode-bridge-tool-action'));
@@ -421,80 +379,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		});
 		card.addEventListener('toggle', syncExpandedState);
 		syncExpandedState();
-	}
-
-	private renderEditSummaryItems(parent: HTMLElement, presentation: BridgeActivityPresentation): void {
-		const items = (presentation.items ?? []).filter(item => item.kind === 'file');
-		if (!items.length) {
-			return;
-		}
-		const list = append(parent, $('.shuncode-bridge-edit-summary-files'));
-		for (const item of items.slice(0, 8)) {
-			const row = append(list, $<HTMLButtonElement>('button.shuncode-bridge-edit-summary-file'));
-			row.type = 'button';
-			const icon = append(row, $('span.shuncode-bridge-edit-summary-file-icon'));
-			icon.classList.add(...ThemeIcon.asClassNameArray(Codicon.file));
-			append(row, $('span.shuncode-bridge-edit-summary-file-path', undefined, item.path));
-			if (item.additions !== undefined || item.deletions !== undefined) {
-				const stats = append(row, $('span.shuncode-bridge-edit-summary-file-stats'));
-				append(stats, $('span.additions', undefined, `+${item.additions ?? 0}`));
-				append(stats, $('span.deletions', undefined, `−${item.deletions ?? 0}`));
-			}
-			row.addEventListener('click', event => {
-				event.preventDefault();
-				event.stopPropagation();
-				void this.commandService.executeCommand(BRIDGE_OPEN_RESOURCE, { path: item.path });
-			});
-		}
-		if (items.length > 8) {
-			append(list, $('span.shuncode-bridge-edit-summary-more', undefined, localize('shuncodeBridgeSession.moreEditedFiles', "{0} more files", items.length - 8)));
-		}
-	}
-
-	private renderMiniDiff(parent: HTMLElement, presentation: BridgeActivityPresentation): void {
-		if (!presentation.diffPreview?.length || !presentation.diff) {
-			return;
-		}
-		const preview = append(parent, $('.shuncode-bridge-mini-diff'));
-		for (const file of presentation.diffPreview) {
-			const fileBlock = append(preview, $('.shuncode-bridge-mini-diff-file'));
-			const header = append(fileBlock, $('.shuncode-bridge-mini-diff-header'));
-			const fileButton = append(header, $<HTMLButtonElement>('button.shuncode-bridge-mini-diff-file-button'));
-			fileButton.type = 'button';
-			const fileIcon = append(fileButton, $('span'));
-			fileIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.file));
-			append(fileButton, $('span.shuncode-bridge-mini-diff-path', undefined, file.path));
-			fileButton.addEventListener('click', () => void this.commandService.executeCommand(BRIDGE_OPEN_RESOURCE, { path: file.path }));
-
-			const openDiff = append(header, $<HTMLButtonElement>('button.shuncode-bridge-mini-diff-open'));
-			openDiff.type = 'button';
-			openDiff.setAttribute('title', localize('shuncodeBridgeSession.openFullDiff', "Open full diff"));
-			const diffIcon = append(openDiff, $('span'));
-			diffIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.diff));
-			openDiff.addEventListener('click', () => void this.commandService.executeCommand(BRIDGE_OPEN_DIFF, { diff: presentation.diff, path: file.path }));
-
-			for (let hunkIndex = 0; hunkIndex < file.hunks.length; hunkIndex += 1) {
-				if (hunkIndex > 0) {
-					append(fileBlock, $('div.shuncode-bridge-mini-diff-gap', undefined, '···'));
-				}
-				const hunk = file.hunks[hunkIndex];
-				const code = append(fileBlock, $('.shuncode-bridge-mini-diff-code'));
-				for (const line of hunk.lines) {
-					const row = append(code, $(`div.shuncode-bridge-mini-diff-line.${line.kind}`));
-					const lineNumber = line.kind === 'delete' ? line.oldLine : line.newLine;
-					append(row, $('span.shuncode-bridge-mini-diff-line-number', undefined, lineNumber === undefined ? '' : String(lineNumber)));
-					append(row, $('span.shuncode-bridge-mini-diff-marker', undefined, line.kind === 'add' ? '+' : line.kind === 'delete' ? '−' : ''));
-					const text = append(row, $('span.shuncode-bridge-mini-diff-text', undefined, line.text || ' '));
-					text.setAttribute('title', line.text);
-				}
-				if (hunk.truncated) {
-					append(code, $('div.shuncode-bridge-mini-diff-truncated', undefined, localize('shuncodeBridgeSession.diffMoreLines', "More changed lines…")));
-				}
-			}
-			if (file.truncated) {
-				append(fileBlock, $('div.shuncode-bridge-mini-diff-truncated', undefined, localize('shuncodeBridgeSession.diffMoreHunks', "More changes in this file…")));
-			}
-		}
 	}
 
 	private renderCodeSection(parent: HTMLElement, label: string, value: string | undefined): void {

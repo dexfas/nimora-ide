@@ -500,11 +500,17 @@ Work Sessions 继续复用 native `Location` anchors；旧 Bridge 的 `parseLspI
 
 TaskShadow 的 LSP 入口统一为 `recordLspArtifact()`，location operations 与 hover 由 artifact parser 分流。Bridge 的最后一个 `kind=lsp` / hover rich branch 和 Core `case 'lsp'` icon branch 已删除；LSP 已不再是旧 Chat Bridge Session 的不可替代职责。剩余 rich compatibility 收敛到 apply-patch mini diff、terminal 与 directory exploration。
 
-### Phase 7.16 ? Durable Directory Exploration
+### Phase 7.16 — Durable Directory Exploration
 
-`list_directory` ???? durable Task `report` artifact?metadata ???? entry ? workspace-relative path ? `file/folder/link/other` kind?entry count ? backend truncation?Work Sessions ???? native `ChatResponseFileTreePart` ???????? folder ????????? `children: []`???????????????link/other ????????????????
+`list_directory` 现在写入 durable Task `report` artifact，metadata 保留每个 entry 的 workspace-relative path 与 `file/folder/link/other` kind、entry count 和 backend truncation。Work Sessions 用独立的 native `ChatResponseFileTreePart` 重建目录树；显式 folder 即使没有子项也保留 `children: []`，因此空目录不会被误画成文件，link/other 继续作为叶子节点展示。
 
-? Bridge `parseListDirectoryItems()` / `kind=files` presentation?Core `renderToolItems()` / folder item renderer ???? generic item CSS ????????????? Chat Bridge Session ? rich-only ???? apply-patch mini diff ? terminal controls/output?
+旧 Bridge `parseListDirectoryItems()` / `kind=files` presentation、Core `renderToolItems()` / folder item renderer 以及对应 generic item CSS 已删除。完成这一阶段后，旧 Chat Bridge Session 的 rich-only 价值只剩 apply-patch mini diff 和 terminal controls/output。
+
+### Phase 7.17 — Durable Changeset Diff Content
+
+`apply_patch` changeset artifact 现在除 files/additions/deletions 外，还持久化最多 24k 的 canonical unified diff content，并用 `contentLanguage=diff` 与独立 `contentTruncated` 标记其展示边界。Work Sessions 复用通用 durable content renderer 展示 diff code block，同时继续用原生 file tree 表达受影响文件。这里没有强行使用 `ChatResponseMultiDiffPart`：该原生部件要求 before/after URI，而当前 `apply_patch` contract 只持有版本 hash 与 canonical diff，没有 durable old-file snapshot；伪造 URI 会错误表达完整历史文件。
+
+Bridge 的 unified-diff preview parser、`kind=edit`、Core mini-diff/edit-summary renderer 与对应 CSS 已删除。旧 Session 因此不再提供 changeset-specific rich UI；剩余唯一需要迁出的 rich compatibility 是 terminal controls/output。
 
 ### 风险
 

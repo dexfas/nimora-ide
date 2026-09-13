@@ -202,51 +202,14 @@ export interface BridgeTodo {
 }
 
 export interface BridgeActivityPresentation {
-  readonly kind: "edit" | "terminal" | "generic";
+  readonly kind: "terminal" | "generic";
   readonly title: string;
   readonly subtitle?: string;
   readonly input?: string;
   readonly output?: string;
-  readonly files?: string[];
-  readonly items?: BridgeActivityItem[];
-  readonly diff?: string;
-  readonly diffPreview?: BridgeDiffFilePreview[];
   readonly terminalId?: string;
   readonly commandId?: string;
   readonly exitCode?: number | null;
-}
-
-export interface BridgeDiffFilePreview {
-  readonly path: string;
-  readonly oldPath?: string;
-  readonly newPath?: string;
-  readonly hunks: BridgeDiffHunkPreview[];
-  readonly truncated?: boolean;
-}
-
-export interface BridgeDiffHunkPreview {
-  readonly oldStart: number;
-  readonly newStart: number;
-  readonly lines: BridgeDiffLinePreview[];
-  readonly truncated?: boolean;
-}
-
-export interface BridgeDiffLinePreview {
-  readonly kind: "context" | "add" | "delete";
-  readonly oldLine?: number;
-  readonly newLine?: number;
-  readonly text: string;
-}
-
-export interface BridgeActivityItem {
-  readonly kind: "file";
-  readonly path: string;
-  readonly line?: number;
-  readonly column?: number;
-  readonly label?: string;
-  readonly description?: string;
-  readonly additions?: number;
-  readonly deletions?: number;
 }
 
 export interface BridgeStatus {
@@ -359,80 +322,6 @@ function blockBetween(text: string | undefined, begin: string, end: string): str
   return value || undefined;
 }
 
-const MAX_DIFF_PREVIEW_FILES = 8;
-const MAX_DIFF_PREVIEW_HUNKS_PER_FILE = 4;
-const MAX_DIFF_PREVIEW_LINES_PER_HUNK = 18;
-
-function diffPath(header: string): string | undefined {
-  const value = header.trim();
-  if (!value || value === "/dev/null") return undefined;
-  return value.replace(/^[ab]\//, "");
-}
-
-function parseUnifiedDiffPreview(diff: string | undefined): BridgeDiffFilePreview[] {
-  if (!diff) return [];
-  const lines = diff.split(/\r?\n/);
-  const files: BridgeDiffFilePreview[] = [];
-  let currentFile: { oldPath?: string; newPath?: string; hunks: BridgeDiffHunkPreview[]; truncated?: boolean } | undefined;
-  let currentHunk: { oldStart: number; newStart: number; lines: BridgeDiffLinePreview[]; truncated?: boolean } | undefined;
-  let oldLine = 0;
-  let newLine = 0;
-
-  const finishHunk = () => {
-    if (!currentFile || !currentHunk) return;
-    if (currentFile.hunks.length < MAX_DIFF_PREVIEW_HUNKS_PER_FILE) currentFile.hunks.push(currentHunk);
-    else currentFile.truncated = true;
-    currentHunk = undefined;
-  };
-
-  const finishFile = () => {
-    finishHunk();
-    if (!currentFile) return;
-    const path = currentFile.newPath ?? currentFile.oldPath;
-    if (path) {
-      if (files.length < MAX_DIFF_PREVIEW_FILES) files.push({ path, ...currentFile });
-      else if (files.length > 0) files[files.length - 1] = { ...files[files.length - 1]!, truncated: true };
-    }
-    currentFile = undefined;
-  };
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]!;
-    if (line.startsWith("--- ")) {
-      finishFile();
-      const oldPath = diffPath(line.slice(4));
-      const next = lines[index + 1];
-      const newPath = next?.startsWith("+++ ") ? diffPath(next.slice(4)) : undefined;
-      currentFile = { oldPath, newPath, hunks: [] };
-      if (next?.startsWith("+++ ")) index += 1;
-      continue;
-    }
-    if (!currentFile) continue;
-    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-    if (hunk) {
-      finishHunk();
-      oldLine = Number(hunk[1]);
-      newLine = Number(hunk[2]);
-      currentHunk = { oldStart: oldLine, newStart: newLine, lines: [] };
-      continue;
-    }
-    if (!currentHunk || line === "\\ No newline at end of file" || line === "... <diff truncated>") continue;
-    const marker = line[0];
-    if (marker !== " " && marker !== "+" && marker !== "-") continue;
-    const previewLine: BridgeDiffLinePreview = marker === "+"
-      ? { kind: "add", newLine, text: line.slice(1) }
-      : marker === "-"
-        ? { kind: "delete", oldLine, text: line.slice(1) }
-        : { kind: "context", oldLine, newLine, text: line.slice(1) };
-    if (currentHunk.lines.length < MAX_DIFF_PREVIEW_LINES_PER_HUNK) currentHunk.lines.push(previewLine);
-    else currentHunk.truncated = true;
-    if (marker !== "+") oldLine += 1;
-    if (marker !== "-") newLine += 1;
-  }
-  finishFile();
-  return files;
-}
-
 function bridgePresentation(
   toolName: string,
   args: Record<string, unknown>,
@@ -453,23 +342,12 @@ function bridgePresentation(
     const additions = typeof summary.additions === "number" ? summary.additions : undefined;
     const deletions = typeof summary.deletions === "number" ? summary.deletions : undefined;
     const changeSummary = additions !== undefined || deletions !== undefined ? `+${additions ?? 0} -${deletions ?? 0}` : undefined;
-    const diff = boundedText(structured.diff, 32_000);
     return {
-      kind: "edit",
+      kind: "generic",
       title: files.length === 1 ? `Edited ${files[0]}` : `Edited ${files.length || "workspace"} files`,
       subtitle: isError ? "Edit failed" : changeSummary,
-      files,
-      items: fileRows.flatMap((file) => typeof file.path === "string" ? [{
-        kind: "file" as const,
-        path: typeof file.destination_path === "string" ? file.destination_path : file.path,
-        description: typeof file.action === "string" ? file.action : undefined,
-        additions: typeof file.additions === "number" ? file.additions : undefined,
-        deletions: typeof file.deletions === "number" ? file.deletions : undefined,
-      }] : []),
       input: undefined,
       output: isError ? output : undefined,
-      diff,
-      diffPreview: parseUnifiedDiffPreview(diff),
     };
   }
 

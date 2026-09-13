@@ -89,7 +89,7 @@ function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatRes
       markdown.appendMarkdown("### ");
       markdown.appendText(artifact.title);
       markdown.appendMarkdown("\n\n");
-      markdown.appendCodeblock(artifact.content);
+      markdown.appendCodeblock(artifact.content, artifact.contentLanguage);
       if (artifact.contentTruncated) markdown.appendMarkdown("\n\n_Content truncated in Work Sessions._");
       parts.push(new vscode.ChatResponseMarkdownPart(markdown));
     }

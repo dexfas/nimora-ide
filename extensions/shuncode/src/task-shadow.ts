@@ -12,6 +12,8 @@ export interface ShadowExecutionHandle {
   duplicate: boolean;
 }
 
+const MAX_CHANGESET_CONTENT_CHARS = 24_000;
+
 /**
  * Fail-open compatibility layer for Phase 3 shadow mode. Task journaling must
  * never break the established Chat, Bridge, tool execution, or UI path.
@@ -142,6 +144,8 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
       })
       : [];
     const summary = row.summary && typeof row.summary === "object" && !Array.isArray(row.summary) ? row.summary as Record<string, unknown> : {};
+    const rawDiff = typeof row.diff === "string" ? row.diff.trim() : "";
+    const content = rawDiff.length > MAX_CHANGESET_CONTENT_CHARS ? rawDiff.slice(0, MAX_CHANGESET_CONTENT_CHARS) : rawDiff;
     return this.safe("record changeset", () => this.runtime.recordArtifact(handle.taskId, {
       kind: "changeset",
       title: files.length === 1 ? `Changed ${files[0]}` : `Changed ${files.length} workspace files`,
@@ -152,6 +156,9 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
         additions: typeof summary.additions === "number" ? summary.additions : undefined,
         deletions: typeof summary.deletions === "number" ? summary.deletions : undefined,
         diffTruncated: row.diff_truncated === true,
+        content: content || undefined,
+        contentLanguage: content ? "diff" : undefined,
+        contentTruncated: row.diff_truncated === true || rawDiff.length > MAX_CHANGESET_CONTENT_CHARS,
       },
     }));
   }

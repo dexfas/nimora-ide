@@ -183,7 +183,9 @@ Phase 7.14 把 LSP 再按结果形态拆开：symbols/definition/references/impl
 
 Phase 7.15 完成 LSP presentation 迁移：hover 现在是 durable Task report artifact，保留 source Location、provider/semantic metadata 和有界 content；Work Sessions 用原生 anchor + 独立 markdown code block 展示。TaskShadow 统一成 `recordLspArtifact()`，Bridge/Core 的 `lsp` presentation kind 已删除。旧 Session 当前真正不可替代的 rich UI 只剩 apply-patch mini diff、terminal controls/output，以及 directory exploration。
 
-Phase 7.16 ? directory exploration ??? durable Task report?`list_directory` ?? typed entries?Work Sessions ? native file tree ???????????? folder?Bridge/Core ? `files` presentation?directory parser?generic item renderer/CSS ????? Session ???? apply-patch mini diff ? terminal controls/output ?? rich compatibility?
+Phase 7.16 把 directory exploration 也迁成 durable Task report：`list_directory` 保留 typed entries，Work Sessions 用 native file tree 重建目录结构并显式保留空 folder。Bridge/Core 的 `files` presentation、directory parser、generic item renderer/CSS 已移除。旧 Session 当前只剩 apply-patch mini diff 与 terminal controls/output 两类 rich compatibility。
+
+Phase 7.17 把 apply-patch mini diff 迁成 durable changeset content：Task journal 保存有界 canonical unified diff preview，并用 `diff` code block 在 Work Sessions 展示，受影响文件仍由 native file tree 承接。因为当前 changeset 没有 durable before-file snapshot，未伪装成 native multi-diff URI。Bridge/Core 的 edit presentation、diff preview parser/renderer/CSS 已删除；旧 Session 的最后一个 rich-only 职责只剩 terminal controls/output。
 
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
