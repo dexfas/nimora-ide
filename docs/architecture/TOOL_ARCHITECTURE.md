@@ -66,6 +66,8 @@ IdeToolBroker (thin facade)
 
 `src/ide-tool-definitions.ts` 是 IDE tool → provider owner 的 canonical mapping。`IdeToolBroker` 只负责 provider composition、VS Code LM registration，以及 Native Chat / Bridge 需要的兼容 facade；它不再实现 Workspace/Diagnostics/LSP/Terminal 业务本身。
 
+Phase 5.4.5 在不复制 provider 实现的前提下新增 Host execution adapter：`IdeToolBrokerHostCapabilityExecutor` 直接复用 `IdeToolBroker.invokeDirect()`，因此未来 Worker host-managed 路径与 Bridge/Native Chat 仍共享同一 Workspace/Terminal/Diagnostics/LSP backend。executor 会拒绝不属于 `ide-tool-definitions` 或 metadata environment 不是 `extension-host` 的 capability；这为后续 Capability Router 保留清晰 provider 边界。对应 `CapabilityMetadataHostAuthorizer` 默认 fail-closed：只有 `approval=none` 无需额外 grant，其余能力必须由具体产品 surface 提供 grant resolver。
+
 Terminal subsystem 没有为了“拆文件”而重写：原有 persistent PTY、ConPTY、echo gate、direct execution、output capture、interactive input 和 terminal reuse 逻辑整体迁入 `terminal-command-manager.ts`，并已通过真实 Extension Host terminal smoke。
 
 ## 3. 目标 Capability Definition

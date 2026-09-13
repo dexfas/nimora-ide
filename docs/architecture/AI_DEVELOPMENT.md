@@ -144,6 +144,7 @@ npm run test-shuncode-webmcp-command-transport
 npm run test-shuncode-web-worker-stack
 npm run test-shuncode-host-capability-execution
 npm run test-shuncode-host-capability-durable
+npm run test-shuncode-host-capability-policy
 ```
 
 `test-shuncode-webmcp-core` 必须保护 JSON/DeepSeek line protocol、nested args/heredoc、streaming incomplete-call guard、bounded repair、dedupe persistence/migration 与 pending-delivery bookkeeping。`test-shuncode-webmcp-browser` 使用真实 Edge 和 synthetic DeepSeek DOM 验证 HTTP/binding transport、result delivery、worker plain/tool/host-result/interrupt lifecycle、host-result idempotency 与 repeated-scan no-reexecution；`test-shuncode-webmcp-gateway-shared-agent` 启动真实 Gateway process/managed Edge，确认 Gateway 使用 canonical v25 Core/Site/Agent；`test-shuncode-webmcp-command-transport` 保护 command bridge event cursor/terminal/host-result/interrupt/health/disconnect；`test-shuncode-web-worker-stack` 保护 command transport → adapter → manager → TaskRuntime attach/detach/replay。以上都是自动 integration baseline，**不能写成 live DeepSeek 服务 E2E**；涉及发布级 DeepSeek 兼容时仍需要用户已登录网页上的真实 roundtrip。
@@ -151,6 +152,8 @@ npm run test-shuncode-host-capability-durable
 `test-shuncode-host-capability-execution` 保护未来 host-managed execution 的 execute-once/identity guard/mandatory authorization/result-delivery retry/ambiguous executor failure 语义。这个 smoke 通过不代表 host-managed production dispatch 已启用；在 TaskRuntime durable claim/recovery 完成前，禁止把该 coordinator 直接接到 `run_command` / `apply_patch` 等副作用 capability 的生产自动执行路径。
 
 `test-shuncode-host-capability-durable` 保护 strict Task journal、durable result envelope、进程重启后 result-only recovery、delivered 去重以及 ambiguous crash guard。它证明 Host execution 已具备 crash-safe at-most-once 基础，但仍不等于 WebMCP 已切到 host-managed dispatch；`IdeToolBroker` executor 与 approval/policy wiring 仍必须作为独立迁移阶段验证。
+
+`test-shuncode-host-capability-policy` 保护 metadata approval 的 fail-closed 语义和 IdeToolBroker provider boundary：`approval=none` 可以继续，`session` 等需要显式 grant；Extension Host executor 只能执行 canonical IDE tools，不能吞掉 Runtime/MCP-owned capability。该 smoke + Extension typecheck/bundle 证明真实 Broker object graph 可组合，但仍不代表自动 Worker dispatch 已开启。
 
 修改 page Worker control / command transport / WorkerSession binding 后，还必须运行 `npm run typecheck-shuncode` 与 `npm run compile-shuncode`。真实源码载体验证应确认 Extension Host 同时激活第一方扩展与 `shuncode-integrated-browser-bridge`，隔离 control port 的 `/agent.js` 包含 worker control surface，并在 ShunCode output log 中出现 `Web worker registered: nimora.web-worker via webmcp.integrated-browser`。这只证明真实 Extension Host wiring，不等于 live provider E2E。
 

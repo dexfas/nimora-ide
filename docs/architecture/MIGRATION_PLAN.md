@@ -287,6 +287,8 @@ Phase 5.4.3 新增未接生产 caller 的 `HostCapabilityExecutionCoordinator`�
 
 Phase 5.4.4 已把 Host execution claim/result/delivery 接到 TaskRuntime 的严格持久化路径。普通 Chat/Bridge shadow journal 仍保持 fail-open；未来 execution owner 使用 `claimExecution / finishExecutionStrict / markResultPreparedStrict / markDeliveredStrict`，任何落盘失败都会 fail-closed。Task execution 现在可持久化 bounded Worker result envelope，用于进程重启后只恢复结果而不重跑 capability。`TaskHostCapabilityExecutionStore` 的恢复规则是：`finished + matching result payload` 可恢复为 executed/delivered；`requested|executing`、finished 但缺 result、identity 不一致都视为 ambiguous/拒绝自动继续。自动 smoke 已覆盖 restart recovery、delivered 去重、strict claim 持久化失败和“执行后 result 落盘失败不得再次执行”。**这提供 crash-safe at-most-once，而不是对任意外部副作用宣称 impossible 的 exactly-once。**
 
+Phase 5.4.5 已把真实 Extension Host `IdeToolBroker` 包装为 `HostCapabilityExecutor`，并把 Coordinator + Task-backed durable store + metadata policy authorizer 组合成 dormant `HostCapabilityExecutionService`。该 service 在第一方 Extension activate 时完成对象图 wiring，但**没有订阅 WorkerEvent、没有自动 dispatch caller**。Broker executor 只处理 `src/ide-tool-definitions.ts` 明确归属 Extension Host 的能力；Runtime/MCP-owned `read_files/search_files/apply_patch` 不会误路由进 Broker。默认 authorizer 只自动放行 `approval=none`，`session/task-grant/always` 没有显式 grant resolver 时 fail-closed，因此 `run_command/send_command_input` 当前不会因 service 存在而获得执行权限。
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

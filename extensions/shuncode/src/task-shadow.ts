@@ -31,6 +31,11 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
     });
   }
 
+  /** Strict execution-owner APIs share the same durable TaskRuntime but bypass fail-open shadow wrappers. */
+  executionRuntime(): TaskRuntime {
+    return this.runtime;
+  }
+
   async ensureNativeChatTask(sourceKey: string, workspace: string | undefined, initialGoal: string): Promise<string | undefined> {
     return this.safe("ensure native chat task", async () => {
       await this.ready;

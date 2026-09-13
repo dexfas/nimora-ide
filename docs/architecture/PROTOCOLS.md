@@ -139,6 +139,8 @@ Phase 5.4.3 的 opt-in Host execution coordinator 进一步把 `execute once` �
 
 Phase 5.4.4 为 Host execution 增加 Task-backed durable contract。execution claim 必须先严格写入 `TaskExecutionRequested/Started`，成功返回后 caller 才允许启动 executor；执行结束后必须严格写入 `TaskExecutionFinished + TaskExecutionResultPrepared(resultPayload)`，delivery 确认再写 `TaskExecutionDelivered`。进程重启看到 `executing` 时不能推断“没执行”，必须按 ambiguous 处理；只有已经存在 matching durable result payload 时才能跳过 authorization/executor 并恢复 result。这样恢复策略是 conservative at-most-once：不重复副作用优先于自动重试。
 
+Phase 5.4.5 增加 provider/policy boundary。`IdeToolBrokerHostCapabilityExecutor` 仅接受 canonical IDE tool definitions 且要求 capability environment=`extension-host`；其他 provider-owned capability 必须由后续 Router 选择对应 executor。`CapabilityMetadataHostAuthorizer` 直接尊重 registry 的 `approval` 字段：`none` 可继续，其余模式若没有显式 grant resolver 一律拒绝。第一方 Extension 已构造 dormant Host execution service，但当前没有 protocol path 会自动调用它。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：

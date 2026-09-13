@@ -6,6 +6,7 @@ import { configureShunCodeModel, setShunCodeApiKey } from "./config.js";
 import { codexAuthManager, onCodexAuthChange } from "./codex-auth.js";
 import { BranchStateStore } from "./branch-state.js";
 import { registerShunCodeCustomAgents } from "./custom-agents.js";
+import { HostCapabilityExecutionService } from "./host-capability-execution-service.js";
 import { IdeToolBroker } from "./ide-tool-broker.js";
 import { ShunCodeLanguageModelProvider } from "./model-provider.js";
 import { registerShunCodeNativeChat } from "./native-chat.js";
@@ -56,6 +57,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("ShunCode");
   const ideToolBroker = new IdeToolBroker();
   const taskShadow = new TaskShadowRecorder(context, output);
+  const hostCapabilityExecution = new HostCapabilityExecutionService(taskShadow.executionRuntime(), ideToolBroker);
+  output.appendLine("[extension] host capability execution service staged; automatic Worker dispatch remains disabled");
+  void hostCapabilityExecution;
   const webWorkerSessions = new WorkerSessionManager({ taskBindings: taskShadow, executionProjection: taskShadow });
   const webWorkerTransport = new WebMcpCommandTransport({
     executeCommand: <T>(command: string, ...args: unknown[]) => vscode.commands.executeCommand<T>(command, ...args),
