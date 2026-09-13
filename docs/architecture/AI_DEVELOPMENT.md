@@ -146,6 +146,7 @@ npm run test-shuncode-gateway-upstream-provider
 npm run test-shuncode-gateway-managed-browser-provider
 npm run test-shuncode-gateway-personal-edge-provider
 npm run test-shuncode-gateway-webmcp-page-host
+npm run test-shuncode-gateway-mcp-exposure
 npm run test-shuncode-webmcp-command-transport
 npm run test-shuncode-web-worker-stack
 npm run test-shuncode-host-capability-execution
@@ -167,6 +168,8 @@ npm run test-shuncode-web-worker-release-gate
 `test-shuncode-gateway-personal-edge-provider` 保护 Personal Edge active-client/shared-tab heartbeat、403/400/409/410 control guard、command queue、poll abort、result settlement、command timeout 与 7 个 capability contract。`test-shuncode-gateway-federation` 还必须保留真实 Gateway `personal_edge_read → /poll → /result → MCP result` roundtrip；修改 Personal Edge route/provider 任一侧时两条都要运行。
 
 `test-shuncode-gateway-webmcp-page-host` 保护 canonical Core/Site/Agent source composition/cache、generic fallback、per-page session reuse、binding token guard、tool projection/invoke serialization 与 connect/prime contract。修改 Gateway page-agent source 路径、binding、token/session 或 `/control/connect-current` 时，除该 smoke 外还必须运行真实 Edge `test-shuncode-webmcp-gateway-shared-agent` 与 synthetic `test-shuncode-webmcp-browser`。
+
+`test-shuncode-gateway-mcp-exposure` 保护 Gateway lightweight Streamable HTTP MCP exposure 的 initialize/session/list/call/invalid-session contract。修改 `/mcp` route、session transport 或 exposure adapter 时，还必须运行 `test-shuncode-gateway-federation`。不要因为 Gateway adapter 存在就把 `bridge-server.ts` 的 EventStore/keepalive/session-capacity/Cloudflare public exposure 直接替换掉；两者当前 reliability profile 不同。
 
 `test-shuncode-host-capability-execution` 保护未来 host-managed execution 的 execute-once/identity guard/mandatory authorization/result-delivery retry/ambiguous executor failure 语义。这个 smoke 通过不代表 host-managed production dispatch 已启用；在 TaskRuntime durable claim/recovery 完成前，禁止把该 coordinator 直接接到 `run_command` / `apply_patch` 等副作用 capability 的生产自动执行路径。
 

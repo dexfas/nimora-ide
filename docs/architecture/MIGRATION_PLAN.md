@@ -366,7 +366,11 @@ web model → request → Nimora tool → result delivery → final model respon
 
 `webmcp-page-host.mjs` 现在独立拥有 managed Web AI page 的 agent source/session boundary：优先组合 canonical `webmcp-page-core.js + webmcp-site-adapters.js + arena-agent-bridge.js`，缺少 shared source env 时仍读取 `generic-chat-agent.js` compatibility fallback；factory source 只加载一次。每个 Playwright page 只建立一次随机 token + list/invoke binding session，binding 必须校验 token；tool result 经过 binary-safe serialization 后才进入网页。`connect()` 负责当前 page 的 ensure/status/prime/page-info，但不拥有 browser lifecycle。`test-shuncode-gateway-webmcp-page-host` 保护 source cache/composition、fallback、session reuse、token guard、binding payload、serialization、prime；真实 `test-shuncode-webmcp-gateway-shared-agent` 继续保护 canonical v25 binding transport。
 
-当前 `server.mjs` 已收缩为 provider/page-host composition、HTTP control routes、MCP exposure/session 与 process bootstrap。下一步评估 MCP Exposure Adapter / HTTP control router 是否值得继续拆；Bridge endpoint ownership 仍不在这一 commit 切换。
+### Phase 6.7 — Gateway MCP Exposure Adapter
+
+`mcp-exposure-adapter.mjs` 现在独立拥有 Gateway 本地标准 Streamable HTTP MCP server/session：initialize 创建 session，后续 POST/GET/DELETE 按 `mcp-session-id` 路由，tools/list 与 tools/call 仅回调 Capability federation。原 `/mcp` endpoint、invalid-session 400 response 与 server identity 保持不变。`test-shuncode-gateway-mcp-exposure` 用真实 MCP Client 保护 initialize/session/list/call/invalid-session；`test-shuncode-gateway-federation` 继续保护 adapter 接到真实 Gateway provider registry 后的端到端行为。
+
+**Bridge 暂不复用这个轻量 adapter。** `bridge-server.ts` 的 public exposure 还包含 bounded EventStore/replay、keepalive/retry、session capacity/idle cleanup、Cloudflare Quick Tunnel 的 JSON-response/SSE 限制、Task shadow execution 与 activity state。把它直接替换为 Gateway adapter 会是能力回退，而不是架构收敛。Phase 6 后续 Bridge reposition 应先迁走 progress/activity/business state，再决定是否抽一个更高层的共享 MCP exposure contract；不以代码复用为目的降级 Bridge reliability。
 
 ### 风险
 

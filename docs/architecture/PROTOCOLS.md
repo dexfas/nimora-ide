@@ -171,6 +171,8 @@ Phase 6.5 起，Personal Edge localhost protocol 的状态机也由独立 provid
 
 Phase 6.6 起，Gateway-managed WebMCP page binding 由独立 Page Host 持有。每个 page 建立一组随机 token + `listTools/invokeTool` Playwright bindings，重复 connect 复用同一 page session；binding token mismatch 必须在调用 capability 前拒绝。canonical v25 source 仍通过 Core/Site/Agent 三段源码组合生成，standalone generic agent 仅作为 shared source 未配置时的 compatibility fallback。Page Host 只依赖 capability list/call callbacks，不直接知道 upstream/Integrated/Personal provider。
 
+Phase 6.7 起，Gateway `/mcp` 由独立 `McpExposureAdapter` 持有 session map 与 Streamable HTTP transport。Adapter contract 只有 `listTools/callTool`；它不拥有 Capability provider、WebMCP page、Task 或 tunnel state。Bridge 的 public MCP endpoint 仍保留自己的增强 session protocol（EventStore replay、keepalive、capacity/cleanup、Cloudflare-specific behavior），因此当前两者是同一标准的不同 exposure profiles，而不是可以直接互换的 implementation。
+
 重要安全语义：只有明确的 read-only upstream tools 可以在 transport failure 后自动 retry；side-effecting tools 不自动 retry，而是要求 caller 核实状态。
 
 这条语义与 WebMCP execution ledger 是同一个更高层问题，未来应统一到 Tool metadata + execution policy。

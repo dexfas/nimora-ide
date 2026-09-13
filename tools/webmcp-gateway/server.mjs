@@ -1,11 +1,8 @@
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import express from 'express';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { createIntegratedBrowserProvider } from './integrated-browser-provider.mjs';
 import { createManagedBrowserProvider } from './managed-browser-provider.mjs';
+import { createGatewayMcpExposureAdapter } from './mcp-exposure-adapter.mjs';
 import { createPersonalEdgeProvider, PersonalEdgeControlError, PersonalEdgePollAbortedError } from './personal-edge-provider.mjs';
 import { GatewayProviderRegistry } from './provider-registry.mjs';
 import { createUpstreamMcpProvider } from './upstream-mcp-provider.mjs';
@@ -77,25 +74,10 @@ const webMcpPageHost = createWebMcpPageHost({
   sharedSiteAdaptersPath: SHARED_SITE_ADAPTERS_PATH,
   sharedPageAgentPath: SHARED_PAGE_AGENT_PATH,
 });
-
-function createServer() {
-  const server = new Server(
-    { name: 'shuncode-browser-gateway', version: '0.1.0' },
-    { capabilities: { tools: {}, logging: {} }, instructions: 'ShunCode tools plus persistent browser DOM/click/fill automation.' },
-  );
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return { tools: await listAllTools() };
-  });
-  server.setRequestHandler(CallToolRequestSchema, async request => {
-    const { name, arguments: args = {} } = request.params;
-    return await callAnyTool(name, args);
-  });
-  return server;
-}
+const mcpExposure = createGatewayMcpExposureAdapter({ listTools: listAllTools, callTool: callAnyTool });
 
 const app = express();
 app.use(express.json({ limit: '8mb' }));
-const sessions = new Map();
 
 app.get('/control/healthz', (_req, res) => {
   res.json({ ok: true, integratedWebMcp: true, controlVersion: 2, browserRunning: managedBrowserProvider.isRunning(), profile: managedBrowserProvider.profileDir, personalEdge: personalEdgeProvider.status() });
@@ -215,19 +197,7 @@ app.get('/healthz', async (_req, res) => {
 
 app.post('/mcp', async (req, res) => {
   try {
-    const sid = req.headers['mcp-session-id'];
-    let transport = typeof sid === 'string' ? sessions.get(sid) : undefined;
-    if (!transport && !sid && isInitializeRequest(req.body)) {
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: id => sessions.set(id, transport),
-      });
-      transport.onclose = () => { if (transport.sessionId) sessions.delete(transport.sessionId); };
-      await createServer().connect(transport);
-    } else if (!transport) {
-      return res.status(400).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Invalid or missing MCP session ID' }, id: null });
-    }
-    await transport.handleRequest(req, res, req.body);
+    await mcpExposure.handlePost(req, res, req.body);
   } catch (error) {
     if (!res.headersSent) res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
@@ -235,10 +205,7 @@ app.post('/mcp', async (req, res) => {
 
 for (const method of ['get', 'delete']) {
   app[method]('/mcp', async (req, res) => {
-    const sid = req.headers['mcp-session-id'];
-    const transport = typeof sid === 'string' ? sessions.get(sid) : undefined;
-    if (!transport) return res.status(400).send('Invalid or missing MCP session ID');
-    await transport.handleRequest(req, res);
+    await mcpExposure.handleSessionRequest(req, res);
   });
 }
 

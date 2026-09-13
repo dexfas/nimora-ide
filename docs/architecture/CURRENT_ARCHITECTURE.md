@@ -232,7 +232,9 @@ Phase 6.5 已把 Personal Edge provider/control broker 物理拆到 `personal-ed
 
 Phase 6.6 已把 Gateway-managed WebMCP page host 拆到 `webmcp-page-host.mjs`。canonical Core/Site/Agent source composition、standalone `generic-chat-agent.js` compatibility fallback、per-page WeakMap session、随机 token/binding、tool list/invoke binding、binary-safe serialization、connect/status/prime 都由 page host 持有。`server.mjs` 只注入 managed-browser 与 capability callbacks，并保留 `/control/connect-current` route。真实 Edge shared-agent 仍验证 canonical v25 agent 通过 Playwright binding transport 工作。
 
-Gateway `server.mjs` 现在主要剩 HTTP/MCP exposure routes、provider/page-host composition 与 process bootstrap；provider 和 page-agent session state 已不再散落在 composition root。
+Phase 6.7 又把 Gateway 的标准 Streamable HTTP MCP session/server 逻辑拆到 `mcp-exposure-adapter.mjs`。Adapter 只依赖 `listTools/callTool`，拥有 Gateway 本地 `/mcp` 的 initialize/session/list/call/invalid-session 语义；`server.mjs` 仅把 Express request/response 转交给 adapter。Bridge 的公网 MCP server 暂不改用该 adapter，因为 Bridge 仍额外拥有 event replay、keepalive/retry、session capacity/cleanup、Cloudflare JSON response 与 Task shadow execution 等高级语义。
+
+Gateway `server.mjs` 现在主要剩 HTTP control route wiring、provider/page-host/exposure composition 与 process bootstrap；provider、page-agent session 和 MCP session state 都已不再散落在 composition root。
 
 默认 WebMCP control/gateway 端口仍保持 48322/48321 以兼容现有安装版；源码/测试实例可通过 `SHUNCODE_WEBMCP_CONTROL_PORT` / `SHUNCODE_WEBMCP_GATEWAY_PORT` 隔离运行。动态 discovery/多 workspace handshake 尚未完成。
 
