@@ -31,6 +31,12 @@ try {
   await runtime.initialize();
   const task = await runtime.ensureTask({ kind: 'bridge', key: 'session-a', workspace: '/workspace' }, 'Refactor Gateway');
   assert.equal(task.goal, 'Refactor Gateway');
+  await runtime.updateContext(task.taskId, {
+    summary: 'Gateway refactor is in progress.',
+    constraints: ['No duplicate side effects', 'No duplicate side effects', 'Keep VS Code as foundation'],
+    decisions: ['Task owns durable state'],
+    relevantFiles: ['src/task-runtime.ts'],
+  });
 
   await runtime.setTodos(task.taskId, [
     { id: 'audit', title: 'Audit', status: 'completed' },
@@ -84,6 +90,8 @@ try {
   const beforeRestart = runtime.getTask(task.taskId)!;
   assert.equal(beforeRestart.todos[1]?.status, 'in_progress');
   assert.equal(beforeRestart.progress?.percent, 35);
+  assert.deepEqual(beforeRestart.context.constraints, ['No duplicate side effects', 'Keep VS Code as foundation']);
+  assert.equal(beforeRestart.context.summary, 'Gateway refactor is in progress.');
   assert.equal(beforeRestart.workerSessions['worker-session-1']?.workerId, 'nimora.api-runtime');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.status, 'succeeded');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.deliveryStatus, 'pending');
@@ -102,6 +110,7 @@ try {
   assert.equal(afterRestart.taskId, beforeRestart.taskId);
   assert.deepEqual(afterRestart.todos, beforeRestart.todos);
   assert.deepEqual(afterRestart.progress, beforeRestart.progress);
+  assert.deepEqual(afterRestart.context, beforeRestart.context);
   assert.deepEqual(afterRestart.workerSessions, beforeRestart.workerSessions);
   assert.deepEqual(afterRestart.executions, beforeRestart.executions);
   assert.deepEqual(afterRestart.artifacts, beforeRestart.artifacts);

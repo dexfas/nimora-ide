@@ -144,6 +144,22 @@ Context Engine 属于 Task Runtime，负责：
 
 Capability Router 与 Skill Router 根据预算动态决定暴露内容。
 
+### Phase 4.4 durable context / handoff
+
+Task Snapshot 现在正式包含：
+
+```text
+context.summary
+context.constraints[]
+context.decisions[]
+context.relevantFiles[]
+context.updatedAt
+```
+
+`TaskRuntime.updateContext()` 会在 journal 边界做 trim、去重、单项字符限制和最大条目限制，避免“长期记忆”本身无限增长。`src/context-handoff.ts` 再从 Task Snapshot 选取 goal、context、todos、progress、artifacts、recent executions 和 Worker history，生成结构化 package 与受 `maxChars` 硬预算约束的文本 projection。
+
+该 handoff 不等于 Memory，也不等于 transcript migration：provider-native 对话历史继续留在原 WorkerSession；handoff 只携带继续完成 Task 所需的最小持久事实。Execution 的 delivery state 会被保留，避免 failover 时把 `pending` 结果误当作 `delivered` 后重新执行副作用操作。
+
 ## 6. Memory
 
 Memory 不等于“把所有旧聊天塞进 prompt”。

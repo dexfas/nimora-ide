@@ -6,6 +6,7 @@ import {
   replayTaskEvents,
   taskSourceIdentity,
   type TaskArtifactRef,
+  type TaskContextState,
   type TaskEvent,
   type TaskExecution,
   type TaskInteractionOutcome,
@@ -18,9 +19,13 @@ import {
 
 const MAX_GOAL_CHARS = 8_000;
 const MAX_RESULT_SUMMARY_CHARS = 2_000;
+const MAX_CONTEXT_SUMMARY_CHARS = 12_000;
+const MAX_CONTEXT_ITEM_CHARS = 1_500;
+const MAX_CONTEXT_ITEMS = 64;
 const TASK_EVENT_TYPES = new Set<TaskEvent["type"]>([
   "TaskCreated",
   "TaskGoalUpdated",
+  "TaskContextUpdated",
   "TaskStatusChanged",
   "TaskTodosUpdated",
   "TaskProgressUpdated",
@@ -57,6 +62,20 @@ function boundText(value: string | undefined, maxChars: number): string | undefi
   const normalized = value.trim();
   if (!normalized) return undefined;
   return normalized.length <= maxChars ? normalized : `${normalized.slice(0, maxChars - 1)}…`;
+}
+
+function boundTextList(values: readonly string[] | undefined, maxItems = MAX_CONTEXT_ITEMS): string[] {
+  if (!values?.length) return [];
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const bounded = boundText(value, MAX_CONTEXT_ITEM_CHARS);
+    if (!bounded || seen.has(bounded)) continue;
+    seen.add(bounded);
+    result.push(bounded);
+    if (result.length >= maxItems) break;
+  }
+  return result;
 }
 
 function stableJson(value: unknown): string {
@@ -147,6 +166,21 @@ export class TaskRuntime {
 
   async setTodos(taskId: string, todos: readonly TaskTodo[]): Promise<void> {
     await this.append(taskId, "TaskTodosUpdated", { todos: todos.map(todo => ({ ...todo })) });
+  }
+
+  async updateContext(taskId: string, input: Partial<Pick<TaskContextState, "summary" | "constraints" | "decisions" | "relevantFiles">>): Promise<TaskContextState> {
+    await this.initialize();
+    const current = this.tasks.get(taskId)?.context;
+    if (!current) throw new Error(`Unknown task: ${taskId}`);
+    const context: TaskContextState = {
+      summary: input.summary === undefined ? current.summary : boundText(input.summary, MAX_CONTEXT_SUMMARY_CHARS),
+      constraints: input.constraints === undefined ? [...current.constraints] : boundTextList(input.constraints),
+      decisions: input.decisions === undefined ? [...current.decisions] : boundTextList(input.decisions),
+      relevantFiles: input.relevantFiles === undefined ? [...current.relevantFiles] : boundTextList(input.relevantFiles, 128),
+      updatedAt: this.now(),
+    };
+    await this.append(taskId, "TaskContextUpdated", { context });
+    return structuredClone(this.tasks.get(taskId)!.context);
   }
 
   async reportProgress(taskId: string, progress: Omit<TaskProgress, "at">): Promise<void> {

@@ -26,6 +26,14 @@ export interface TaskProgress {
   at: string;
 }
 
+export interface TaskContextState {
+  summary?: string;
+  constraints: string[];
+  decisions: string[];
+  relevantFiles: string[];
+  updatedAt?: string;
+}
+
 export interface TaskInteraction {
   interactionId: string;
   surface: "native-chat" | "bridge";
@@ -80,6 +88,7 @@ export interface TaskSnapshot {
   source: TaskSource;
   status: TaskStatus;
   goal?: string;
+  context: TaskContextState;
   createdAt: string;
   updatedAt: string;
   todos: TaskTodo[];
@@ -104,6 +113,7 @@ interface TaskEventBase<T extends string, P> {
 export type TaskEvent =
   | TaskEventBase<"TaskCreated", { source: TaskSource; goal?: string }>
   | TaskEventBase<"TaskGoalUpdated", { goal: string }>
+  | TaskEventBase<"TaskContextUpdated", { context: TaskContextState }>
   | TaskEventBase<"TaskStatusChanged", { status: TaskStatus }>
   | TaskEventBase<"TaskTodosUpdated", { todos: TaskTodo[] }>
   | TaskEventBase<"TaskProgressUpdated", { progress: TaskProgress }>
@@ -146,6 +156,7 @@ export function applyTaskEvent(snapshot: TaskSnapshot | undefined, event: TaskEv
       source: { ...event.payload.source },
       status: "ready",
       goal: event.payload.goal,
+      context: { constraints: [], decisions: [], relevantFiles: [] },
       createdAt: event.at,
       updatedAt: event.at,
       todos: [],
@@ -164,6 +175,16 @@ export function applyTaskEvent(snapshot: TaskSnapshot | undefined, event: TaskEv
   switch (event.type) {
     case "TaskGoalUpdated":
       return { ...base, goal: event.payload.goal };
+    case "TaskContextUpdated":
+      return {
+        ...base,
+        context: {
+          ...event.payload.context,
+          constraints: [...event.payload.context.constraints],
+          decisions: [...event.payload.context.decisions],
+          relevantFiles: [...event.payload.context.relevantFiles],
+        },
+      };
     case "TaskStatusChanged":
       return { ...base, status: event.payload.status };
     case "TaskTodosUpdated":

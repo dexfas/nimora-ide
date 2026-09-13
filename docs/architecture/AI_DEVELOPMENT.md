@@ -113,6 +113,8 @@ npm run compile-shuncode
 
 `WorkerSessionManager` smoke 必须覆盖：多 adapter registry、managed/native session id 分离、Task bind/rebind/unbind、running-session ownership guard、send/interrupt/resume/health routing、dispose cleanup，以及 Task journal restart replay。Manager/Task contract 改动同样要确认 `compile-client` 中没有这些新文件自己的 diagnostic。
 
+`Context Handoff` 改动必须运行 `npm run test-shuncode-context-handoff`。至少验证 durable Task context replay、provider-neutral package、provider-native session id 不泄露、execution delivery state 保留、普通预算与极小硬预算、截断 section 显式报告，以及 restart 前后 handoff package/text parity。不要把完整 provider transcript 为了“方便切换”重新塞进 Task journal。
+
 如果改动 Bridge shadow wiring，还要在隔离源码实例中做真实 local MCP roundtrip。由于第一方扩展在普通 source carrier 中仍可能被当作 builtin/Production mode，Bridge local smoke 应显式使用 extension development path：
 
 ```powershell

@@ -186,6 +186,31 @@ Manager 不拥有 transcript、Task goal、capability policy 或 context packing
 
 运行中的 WorkerSession 不允许 rebind/unbind。这个限制不是 UI 偏好，而是 ownership invariant：一次 turn 尚未结束时，不能把同一执行 session 从 Task A 静默改挂到 Task B。
 
+## 6.2 Context Handoff
+
+Phase 4.4 已新增 `src/context-handoff.ts`。Worker 切换不复制完整旧 transcript，而是从 durable Task Snapshot 构造 bounded、provider-neutral 的 handoff package：
+
+```text
+Task Snapshot
+  ├─ goal
+  ├─ context summary / constraints / decisions
+  ├─ relevant files
+  ├─ progress / todos
+  ├─ recent artifacts
+  ├─ recent executions + delivery state
+  └─ Worker history
+        ↓
+Context Handoff Package
+        ↓ budgeted text projection / adapter-specific packing
+next Worker
+```
+
+Task context 本身通过 `TaskContextUpdated` 持久化在 append-only journal，当前字段为 `summary / constraints / decisions / relevantFiles`。写入侧负责去重、字符上限和条目数上限；重启 replay 后生成的 handoff package 保持一致。
+
+Handoff package 刻意不包含 provider-native `adapterSessionId`、完整 tool arguments、完整 diff 或旧聊天全文。它可以包含 Nimora-managed session id 作为 Task-domain 历史引用，但 transport/provider 私有身份不应成为跨 Worker 上下文的一部分。
+
+文本 projection 的 `maxChars` 是硬预算。某 section 超预算时会进入 `truncatedSections`；结构化 package 仍可由未来 adapter 根据模型 context window、tokenizer 与 capability budget 进一步压缩。当前实现用字符预算保护 Phase 4 迁移边界，后续 Context Engine 再升级为 token-aware budget。
+
 ## 7. Web Worker / WebMCP
 
 ### 正式 Adapter Layer

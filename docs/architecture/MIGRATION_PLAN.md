@@ -193,7 +193,7 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 
 ## 6. Phase 4 — Worker Contract
 
-**Status: In progress — Phase 4.1 ApiWorkerAdapter + Phase 4.2 AgentHostWorkerAdapter + Phase 4.3 WorkerSessionManager completed (2026-09-13)**
+**Status: In progress — Phase 4.1 ApiWorkerAdapter + Phase 4.2 AgentHostWorkerAdapter + Phase 4.3 WorkerSessionManager + Phase 4.4 Context Handoff completed (2026-09-13)**
 
 ### 目标
 
@@ -204,7 +204,7 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 1. `ApiWorkerAdapter` 包装现有 first-party Runtime；✅ contract/adapter 已落地，Native Chat 尚未切换 caller
 2. `AgentHostWorkerAdapter` 包装现有 IAgentConnection/AHP；✅ semantic adapter 已落地，现有 Sessions/UI caller 尚未切换
 3. Worker Session Manager；✅ registry / managed session identity / Task binding 已落地
-4. Context handoff package；
+4. Context handoff package；✅ durable Task context + provider-neutral budgeted handoff 已落地
 5. Web Worker adapter 最后接入。
 
 ### 风险
@@ -231,6 +231,10 @@ Phase 4.3 已新增 `src/worker-session-manager.ts`。Manager 为 heterogeneous 
 
 Task Runtime 同步新增 `TaskWorkerAttached` / `TaskWorkerDetached` 事件以及 `TaskSnapshot.workerSessions`。绑定关系进入 append-only journal，重启后可以 replay；同一 managed session id 若突然指向不同 worker/native session 会被拒绝，防止 identity 被静默篡改。运行中的 WorkerSession 也不能被 rebind/unbind 到另一个 Task，避免 Task ownership 在一次正在执行的 turn 中途漂移。
 
+Phase 4.4 已新增 durable `TaskContextUpdated`，Task Snapshot 正式持有 bounded `summary / constraints / decisions / relevantFiles`。`src/context-handoff.ts` 从 Task Source of Truth 生成 provider-neutral handoff package 和文本 projection；它不复制 provider-native transcript，也不把 adapter-native session id 暴露给下一个 Worker。`maxChars` 是 caller 的硬预算，section 被截断时会显式记录 `truncatedSections`，而不是静默撑爆上下文。
+
+handoff 会保留 execution 的 `status / deliveryStatus`，因此一次 tool 已执行但只到 `delivery=pending` 时，切换 Worker 不会把它误解释为“远端已经收到结果”。这为后续真正的 worker switch/failover 提供了最低限度的 at-most-once 语义基础。
+
 ### 测试
 
 - API adapter fake-runtime parity（streaming/reasoning/capability/checkpoint/cancel/health/tool invocation context/legacy trace projection）；✅
@@ -239,7 +243,8 @@ Task Runtime 同步新增 `TaskWorkerAttached` / `TaskWorkerDetached` 事件以�
 - AgentHost real local/remote provider session；⏳ 现有 Sessions/UI caller 尚未切换
 - cancel/resume/health；API cancel/resume/health ✅，AgentHost cancel/health ✅，AgentHost resume ⏳
 - WorkerSessionManager registry/routing/Task attach-detach/replay；✅
-- worker switch with same Task context；⏳ 等待 Phase 4.4 Context Handoff
+- Context Handoff package/budget/replay/provider-neutral identity；✅
+- worker switch with same Task context；🟡 handoff package 已就绪，待真实 caller switch/failover integration
 
 ### 回滚
 
