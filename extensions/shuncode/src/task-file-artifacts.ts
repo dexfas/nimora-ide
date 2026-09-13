@@ -112,6 +112,29 @@ export function taskDiagnosticsArtifact(args: unknown, resultText: string): Task
   };
 }
 
+export function taskDirectoryArtifact(args: unknown, resultText: string): TaskFileNavigationArtifactInput | undefined {
+  if (!resultText.includes("=== LIST_DIRECTORY BEGIN ===")) return undefined;
+  const input = asRecord(args);
+  const target = resultJsonString(resultText, "path") ?? (typeof input?.path === "string" && input.path.trim() ? input.path.trim() : ".");
+  const entries = [...resultText.matchAll(/^\[(DIR|FILE|LINK|OTHER)\]\s+(.+)$/gm)].flatMap(match => {
+    const path = match[2]?.trim();
+    if (!path) return [];
+    const kind = match[1] === "DIR" ? "folder" : match[1] === "FILE" ? "file" : match[1] === "LINK" ? "link" : "other";
+    return [{ path, kind }];
+  });
+  const total = resultInteger(resultText, "returned_entries") ?? entries.length;
+  return {
+    kind: "report",
+    title: target === "." ? "Explored workspace" : `Explored ${target}`,
+    metadata: {
+      entries,
+      entryCount: total,
+      sourceTool: "list_directory",
+      resultTruncated: resultBoolean(resultText, "truncated"),
+    },
+  };
+}
+
 export function taskLspLocationArtifact(args: unknown, resultText: string): TaskFileNavigationArtifactInput | undefined {
   if (!resultText.includes("=== LSP BEGIN ===")) return undefined;
   const input = asRecord(args);

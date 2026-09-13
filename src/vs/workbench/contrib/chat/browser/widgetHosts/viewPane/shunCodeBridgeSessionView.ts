@@ -14,12 +14,11 @@ import { ICommandService } from '../../../../../../platform/commands/common/comm
 import { defaultButtonStyles } from '../../../../../../platform/theme/browser/defaultStyles.js';
 
 interface BridgeActivityPresentation {
-	readonly kind: 'files' | 'edit' | 'terminal' | 'generic';
+	readonly kind: 'edit' | 'terminal' | 'generic';
 	readonly title: string;
 	readonly subtitle?: string;
 	readonly input?: string;
 	readonly output?: string;
-	readonly files?: string[];
 	readonly items?: BridgeActivityItem[];
 	readonly diff?: string;
 	readonly diffPreview?: BridgeDiffFilePreview[];
@@ -51,12 +50,8 @@ interface BridgeDiffLinePreview {
 }
 
 interface BridgeActivityItem {
-	readonly kind: 'file' | 'folder';
+	readonly kind: 'file';
 	readonly path: string;
-	readonly line?: number;
-	readonly column?: number;
-	readonly label?: string;
-	readonly description?: string;
 	readonly additions?: number;
 	readonly deletions?: number;
 }
@@ -128,7 +123,6 @@ function activityIcon(activity: BridgeActivity): ThemeIcon {
 		return ThemeIcon.modify(Codicon.loading, 'spin');
 	}
 	switch (activity.presentation?.kind) {
-		case 'files': return Codicon.files;
 		case 'edit': return Codicon.edit;
 		case 'terminal': return Codicon.terminal;
 		default: return Codicon.tools;
@@ -393,9 +387,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 		}
 
 		const body = append(card, $('.shuncode-bridge-tool-body'));
-		if (presentation.kind !== 'edit') {
-			this.renderToolItems(body, presentation);
-		}
 		if (presentation.kind === 'edit') {
 			this.renderMiniDiff(body, presentation);
 		}
@@ -504,50 +495,6 @@ export class ShunCodeBridgeSessionView extends Disposable {
 				append(fileBlock, $('div.shuncode-bridge-mini-diff-truncated', undefined, localize('shuncodeBridgeSession.diffMoreHunks', "More changes in this file…")));
 			}
 		}
-	}
-
-	private renderToolItems(parent: HTMLElement, presentation: BridgeActivityPresentation): void {
-		const items: BridgeActivityItem[] = presentation.items ?? (presentation.files ?? []).map(path => ({ kind: 'file' as const, path }));
-		if (!items.length) return;
-		const container = append(parent, $('.shuncode-bridge-tool-items'));
-		for (const item of items.slice(0, 40)) {
-			const row = append(container, $('div.shuncode-bridge-tool-item'));
-			row.tabIndex = 0;
-			row.setAttribute('role', 'button');
-			row.setAttribute('title', item.line ? `${item.path}:${item.line}:${item.column ?? 1}` : item.path);
-			const icon = append(row, $('span.shuncode-bridge-tool-item-icon'));
-			const itemIcon = item.kind === 'folder' ? Codicon.folder
-				: Codicon.file;
-			icon.classList.add(...ThemeIcon.asClassNameArray(itemIcon));
-			const labels = append(row, $('.shuncode-bridge-tool-item-labels'));
-			append(labels, $('span.shuncode-bridge-tool-item-primary', undefined, item.label || item.path));
-			const location = item.line ? `${item.path}:${item.line}${item.column ? `:${item.column}` : ''}` : (item.label ? item.path : undefined);
-			const change = item.additions !== undefined || item.deletions !== undefined ? `+${item.additions ?? 0} -${item.deletions ?? 0}` : undefined;
-			const secondary = [location, item.description, change].filter(Boolean).join(' · ');
-			if (secondary) append(labels, $('span.shuncode-bridge-tool-item-secondary', undefined, secondary));
-
-			const openResource = () => void this.commandService.executeCommand(BRIDGE_OPEN_RESOURCE, { path: item.path, line: item.line, column: item.column, folder: item.kind === 'folder' });
-			row.addEventListener('click', openResource);
-			row.addEventListener('keydown', event => {
-				if (event.key === 'Enter' || event.key === ' ') {
-					event.preventDefault();
-					openResource();
-				}
-			});
-
-			if (presentation.kind === 'edit' && presentation.diff && item.kind === 'file') {
-				const diffButton = append(row, $<HTMLButtonElement>('button.shuncode-bridge-tool-item-action'));
-				diffButton.type = 'button';
-				diffButton.setAttribute('title', localize('shuncodeBridgeSession.openFileDiff', "Open file diff"));
-				const diffIcon = append(diffButton, $('span'));
-				diffIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.diff));
-				diffButton.addEventListener('click', event => {
-					event.stopPropagation();
-					void this.commandService.executeCommand(BRIDGE_OPEN_DIFF, { diff: presentation.diff, path: item.path });
-				});
-			}
-		}
-		if (items.length > 40) append(container, $('span.shuncode-bridge-tool-more', undefined, localize('shuncodeBridgeSession.moreItems', "{0} more items", items.length - 40)));
 	}
 
 	private renderCodeSection(parent: HTMLElement, label: string, value: string | undefined): void {

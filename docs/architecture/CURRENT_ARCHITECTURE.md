@@ -183,6 +183,8 @@ Phase 7.14 把 LSP 再按结果形态拆开：symbols/definition/references/impl
 
 Phase 7.15 完成 LSP presentation 迁移：hover 现在是 durable Task report artifact，保留 source Location、provider/semantic metadata 和有界 content；Work Sessions 用原生 anchor + 独立 markdown code block 展示。TaskShadow 统一成 `recordLspArtifact()`，Bridge/Core 的 `lsp` presentation kind 已删除。旧 Session 当前真正不可替代的 rich UI 只剩 apply-patch mini diff、terminal controls/output，以及 directory exploration。
 
+Phase 7.16 ? directory exploration ??? durable Task report?`list_directory` ?? typed entries?Work Sessions ? native file tree ???????????? folder?Bridge/Core ? `files` presentation?directory parser?generic item renderer/CSS ????? Session ???? apply-patch mini diff ? terminal controls/output ?? rich compatibility?
+
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
 ## 7. Bridge

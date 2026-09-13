@@ -500,6 +500,12 @@ Work Sessions 继续复用 native `Location` anchors；旧 Bridge 的 `parseLspI
 
 TaskShadow 的 LSP 入口统一为 `recordLspArtifact()`，location operations 与 hover 由 artifact parser 分流。Bridge 的最后一个 `kind=lsp` / hover rich branch 和 Core `case 'lsp'` icon branch 已删除；LSP 已不再是旧 Chat Bridge Session 的不可替代职责。剩余 rich compatibility 收敛到 apply-patch mini diff、terminal 与 directory exploration。
 
+### Phase 7.16 ? Durable Directory Exploration
+
+`list_directory` ???? durable Task `report` artifact?metadata ???? entry ? workspace-relative path ? `file/folder/link/other` kind?entry count ? backend truncation?Work Sessions ???? native `ChatResponseFileTreePart` ???????? folder ????????? `children: []`???????????????link/other ????????????????
+
+? Bridge `parseListDirectoryItems()` / `kind=files` presentation?Core `renderToolItems()` / folder item renderer ???? generic item CSS ????????????? Chat Bridge Session ? rich-only ???? apply-patch mini diff ? terminal controls/output?
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

@@ -202,7 +202,7 @@ export interface BridgeTodo {
 }
 
 export interface BridgeActivityPresentation {
-  readonly kind: "files" | "edit" | "terminal" | "generic";
+  readonly kind: "edit" | "terminal" | "generic";
   readonly title: string;
   readonly subtitle?: string;
   readonly input?: string;
@@ -239,7 +239,7 @@ export interface BridgeDiffLinePreview {
 }
 
 export interface BridgeActivityItem {
-  readonly kind: "file" | "folder";
+  readonly kind: "file";
   readonly path: string;
   readonly line?: number;
   readonly column?: number;
@@ -359,17 +359,6 @@ function blockBetween(text: string | undefined, begin: string, end: string): str
   return value || undefined;
 }
 
-function parseListDirectoryItems(text: string | undefined): BridgeActivityItem[] {
-  if (!text) return [];
-  const items: BridgeActivityItem[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const match = line.match(/^\[(DIR|FILE|LINK|OTHER)\]\s+(.+)$/);
-    if (!match) continue;
-    items.push({ kind: match[1] === "DIR" ? "folder" : "file", path: match[2] });
-  }
-  return items;
-}
-
 const MAX_DIFF_PREVIEW_FILES = 8;
 const MAX_DIFF_PREVIEW_HUNKS_PER_FILE = 4;
 const MAX_DIFF_PREVIEW_LINES_PER_HUNK = 18;
@@ -481,20 +470,6 @@ function bridgePresentation(
       output: isError ? output : undefined,
       diff,
       diffPreview: parseUnifiedDiffPreview(diff),
-    };
-  }
-
-  if (toolName === "list_directory") {
-    const target = typeof args.path === "string" && args.path.trim() ? args.path.trim() : "workspace";
-    const items = parseListDirectoryItems(resultText);
-    return {
-      kind: "files",
-      title: `Explored ${target}`,
-      subtitle: items.length ? `${items.length} item${items.length === 1 ? "" : "s"}` : undefined,
-      items,
-      files: items.filter((item) => item.kind === "file").map((item) => item.path),
-      input: undefined,
-      output: isError ? output : undefined,
     };
   }
 
@@ -1907,6 +1882,8 @@ export class BridgeManager implements vscode.Disposable {
           await this.taskShadow.recordFileNavigationArtifact(execution, toolName, result.structuredContent);
           if (toolName === "get_diagnostics") {
             await this.taskShadow.recordDiagnosticsArtifact(execution, args, resultText);
+          } else if (toolName === "list_directory") {
+            await this.taskShadow.recordDirectoryArtifact(execution, args, resultText);
           } else if (toolName === "lsp") {
             await this.taskShadow.recordLspArtifact(execution, args, resultText);
           }

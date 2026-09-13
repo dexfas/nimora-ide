@@ -166,65 +166,6 @@
 	padding: 3px 8px 10px 31px;
 }
 
-.shuncode-bridge-tool-items,
-.shuncode-bridge-tool-files {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-}
-
-.shuncode-bridge-tool-item,
-.shuncode-bridge-tool-file {
-	display: flex;
-	min-width: 0;
-	align-items: center;
-	gap: 6px;
-	min-height: 25px;
-	padding: 2px 5px;
-	border-radius: 4px;
-	font-size: 12px;
-}
-
-.shuncode-bridge-tool-item {
-	cursor: pointer;
-}
-
-.shuncode-bridge-tool-item:hover,
-.shuncode-bridge-tool-item:focus-visible {
-	outline: none;
-	background: var(--vscode-list-hoverBackground);
-}
-
-.shuncode-bridge-tool-item-icon {
-	flex: none;
-	color: var(--vscode-descriptionForeground);
-}
-
-.shuncode-bridge-tool-item-labels {
-	display: flex;
-	min-width: 0;
-	flex: 1;
-	flex-direction: column;
-	gap: 1px;
-}
-
-.shuncode-bridge-tool-item-primary,
-.shuncode-bridge-tool-item-secondary {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.shuncode-bridge-tool-item-primary {
-	color: var(--vscode-foreground);
-}
-
-.shuncode-bridge-tool-item-secondary {
-	font-size: 10px;
-	color: var(--vscode-descriptionForeground);
-}
-
-.shuncode-bridge-tool-item-action,
 .shuncode-bridge-tool-action {
 	display: inline-flex;
 	flex: none;
@@ -242,15 +183,6 @@
 	font-size: 11px;
 }
 
-.shuncode-bridge-tool-item-action {
-	width: 25px;
-	padding: 0;
-	background: transparent;
-	border-color: transparent;
-	color: var(--vscode-descriptionForeground);
-}
-
-.shuncode-bridge-tool-item-action:hover,
 .shuncode-bridge-tool-action:hover {
 	background: var(--vscode-button-secondaryHoverBackground);
 	color: var(--vscode-button-secondaryForeground);

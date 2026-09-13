@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { projectTaskCenterState, type TaskCenterTaskDetail } from "../../../src/task-center-projection.js";
 import type { TaskRuntime } from "../../../src/task-runtime.js";
 import type { TaskShadowRecorder } from "./task-shadow.js";
-import { buildTaskSessionFileTree, formatTaskSessionMarkdown, presentTaskSession, presentTaskSessionArtifacts, type TaskSessionPresentationStatus } from "./task-center-session-presentation.js";
+import { buildTaskSessionEntryTree, buildTaskSessionFileTree, formatTaskSessionMarkdown, presentTaskSession, presentTaskSessionArtifacts, type TaskSessionPresentationStatus } from "./task-center-session-presentation.js";
 
 export const NIMORA_TASK_SESSION_TYPE = "nimora-task";
 
@@ -70,6 +70,10 @@ function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatRes
     if (tree.length) parts.push(new vscode.ChatResponseFileTreePart(tree, vscode.Uri.file(detail.summary.workspace)));
   }
   for (const artifact of artifacts) {
+    if (detail.summary.workspace && artifact.entries.length) {
+      const tree = buildTaskSessionEntryTree(artifact.entries);
+      if (tree.length) parts.push(new vscode.ChatResponseFileTreePart(tree, vscode.Uri.file(detail.summary.workspace)));
+    }
     const uri = safeArtifactUri(artifact.uri, detail.summary.workspace);
     if (uri) parts.push(new vscode.ChatResponseAnchorPart(uri, artifact.title));
     for (const location of artifact.locations) {

@@ -26,6 +26,8 @@ export interface TaskSessionArtifactPresentation {
   locations: TaskSessionArtifactLocation[];
   locationCount?: number;
   locationsTruncated: boolean;
+  entries: TaskSessionArtifactEntry[];
+  entryCount?: number;
   content?: string;
   contentTruncated: boolean;
 }
@@ -35,6 +37,11 @@ export interface TaskSessionArtifactLocation {
   line: number;
   column?: number;
   label?: string;
+}
+
+export interface TaskSessionArtifactEntry {
+  path: string;
+  kind: "file" | "folder" | "link" | "other";
 }
 
 export interface TaskSessionFileTreeNode {
@@ -136,6 +143,18 @@ function artifactLocations(metadata: Record<string, unknown> | undefined): TaskS
   }).slice(0, 40);
 }
 
+function artifactEntries(metadata: Record<string, unknown> | undefined): TaskSessionArtifactEntry[] {
+  if (!Array.isArray(metadata?.entries)) return [];
+  return metadata.entries.flatMap(value => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    const row = value as Record<string, unknown>;
+    const path = safeWorkspaceRelativePath(row.path);
+    const kind = row.kind;
+    if (!path || (kind !== "file" && kind !== "folder" && kind !== "link" && kind !== "other")) return [];
+    return [{ path, kind }];
+  });
+}
+
 export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskSessionArtifactPresentation[] {
   return detail.artifacts.map(artifact => {
     const metadata = artifact.metadata;
@@ -144,6 +163,7 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       : [];
     const uri = typeof artifact.uri === "string" && artifact.uri.trim() ? artifact.uri.trim() : undefined;
     const locations = artifactLocations(metadata);
+    const entries = artifactEntries(metadata);
     const content = artifactContent(metadata);
     return {
       artifactId: artifact.artifactId,
@@ -158,10 +178,41 @@ export function presentTaskSessionArtifacts(detail: TaskCenterTaskDetail): TaskS
       locations,
       locationCount: metadataNumber(metadata, "locationCount"),
       locationsTruncated: metadata?.locationsTruncated === true,
+      entries,
+      entryCount: metadataNumber(metadata, "entryCount"),
       content: content.content,
       contentTruncated: content.truncated,
     };
   });
+}
+
+export function buildTaskSessionEntryTree(entries: readonly TaskSessionArtifactEntry[]): TaskSessionFileTreeNode[] {
+  interface MutableNode {
+    name: string;
+    children: Map<string, MutableNode>;
+    directory: boolean;
+  }
+  const root = new Map<string, MutableNode>();
+  for (const entry of entries) {
+    const path = safeWorkspaceRelativePath(entry.path);
+    if (!path) continue;
+    const segments = path.split("/");
+    let children = root;
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      let node = children.get(segment);
+      if (!node) {
+        node = { name: segment, children: new Map(), directory: false };
+        children.set(segment, node);
+      }
+      if (index < segments.length - 1 || entry.kind === "folder") node.directory = true;
+      children = node.children;
+    }
+  }
+  const project = (nodes: Map<string, MutableNode>): TaskSessionFileTreeNode[] => [...nodes.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(node => ({ name: node.name, ...(node.directory || node.children.size ? { children: project(node.children) } : {}) }));
+  return project(root);
 }
 
 export function buildTaskSessionFileTree(paths: readonly string[]): TaskSessionFileTreeNode[] {
@@ -230,6 +281,7 @@ export function formatTaskSessionMarkdown(detail: TaskCenterTaskDetail): string 
         artifact.resultTruncated ? "results truncated" : undefined,
         artifact.locationCount !== undefined ? `${artifact.locationCount} location${artifact.locationCount === 1 ? "" : "s"}` : undefined,
         artifact.locationsTruncated ? "location links truncated" : undefined,
+        artifact.entryCount !== undefined ? `${artifact.entryCount} entr${artifact.entryCount === 1 ? "y" : "ies"}` : undefined,
         artifact.contentTruncated ? "content truncated" : undefined,
       ].filter((value): value is string => Boolean(value));
       lines.push(`- **${artifact.title}** · ${artifact.kind}${stats.length ? ` · ${stats.join(" · ")}` : ""}`);

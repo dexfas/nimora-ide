@@ -13,8 +13,8 @@ const bundlePath = path.join(bundleDirectory, 'task-center-session-presentation.
 await esbuild.build({
   stdin: {
     contents: `
-      export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';
-      export { taskDiagnosticsArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
+      export { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionEntryTree, buildTaskSessionFileTree, formatTaskSessionMarkdown } from './extensions/shuncode/src/task-center-session-presentation.ts';
+      export { taskDiagnosticsArtifact, taskDirectoryArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact } from './extensions/shuncode/src/task-file-artifacts.ts';
     `,
     resolveDir: root,
     sourcefile: 'task-center-session-presentation-entry.ts',
@@ -28,7 +28,7 @@ await esbuild.build({
   logLevel: 'silent',
 });
 
-const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact } = require(bundlePath);
+const { presentTaskSession, presentTaskSessionArtifacts, buildTaskSessionEntryTree, buildTaskSessionFileTree, formatTaskSessionMarkdown, taskDiagnosticsArtifact, taskDirectoryArtifact, taskFileNavigationArtifact, taskLspArtifact, taskLspHoverArtifact, taskLspLocationArtifact } = require(bundlePath);
 
 const summary = {
   version: 1,
@@ -276,6 +276,39 @@ try {
   assert.equal(hoverPresentation.contentTruncated, true);
   assert.deepEqual(hoverPresentation.locations, [{ path: 'src/hover.ts', line: 7, column: 5, label: 'Hover source' }]);
 
+  const directoryArtifact = taskDirectoryArtifact({ path: 'src', depth: 2 }, [
+    '=== LIST_DIRECTORY BEGIN ===',
+    'path: "src"',
+    'depth: 2',
+    'include_hidden: false',
+    'no_ignore: false',
+    'returned_entries: 4',
+    'truncated: true',
+    '--- ENTRIES ---',
+    '[DIR] src/empty',
+    '[DIR] src/lib',
+    '[FILE] src/lib/index.ts',
+    '[LINK] src/current.ts',
+    '=== LIST_DIRECTORY END ===',
+  ].join('\n'));
+  assert.equal(directoryArtifact?.kind, 'report');
+  assert.equal(directoryArtifact?.title, 'Explored src');
+  assert.deepEqual(directoryArtifact?.metadata?.entries, [
+    { path: 'src/empty', kind: 'folder' },
+    { path: 'src/lib', kind: 'folder' },
+    { path: 'src/lib/index.ts', kind: 'file' },
+    { path: 'src/current.ts', kind: 'link' },
+  ]);
+  assert.equal(directoryArtifact?.metadata?.entryCount, 4);
+  assert.equal(directoryArtifact?.metadata?.resultTruncated, true);
+  assert.deepEqual(buildTaskSessionEntryTree(directoryArtifact?.metadata?.entries ?? []), [
+    { name: 'src', children: [
+      { name: 'current.ts' },
+      { name: 'empty', children: [] },
+      { name: 'lib', children: [{ name: 'index.ts' }] },
+    ] },
+  ], 'directory entry trees must preserve empty-folder semantics with children: []');
+
   const markdown = formatTaskSessionMarkdown(detail);
   assert.match(markdown, /### Todos/);
   assert.match(markdown, /### AI Workers/);
@@ -294,6 +327,7 @@ try {
   assert.match(sessionsSource, /registerChatSessionContentProvider\(/);
   assert.match(sessionsSource, /artifact\.kind === "changeset" \|\| artifact\.kind === "file"/, 'changeset and durable file-navigation artifacts must share native file-tree presentation');
   assert.match(sessionsSource, /new vscode\.ChatResponseFileTreePart\(/, 'workspace file artifacts must use the native file-tree presentation');
+  assert.match(sessionsSource, /buildTaskSessionEntryTree\(artifact\.entries\)/, 'directory artifacts must use the native file tree while preserving folder nodes');
   assert.match(sessionsSource, /new vscode\.Location\(fileUri, position\)/, 'search artifacts must preserve line-level locations with native Location anchors');
   assert.match(sessionsSource, /new vscode\.ChatResponseAnchorPart\(target,/, 'search locations must render as native anchors');
   assert.match(sessionsSource, /markdown\.appendCodeblock\(artifact\.content\)/, 'durable hover/report content must render as a bounded native markdown part');
@@ -310,12 +344,15 @@ try {
   const taskShadowSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'task-shadow.ts'), 'utf8');
   assert.match(taskShadowSource, /recordFileNavigationArtifact[\s\S]{0,500}taskFileNavigationArtifact\(toolName, structuredContent\)[\s\S]{0,500}recordArtifact/);
   assert.match(taskShadowSource, /recordDiagnosticsArtifact[\s\S]{0,500}taskDiagnosticsArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
+  assert.match(taskShadowSource, /recordDirectoryArtifact[\s\S]{0,500}taskDirectoryArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
   assert.match(taskShadowSource, /recordLspArtifact[\s\S]{0,500}taskLspArtifact\(args, resultText\)[\s\S]{0,500}recordArtifact/);
   const bridgeSource = await fs.readFile(path.join(root, 'extensions', 'shuncode', 'src', 'bridge-server.ts'), 'utf8');
   assert.match(bridgeSource, /recordFileNavigationArtifact\(execution, toolName, result\.structuredContent\)/, 'successful Bridge file navigation must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "read_files"\)/, 'read_files must no longer have a Bridge-only rich presentation branch');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "find_files"\)/, 'find_files must no longer have a Bridge-only rich presentation branch');
   assert.doesNotMatch(bridgeSource, /if \(toolName === "search_files"\)/, 'search_files must no longer have a Bridge-only rich presentation branch after native Location anchors exist');
+  assert.match(bridgeSource, /toolName === "list_directory"[\s\S]{0,200}recordDirectoryArtifact\(execution, args, resultText\)/, 'successful directory exploration must be durably projected into Task artifacts');
+  assert.doesNotMatch(bridgeSource, /parseListDirectoryItems\(|kind:\s*"files"/, 'list_directory must no longer have a Bridge-only rich presentation branch');
   assert.match(bridgeSource, /toolName === "get_diagnostics"[\s\S]{0,200}recordDiagnosticsArtifact\(execution, args, resultText\)/, 'successful Bridge diagnostics must be durably projected into Task artifacts');
   assert.doesNotMatch(bridgeSource, /kind:\s*"diagnostics"|parseDiagnosticsItems\(/, 'get_diagnostics must no longer have a Bridge-only rich presentation branch');
   assert.match(bridgeSource, /toolName === "lsp"[\s\S]{0,200}recordLspArtifact\(execution, args, resultText\)/, 'successful Bridge LSP calls must be durably projected into Task artifacts');
@@ -326,6 +363,9 @@ try {
   assert.doesNotMatch(bridgeSessionSource, /case 'diagnostics'|item\.kind === 'diagnostic'|item\.severity/, 'dead diagnostics-specific Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /item\.kind === 'symbol'/, 'dead LSP symbol-item Chat Core rendering must be removed');
   assert.doesNotMatch(bridgeSessionSource, /case 'lsp'/, 'dead LSP Chat Core presentation kind must be removed after hover migration');
+  assert.doesNotMatch(bridgeSessionSource, /renderToolItems|case 'files'|item\.kind === 'folder'/, 'dead directory/generic item rendering must be removed after native file-tree migration');
+  const bridgeSessionCss = await fs.readFile(path.join(root, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'widgetHosts', 'viewPane', 'media', 'shunCodeBridgeSessionView.css'), 'utf8');
+  assert.doesNotMatch(bridgeSessionCss, /shuncode-bridge-tool-item/, 'dead generic item CSS must be removed with the directory renderer');
 
   const extensionPackage = JSON.parse(await fs.readFile(path.join(root, 'extensions', 'shuncode', 'package.json'), 'utf8'));
   assert.ok(extensionPackage.enabledApiProposals.includes('chatSessionsProvider'));
