@@ -16,7 +16,7 @@
 | P1 | 两套 Agent runtime 无统一 domain | Core AgentHost + first-party Runtime | session/task/worker 重复建模 | Worker Contract + Task Runtime |
 | P1 | Nimora product logic 进入 Chat Core | Bridge/branch/model/tool renderer patches | 上游升级成本、AI 误改 | Thin Core migration |
 | P1 | Bridge 职责过宽 | `bridge-server.ts` 同时 MCP/tunnel/state/UI | 修改牵连大、难测试 | split exposure/tunnel/task state |
-| P1 | Gateway 单文件职责过宽 | Phase 6.1–6.4 已拆出 Provider Registry、Integrated Browser、upstream MCP 与 Managed Browser；`server.mjs` 仍集中 Personal Edge long-poll broker 与 WebMCP page-agent session/injection | 剩余 browser-sharing/session state failure isolation 仍有限 | 下一步拆 Personal Edge provider/control broker；WebMCP page host 最后独立，不改变 `/mcp` / `/control/*` compatibility |
+| P1 | Gateway 单文件职责过宽 | Phase 6.1–6.5 已拆出 Provider Registry、Integrated Browser、upstream MCP、Managed Browser、Personal Edge；`server.mjs` 仍集中 WebMCP page-agent source/session/injection 与 HTTP/MCP bootstrap | page-agent session 与 process composition 仍耦合 | 下一步抽 WebMCP page host，再决定 MCP exposure adapter/process bootstrap 是否独立；不改变 `/mcp` / `/control/*` compatibility |
 | P2 | standalone Gateway legacy page-agent fallback | Phase 5 已让 Extension + Extension-launched Gateway 共用 canonical v25 Core/Site/Agent，但 standalone Gateway 缺 shared-source env 时仍回退 `generic-chat-agent.js` | standalone fix 仍可能漂移 | 后续把 fallback 也改为可打包的 canonical WebMCP bundle，再删除 legacy agent |
 | P1 | localhost port discovery 尚未完成 | Phase 5 已允许源码通过 env 覆盖 48321/48322，但默认安装、多 workspace 仍无 discovery/handshake | 多 workspace/并行实例需手工分配 | dynamic port + discovery/handshake |
 | P1 | Context/tool 全量暴露趋势 | Capability metadata 已存在，但 WebMCP prime 仍可发送大量 tools | token/attention/attack surface | Capability Router / Context Budget / dynamic loading |

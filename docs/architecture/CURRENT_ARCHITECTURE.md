@@ -228,7 +228,9 @@ Phase 6.3 又把 upstream MCP client 物理拆到 `upstream-mcp-provider.mjs`：
 
 Phase 6.4 再把 Managed Browser provider 物理拆到 `managed-browser-provider.mjs`。persistent Edge context lifecycle、`browser_open/pages/click/fill/get_text/dom/evaluate/screenshot` 八个 capability、page selection、screenshot artifact path，以及 `start/status/open/stop` 本地 control surface 都由 provider 持有；`server.mjs` 只保留 HTTP route 适配和 WebMCP page-agent 注入。现有 `/control/start-browser`、`/control/status`、`/control/open`、`/control/stop-browser` response shape 保持不变，真实 Edge shared-agent smoke 继续通过。
 
-Personal Edge long-poll broker 与 WebMCP browser control/session 注入目前仍物理位于 `server.mjs`，Gateway monolith 尚未完成拆分。
+Phase 6.5 已把 Personal Edge provider/control broker 物理拆到 `personal-edge-provider.mjs`。共享 tab heartbeat/state、7 个 `personal_edge_*` capabilities、command queue、pending result、long-poll waiter、403/400/409/410 control error 语义都由 provider 持有；`server.mjs` 的 `/control/personal-edge/register|poll|result` 只做 HTTP 映射。poll 客户端断开只移除 waiter，不把已经进入 pending result 的 capability 当成撤销执行。真实 Gateway federation smoke 已验证标准 `/mcp` 发起 `personal_edge_read` → control poll → result 回填的完整 roundtrip。
+
+WebMCP browser control/session 注入目前仍物理位于 `server.mjs`；Gateway monolith 已明显收缩，但 page-agent host/composition root 尚未拆分。
 
 默认 WebMCP control/gateway 端口仍保持 48322/48321 以兼容现有安装版；源码/测试实例可通过 `SHUNCODE_WEBMCP_CONTROL_PORT` / `SHUNCODE_WEBMCP_GATEWAY_PORT` 隔离运行。动态 discovery/多 workspace handshake 尚未完成。
 

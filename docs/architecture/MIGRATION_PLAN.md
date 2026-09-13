@@ -358,7 +358,11 @@ web model → request → Nimora tool → result delivery → final model respon
 
 `managed-browser-provider.mjs` 独立拥有 Gateway-managed persistent Edge 的 launch/reuse/close 生命周期、page selection、page metadata 与八个 browser capabilities。原有 `browser_open/pages/click/fill/get_text/dom/evaluate/screenshot` metadata 和 result shape 保持不变；`start/status/open/stop/currentPage/pages/pageInfo` 作为 Gateway 内部 control surface 提供给现有 `/control/*` routes 与 WebMCP page-agent host。`server.mjs` 不再直接 import Playwright `chromium`，也不再持有 `browserContext/browserConnectPromise`。`test-shuncode-gateway-managed-browser-provider` 使用 fake Playwright context 保护 lifecycle/control/tool/metadata；真实 Edge `test-shuncode-webmcp-gateway-shared-agent` 继续验证 page-agent binding transport。
 
-当前 `server.mjs` 仍持有 WebMCP page-agent session/injection 与 Personal Edge long-poll broker；下一物理拆分优先 Personal Edge，page-agent host 最后处理，避免一次改变 browser provider 和 WebMCP session ownership。
+### Phase 6.5 — Personal Edge Provider / Control Broker Extraction
+
+`personal-edge-provider.mjs` 现在独立拥有 shared-tab client state、90 秒 heartbeat freshness、7 个 Personal Edge tool definitions、command queue、pending result timeout、long-poll waiters 与 result settlement。Gateway route 层仍保留 `/control/personal-edge/register|poll|result` 原路径和 payload，但鉴权/active-client/pending-result 校验已由 provider 返回同样的 403/400/409/410 语义。poll HTTP 断开通过 AbortSignal 仅取消当前 waiter，不自动取消已经发出的 tool command。`test-shuncode-gateway-personal-edge-provider` 保护 auth/status/tool/poll/result/timeout/abort；`test-shuncode-gateway-federation` 进一步用真实 Gateway `/mcp` 验证 `personal_edge_read → poll → result → MCP result`。
+
+当前 `server.mjs` 剩余主要职责为 WebMCP page-agent source/session/injection、HTTP/MCP route composition 与 process bootstrap。下一步先抽 WebMCP page host，再评估是否需要把 HTTP/MCP exposure adapter 独立出来；不在同一 commit 改 endpoint owner。
 
 ### 风险
 

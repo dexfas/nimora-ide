@@ -5,10 +5,10 @@ import express from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import { defineGatewayCapability } from './capability-contract.mjs';
 import { createIntegratedBrowserProvider } from './integrated-browser-provider.mjs';
 import { createManagedBrowserProvider } from './managed-browser-provider.mjs';
-import { defineGatewayProvider, GatewayProviderRegistry } from './provider-registry.mjs';
+import { createPersonalEdgeProvider, PersonalEdgeControlError, PersonalEdgePollAbortedError } from './personal-edge-provider.mjs';
+import { GatewayProviderRegistry } from './provider-registry.mjs';
 import { createUpstreamMcpProvider } from './upstream-mcp-provider.mjs';
 
 const PORT = Number(process.env.PORT || 48321);
@@ -25,160 +25,9 @@ const PERSONAL_EDGE_BRIDGE_TOKEN = process.env.SHUNCODE_PERSONAL_EDGE_TOKEN || '
 const integratedBrowserProvider = createIntegratedBrowserProvider({ bridgeUrl: INTEGRATED_BROWSER_BRIDGE });
 const upstreamMcpProvider = createUpstreamMcpProvider({ url: UPSTREAM_URL });
 const managedBrowserProvider = createManagedBrowserProvider({ edgePath: EDGE_PATH, profileDir: PROFILE_DIR, screenshotDir: SCREENSHOT_DIR });
+const personalEdgeProvider = createPersonalEdgeProvider({ token: PERSONAL_EDGE_BRIDGE_TOKEN });
 const pageAgentSessions = new WeakMap();
 let chatAgentFactorySource;
-let personalEdgeClient = { clientId: '', shared: false, lastSeen: 0, tab: null };
-const personalEdgeCommandQueue = [];
-const personalEdgePendingResults = new Map();
-const personalEdgePollWaiters = [];
-
-const personalEdgeMetadata = (id, title, risk, idempotency, retry, approval, { destructive = false, tags = [] } = {}) => ({
-  id,
-  version: 1,
-  title,
-  category: 'browser',
-  tags,
-  environment: 'personal-browser',
-  risk,
-  idempotency,
-  retry,
-  approval,
-  destructive,
-  openWorld: true,
-});
-
-const personalEdgeTools = [
-  defineGatewayCapability({
-    name: 'personal_edge_status',
-    description: 'PERSONAL EDGE BRIDGE: report whether the user explicitly shared a tab from their normal Microsoft Edge and return that tab metadata.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-  }, personalEdgeMetadata('browser.personal.status', 'Personal Edge Status', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'personal', 'read'] })),
-  defineGatewayCapability({
-    name: 'personal_edge_read',
-    description: 'PERSONAL EDGE BRIDGE (READ ONLY): read title, URL and visible body text from the single normal http/https Edge tab the user explicitly shared. Does not click, type, navigate, or evaluate arbitrary JavaScript.',
-    inputSchema: { type: 'object', properties: { max_chars: { type: 'integer', minimum: 1, maximum: 50000, default: 20000 } }, additionalProperties: false },
-  }, personalEdgeMetadata('browser.personal.read', 'Read Personal Edge Page', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'personal', 'read'] })),
-  defineGatewayCapability({
-    name: 'personal_edge_elements',
-    description: 'PERSONAL EDGE BRIDGE (READ ONLY): inspect visible interactive elements in the shared personal Edge tab. Returns generated CSS selectors plus safe metadata such as tag/text/role/placeholder; does not return current input values.',
-    inputSchema: { type: 'object', properties: { max_elements: { type: 'integer', minimum: 1, maximum: 200, default: 100 } }, additionalProperties: false },
-  }, personalEdgeMetadata('browser.personal.elements', 'Inspect Personal Edge Elements', 'read', 'safe', 'automatic', 'none', { tags: ['browser', 'personal', 'read', 'elements'] })),
-  defineGatewayCapability({
-    name: 'personal_edge_click',
-    description: 'PERSONAL EDGE BRIDGE: click one element in the user-shared personal Edge tab by CSS selector. This can cause account/page side effects and is subject to WebMCP approval.',
-    inputSchema: { type: 'object', required: ['selector'], properties: { selector: { type: 'string', minLength: 1 } }, additionalProperties: false },
-  }, personalEdgeMetadata('browser.personal.click', 'Click Personal Edge Element', 'external-side-effect', 'non-idempotent', 'never', 'session', { destructive: true, tags: ['browser', 'personal', 'interaction'] })),
-  defineGatewayCapability({
-    name: 'personal_edge_fill',
-    description: 'PERSONAL EDGE BRIDGE: replace text in an input, textarea, or contenteditable element in the user-shared personal Edge tab. Subject to WebMCP approval.',
-    inputSchema: { type: 'object', required: ['selector', 'value'], properties: { selector: { type: 'string', minLength: 1 }, value: { type: 'string' } }, additionalProperties: false },
-  }, personalEdgeMetadata('browser.personal.fill', 'Fill Personal Edge Field', 'external-side-effect', 'non-idempotent', 'never', 'session', { destructive: true, tags: ['browser', 'personal', 'interaction'] })),
-  defineGatewayCapability({
-    name: 'personal_edge_navigate',
-    description: 'PERSONAL EDGE BRIDGE: navigate the user-shared personal Edge tab to an http/https URL. The same tab remains shared. Subject to WebMCP approval.',
-    inputSchema: { type: 'object', required: ['url'], properties: { url: { type: 'string', minLength: 1 } }, additionalProperties: false },
-  }, personalEdgeMetadata('browser.personal.navigate', 'Navigate Personal Edge', 'external-side-effect', 'non-idempotent', 'never', 'session', { destructive: true, tags: ['browser', 'personal', 'navigate'] })),
-  defineGatewayCapability({
-    name: 'personal_edge_reload',
-    description: 'PERSONAL EDGE BRIDGE: reload the user-shared personal Edge tab. Subject to WebMCP approval because it can discard transient page state.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-  }, personalEdgeMetadata('browser.personal.reload', 'Reload Personal Edge', 'external-side-effect', 'non-idempotent', 'never', 'session', { destructive: true, tags: ['browser', 'personal', 'navigate'] })),
-];
-
-function personalEdgeStatusData() {
-  const connected = !!personalEdgeClient.clientId && Date.now() - personalEdgeClient.lastSeen < 90000;
-  return {
-    connected,
-    shared: connected && !!personalEdgeClient.shared,
-    lastSeen: personalEdgeClient.lastSeen || null,
-    tab: connected && personalEdgeClient.shared ? personalEdgeClient.tab || null : null,
-  };
-}
-
-function personalEdgeSharedTab() {
-  const status = personalEdgeStatusData();
-  if (!status.connected) throw new Error('Personal Edge Bridge is not connected. Make sure the Edge extension is installed and active.');
-  if (!status.shared || !status.tab) throw new Error('No Personal Edge tab is shared. Click the ShunCode Personal Edge Bridge extension on the target tab so its badge shows ON.');
-  if (!/^https?:/i.test(String(status.tab.url || ''))) {
-    throw new Error('The shared Personal Edge tab is a privileged/non-web page. Share a normal http/https page instead.');
-  }
-  return status.tab;
-}
-
-function takeQueuedPersonalEdgeCommand() {
-  while (personalEdgeCommandQueue.length) {
-    const command = personalEdgeCommandQueue.shift();
-    if (personalEdgePendingResults.has(command.id)) return command;
-  }
-  return null;
-}
-
-function dispatchPersonalEdgeCommand(command) {
-  while (personalEdgePollWaiters.length) {
-    const finish = personalEdgePollWaiters.shift();
-    if (finish(command)) return;
-  }
-  personalEdgeCommandQueue.push(command);
-}
-
-function requestPersonalEdgeCommand(command) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      personalEdgePendingResults.delete(command.id);
-      const index = personalEdgeCommandQueue.findIndex(item => item.id === command.id);
-      if (index >= 0) personalEdgeCommandQueue.splice(index, 1);
-      reject(new Error('Personal Edge command timed out waiting for the shared tab extension'));
-    }, 15000);
-    personalEdgePendingResults.set(command.id, { resolve, reject, timer });
-    dispatchPersonalEdgeCommand(command);
-  });
-}
-
-async function callPersonalEdgeTool(name, args = {}) {
-  if (name === 'personal_edge_status') {
-    const data = personalEdgeStatusData();
-    return textResult(JSON.stringify(data, null, 2), data);
-  }
-  if (name === 'personal_edge_read') {
-    const tab = personalEdgeSharedTab();
-    const maxChars = Math.max(1, Math.min(50000, Number(args.max_chars || 20000)));
-    const data = await requestPersonalEdgeCommand({ id: randomUUID(), op: 'read', tabId: Number(tab.id), maxChars });
-    return textResult(JSON.stringify(data, null, 2), data);
-  }
-  if (name === 'personal_edge_elements') {
-    const tab = personalEdgeSharedTab();
-    const maxElements = Math.max(1, Math.min(200, Number(args.max_elements || 100)));
-    const data = await requestPersonalEdgeCommand({ id: randomUUID(), op: 'elements', tabId: Number(tab.id), maxElements });
-    return textResult(JSON.stringify(data, null, 2), data);
-  }
-  if (name === 'personal_edge_click') {
-    const tab = personalEdgeSharedTab();
-    const selector = String(args.selector || '').trim();
-    if (!selector) throw new Error('personal_edge_click requires selector');
-    const data = await requestPersonalEdgeCommand({ id: randomUUID(), op: 'click', tabId: Number(tab.id), selector });
-    return textResult(JSON.stringify(data, null, 2), data);
-  }
-  if (name === 'personal_edge_fill') {
-    const tab = personalEdgeSharedTab();
-    const selector = String(args.selector || '').trim();
-    if (!selector) throw new Error('personal_edge_fill requires selector');
-    const data = await requestPersonalEdgeCommand({ id: randomUUID(), op: 'fill', tabId: Number(tab.id), selector, value: String(args.value ?? '') });
-    return textResult(JSON.stringify(data, null, 2), data);
-  }
-  if (name === 'personal_edge_navigate') {
-    const tab = personalEdgeSharedTab();
-    const url = String(args.url || '').trim();
-    if (!/^https?:\/\//i.test(url)) throw new Error('personal_edge_navigate only accepts absolute http/https URLs');
-    const data = await requestPersonalEdgeCommand({ id: randomUUID(), op: 'navigate', tabId: Number(tab.id), url });
-    return textResult(JSON.stringify(data, null, 2), data);
-  }
-  if (name === 'personal_edge_reload') {
-    const tab = personalEdgeSharedTab();
-    const data = await requestPersonalEdgeCommand({ id: randomUUID(), op: 'reload', tabId: Number(tab.id) });
-    return textResult(JSON.stringify(data, null, 2), data);
-  }
-  throw new Error(`Unknown Personal Edge tool: ${name}`);
-}
 
 // WebMCP is intended to let chat pages work on the ShunCode workspace, not to
 // repeatedly drive ShunCode's protected browser-opening UI.  The native
@@ -216,12 +65,7 @@ function gatewayProviders() {
     upstreamMcpProvider,
     integratedBrowserProvider,
     managedBrowserProvider,
-    defineGatewayProvider({
-      id: 'personal-edge',
-      listTools: async () => personalEdgeTools,
-      owns: name => personalEdgeTools.some(tool => tool.name === name),
-      callTool: (name, args) => callPersonalEdgeTool(name, args),
-    }),
+    personalEdgeProvider,
   ]);
   return providerRegistry;
 }
@@ -330,83 +174,37 @@ app.use(express.json({ limit: '8mb' }));
 const sessions = new Map();
 
 app.get('/control/healthz', (_req, res) => {
-  res.json({ ok: true, integratedWebMcp: true, controlVersion: 2, browserRunning: managedBrowserProvider.isRunning(), profile: managedBrowserProvider.profileDir, personalEdge: personalEdgeStatusData() });
+  res.json({ ok: true, integratedWebMcp: true, controlVersion: 2, browserRunning: managedBrowserProvider.isRunning(), profile: managedBrowserProvider.profileDir, personalEdge: personalEdgeProvider.status() });
 });
 
 app.post('/control/personal-edge/register', (req, res) => {
   try {
-    if (String(req.body?.token || '') !== PERSONAL_EDGE_BRIDGE_TOKEN) {
-      return res.status(403).json({ ok: false, error: 'invalid personal Edge bridge token' });
-    }
-    const clientId = String(req.body?.clientId || '').trim();
-    if (!clientId) return res.status(400).json({ ok: false, error: 'clientId is required' });
-    personalEdgeClient = {
-      clientId,
-      shared: req.body?.shared === true,
-      lastSeen: Date.now(),
-      tab: req.body?.tab && typeof req.body.tab === 'object' ? req.body.tab : null,
-    };
-    res.json({ ok: true, personalEdge: personalEdgeStatusData() });
+    res.json({ ok: true, personalEdge: personalEdgeProvider.register(req.body || {}) });
   } catch (error) {
+    if (error instanceof PersonalEdgeControlError) return res.status(error.statusCode).json({ ok: false, error: error.message });
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 
-app.get('/control/personal-edge/poll', (req, res) => {
+app.get('/control/personal-edge/poll', async (req, res) => {
+  const controller = new AbortController();
+  res.on('close', () => controller.abort());
   try {
-    if (String(req.query?.token || '') !== PERSONAL_EDGE_BRIDGE_TOKEN) {
-      return res.status(403).json({ ok: false, error: 'invalid personal Edge bridge token' });
-    }
-    const clientId = String(req.query?.clientId || '').trim();
-    if (!clientId || clientId !== personalEdgeClient.clientId) {
-      return res.status(409).json({ ok: false, error: 'personal Edge client is not the active registered client' });
-    }
-    const queued = takeQueuedPersonalEdgeCommand();
-    if (queued) return res.json({ ok: true, command: queued });
-
-    let settled = false;
-    const finish = command => {
-      if (settled) return false;
-      settled = true;
-      clearTimeout(timer);
-      const index = personalEdgePollWaiters.indexOf(finish);
-      if (index >= 0) personalEdgePollWaiters.splice(index, 1);
-      if (!res.headersSent) res.json({ ok: true, command: command || null });
-      return true;
-    };
-    const timer = setTimeout(() => finish(null), 20000);
-    personalEdgePollWaiters.push(finish);
-    res.on('close', () => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      const index = personalEdgePollWaiters.indexOf(finish);
-      if (index >= 0) personalEdgePollWaiters.splice(index, 1);
-    });
+    const command = await personalEdgeProvider.poll({ token: req.query?.token, clientId: req.query?.clientId, signal: controller.signal });
+    if (!res.headersSent && !res.destroyed) res.json({ ok: true, command });
   } catch (error) {
+    if (error instanceof PersonalEdgePollAbortedError) return;
+    if (error instanceof PersonalEdgeControlError) return res.status(error.statusCode).json({ ok: false, error: error.message });
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 
 app.post('/control/personal-edge/result', (req, res) => {
   try {
-    if (String(req.body?.token || '') !== PERSONAL_EDGE_BRIDGE_TOKEN) {
-      return res.status(403).json({ ok: false, error: 'invalid personal Edge bridge token' });
-    }
-    const clientId = String(req.body?.clientId || '').trim();
-    if (!clientId || clientId !== personalEdgeClient.clientId) {
-      return res.status(409).json({ ok: false, error: 'personal Edge client is not the active registered client' });
-    }
-    const id = String(req.body?.id || '').trim();
-    const pending = personalEdgePendingResults.get(id);
-    if (!pending) return res.status(410).json({ ok: false, error: 'personal Edge command is no longer pending' });
-    personalEdgePendingResults.delete(id);
-    clearTimeout(pending.timer);
-    const errorText = String(req.body?.error || '').trim();
-    if (errorText) pending.reject(new Error(errorText));
-    else pending.resolve(req.body?.result ?? null);
+    personalEdgeProvider.submitResult(req.body || {});
     res.json({ ok: true });
   } catch (error) {
+    if (error instanceof PersonalEdgeControlError) return res.status(error.statusCode).json({ ok: false, error: error.message });
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });

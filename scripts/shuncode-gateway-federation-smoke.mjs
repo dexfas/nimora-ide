@@ -117,6 +117,7 @@ const gateway = spawn(process.execPath, ['server.mjs'], {
     PORT: String(gatewayPort),
     SHUNCODE_MCP_URL: `http://127.0.0.1:${upstreamPort}/mcp`,
     SHUNCODE_INTEGRATED_BROWSER_BRIDGE: `http://127.0.0.1:${integratedPort}`,
+    SHUNCODE_PERSONAL_EDGE_TOKEN: 'federation-test-token',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
   windowsHide: true,
@@ -164,7 +165,59 @@ try {
   assert.match(integrated.content.map(part => part.type === 'text' ? part.text : '').join('\n'), /INTEGRATED:integrated_only/);
   assert.equal(upstreamCalls.length, 1);
 
-  console.log('[smoke] Gateway MCP federation local-owner precedence + upstream fallback ok');
+  const controlBase = `http://127.0.0.1:${gatewayPort}/control/personal-edge`;
+  const badRegister = await fetch(`${controlBase}/register`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ token: 'wrong', clientId: 'edge-smoke' }),
+  });
+  assert.equal(badRegister.status, 403);
+  const missingClient = await fetch(`${controlBase}/register`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ token: 'federation-test-token', clientId: '' }),
+  });
+  assert.equal(missingClient.status, 400);
+
+  const registered = await fetch(`${controlBase}/register`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      token: 'federation-test-token',
+      clientId: 'edge-smoke',
+      shared: true,
+      tab: { id: 42, url: 'https://example.test/shared', title: 'Shared' },
+    }),
+  });
+  assert.equal(registered.status, 200);
+  assert.equal((await registered.json()).personalEdge.shared, true);
+
+  const wrongClientPoll = await fetch(`${controlBase}/poll?token=federation-test-token&clientId=other`);
+  assert.equal(wrongClientPoll.status, 409);
+  const staleResult = await fetch(`${controlBase}/result`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ token: 'federation-test-token', clientId: 'edge-smoke', id: 'missing', result: {} }),
+  });
+  assert.equal(staleResult.status, 410);
+
+  const personalReadPromise = client.callTool({ name: 'personal_edge_read', arguments: { max_chars: 1234 } });
+  const poll = await fetch(`${controlBase}/poll?token=federation-test-token&clientId=edge-smoke`);
+  assert.equal(poll.status, 200);
+  const polled = await poll.json();
+  assert.equal(polled.command.op, 'read');
+  assert.equal(polled.command.tabId, 42);
+  assert.equal(polled.command.maxChars, 1234);
+  const submitted = await fetch(`${controlBase}/result`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      token: 'federation-test-token',
+      clientId: 'edge-smoke',
+      id: polled.command.id,
+      result: { title: 'Shared', text: 'hello from personal edge' },
+    }),
+  });
+  assert.equal(submitted.status, 200);
+  const personalRead = await personalReadPromise;
+  assert.match(personalRead.content.map(part => part.type === 'text' ? part.text : '').join('\n'), /hello from personal edge/);
+
+  console.log('[smoke] Gateway MCP federation local-owner/upstream fallback + Personal Edge control roundtrip ok');
 } finally {
   try { await client.close(); } catch {}
   if (gateway.exitCode == null) {

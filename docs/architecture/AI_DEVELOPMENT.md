@@ -144,6 +144,7 @@ npm run test-shuncode-gateway-providers
 npm run test-shuncode-gateway-federation
 npm run test-shuncode-gateway-upstream-provider
 npm run test-shuncode-gateway-managed-browser-provider
+npm run test-shuncode-gateway-personal-edge-provider
 npm run test-shuncode-webmcp-command-transport
 npm run test-shuncode-web-worker-stack
 npm run test-shuncode-host-capability-execution
@@ -161,6 +162,8 @@ npm run test-shuncode-web-worker-release-gate
 `test-shuncode-gateway-upstream-provider` 专门保护 Gateway → Bridge MCP retry safety：listTools transport failure 必须 reset/reconnect；metadata `automatic` tool 可重试一次；metadata side-effect/non-retry tool 即使连接断开也不能重发；旧 Bridge 无 metadata 时只有固定 read-only allowlist 允许兼容 retry。修改 upstream transport、cache 或 retry policy 时该 smoke 是强制项。
 
 `test-shuncode-gateway-managed-browser-provider` 保护 persistent Edge provider 的 lifecycle/control/tool contract：context 复用、start/status/open/stop、八个 browser capability metadata/result、page id guard、screenshot path 都不能因模块拆分漂移。修改 `managed-browser-provider.mjs` 或 Gateway managed-browser control routes 后，除该 smoke 外还必须运行真实 Edge 的 `test-shuncode-webmcp-gateway-shared-agent`。
+
+`test-shuncode-gateway-personal-edge-provider` 保护 Personal Edge active-client/shared-tab heartbeat、403/400/409/410 control guard、command queue、poll abort、result settlement、command timeout 与 7 个 capability contract。`test-shuncode-gateway-federation` 还必须保留真实 Gateway `personal_edge_read → /poll → /result → MCP result` roundtrip；修改 Personal Edge route/provider 任一侧时两条都要运行。
 
 `test-shuncode-host-capability-execution` 保护未来 host-managed execution 的 execute-once/identity guard/mandatory authorization/result-delivery retry/ambiguous executor failure 语义。这个 smoke 通过不代表 host-managed production dispatch 已启用；在 TaskRuntime durable claim/recovery 完成前，禁止把该 coordinator 直接接到 `run_command` / `apply_patch` 等副作用 capability 的生产自动执行路径。
 

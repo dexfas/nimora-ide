@@ -167,6 +167,8 @@ Phase 6.3 起，Gateway → Bridge 的 MCP client 也成为独立 `upstream-mcp`
 
 Phase 6.4 起，Managed Browser 的 Playwright lifecycle 也成为独立 provider protocol boundary。Gateway HTTP control route 不再直接操作 `BrowserContext`；它调用 provider 的 `start/status/open/stop`，WebMCP host 则只通过 `currentPage/pages/pageInfo` 取得当前 managed page。标准 browser tool contract 与 `/control/*` response shape 不变，因此这是 module ownership 迁移，不是外部协议版本升级。
 
+Phase 6.5 起，Personal Edge localhost protocol 的状态机也由独立 provider 持有。`register` 更新 active client/shared tab heartbeat；`poll` 先消费仍有 pending result 的 queued command，否则建立可由 HTTP AbortSignal 取消的 waiter；`result` 只接受当前 active client 且仍 pending 的 command id。HTTP disconnect 只结束 poll waiter，tool command 的 pending result 仍保留到 result 或 command timeout。原有 403 invalid token、400 missing client id、409 inactive client、410 stale result 状态码保持不变。
+
 重要安全语义：只有明确的 read-only upstream tools 可以在 transport failure 后自动 retry；side-effecting tools 不自动 retry，而是要求 caller 核实状态。
 
 这条语义与 WebMCP execution ledger 是同一个更高层问题，未来应统一到 Tool metadata + execution policy。
