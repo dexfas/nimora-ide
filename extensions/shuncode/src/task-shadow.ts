@@ -2,7 +2,7 @@ import path from "node:path";
 import * as vscode from "vscode";
 import { getCapabilityMetadata } from "../../../src/capability-registry.js";
 import { TaskRuntime } from "../../../src/task-runtime.js";
-import type { TaskArtifactRef, TaskInteractionOutcome, TaskProgress, TaskTodo } from "../../../src/task-contract.js";
+import type { TaskArtifactRef, TaskInteractionOutcome, TaskProgress, TaskSnapshot, TaskTodo } from "../../../src/task-contract.js";
 import type { WorkerExecutionProjectionStore, WorkerTaskBindingStore } from "../../../src/worker-session-manager.js";
 
 export interface ShadowExecutionHandle {
@@ -73,6 +73,29 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
   async reportProgress(taskId: string | undefined, progress: Omit<TaskProgress, "at">): Promise<void> {
     if (!taskId) return;
     await this.safe("report progress", () => this.runtime.reportProgress(taskId, progress));
+  }
+
+  async getTaskOwned(taskId: string | undefined): Promise<TaskSnapshot> {
+    if (!taskId) throw new Error("Task Runtime is required for durable Bridge coordination state.");
+    await this.ready;
+    if (this.initializationError) throw this.initializationError;
+    const task = this.runtime.getTask(taskId);
+    if (!task) throw new Error(`Unknown Task Runtime task: ${taskId}`);
+    return task;
+  }
+
+  async setTodosOwned(taskId: string | undefined, todos: readonly TaskTodo[]): Promise<TaskSnapshot> {
+    if (!taskId) throw new Error("Task Runtime is required for durable Bridge todo state.");
+    await this.ready;
+    if (this.initializationError) throw this.initializationError;
+    return await this.runtime.setTodosStrict(taskId, todos);
+  }
+
+  async reportProgressOwned(taskId: string | undefined, progress: Omit<TaskProgress, "at">): Promise<TaskSnapshot> {
+    if (!taskId) throw new Error("Task Runtime is required for durable Bridge progress state.");
+    await this.ready;
+    if (this.initializationError) throw this.initializationError;
+    return await this.runtime.reportProgressStrict(taskId, progress);
   }
 
   async beginExecution(taskId: string | undefined, executionId: string, toolName: string, args: unknown): Promise<ShadowExecutionHandle | undefined> {

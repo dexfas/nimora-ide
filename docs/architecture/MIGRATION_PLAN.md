@@ -402,6 +402,16 @@ web model → request → Nimora tool → result delivery → final model respon
 - remove persistent Bridge mode from Chat；
 - `set_todos/report_progress` 直接映射 Task state。
 
+### Phase 7.1 — Task-owned Bridge Coordination
+
+`set_todos` / `report_progress` 已从“Bridge state first + fail-open Task shadow”切为“Task strict owner first + legacy UI projection”。`TaskRuntime` 新增 `setTodosStrict` / `reportProgressStrict`，且 `TaskCreated` 本身也必须先 durable append 成功才进入 live Task map，避免出现只有 coordination event、没有创建事件的不可 replay journal；`TaskShadowRecorder` 提供 fail-closed `getTaskOwned / setTodosOwned / reportProgressOwned`，不会经过 shadow-mode `safe()`。Bridge coordination 输入校验移到纯 `bridge-task-coordination.ts`：todo id/title/status/数量/唯一性/单一 in-progress 与 progress message/percent/todo link contract 保持原语义。
+
+执行顺序现在是：`validate → strict Task append → read returned Task snapshot → project to BridgeManager.todos/progress activity`。如果 journal append 失败，Task live snapshot 不变化，legacy Bridge UI 也不会变化。`report_progress` 的 explicit/implicit todo linkage 从当前 Task 的 todos 解析，不再从 manager-global `this.todos` 解析，因此不同 MCP session 不会拿另一个 session 的 todo 做权限式关联。
+
+旧 Bridge status UI 仍是 manager-global presentation surface，只显示最近一次 coordination Task 的投影；这只是兼容层。真正的多 Task 选择/时间线要等 Task Center。普通 Bridge file/IDE execution 仍保持 fail-open shadow，本阶段不把所有 Bridge 工具突然变成 TaskRuntime 硬依赖。
+
+`test-shuncode-bridge-task-coordination` 保护 validation、strict write fail-closed、restart replay，以及源码级 “Task owner write before legacy projection” 顺序。
+
 ### 风险
 
 现有用户找不到 Bridge 状态/活动。

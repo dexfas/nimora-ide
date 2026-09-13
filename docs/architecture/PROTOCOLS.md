@@ -173,6 +173,8 @@ Phase 6.6 起，Gateway-managed WebMCP page binding 由独立 Page Host 持有�
 
 Phase 6.7 起，Gateway `/mcp` 由独立 `McpExposureAdapter` 持有 session map 与 Streamable HTTP transport。Adapter contract 只有 `listTools/callTool`；它不拥有 Capability provider、WebMCP page、Task 或 tunnel state。Bridge 的 public MCP endpoint 仍保留自己的增强 session protocol（EventStore replay、keepalive、capacity/cleanup、Cloudflare-specific behavior），因此当前两者是同一标准的不同 exposure profiles，而不是可以直接互换的 implementation。
 
+Phase 7.1 起，Bridge coordination tools 使用 Task-owned durability contract。每个 MCP session 先由 `ensureBridgeTask(sessionId)` 映射到独立 Task；`set_todos` 校验后必须 strict append `TaskTodosUpdated` 成功，`report_progress` 必须依据该 Task 当前 todos 解析 todo linkage，再 strict append `TaskProgressUpdated`。只有 durable Task snapshot 成功更新后，BridgeManager 才更新 manager-global compatibility projection。持久化失败必须在 legacy UI mutation 之前失败，不能出现“界面显示成功但 Task journal 没有”的状态。
+
 重要安全语义：只有明确的 read-only upstream tools 可以在 transport failure 后自动 retry；side-effecting tools 不自动 retry，而是要求 caller 核实状态。
 
 这条语义与 WebMCP execution ledger 是同一个更高层问题，未来应统一到 Tool metadata + execution policy。

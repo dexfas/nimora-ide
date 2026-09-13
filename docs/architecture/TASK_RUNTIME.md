@@ -193,7 +193,7 @@ Task Runtime progress state
 
 外部 Worker 仍可以调用相同 capability，但它不直接“拥有 Bridge todos”。
 
-Phase 3 已开始双写：Bridge 现有 `todos/activities` 仍驱动当前 UI，Task Runtime 同时记录 `TaskTodosUpdated` / `TaskProgressUpdated`。在 consistency 验证完成并建立 Task projection UI 前，不反转 ownership。
+Phase 3 先建立了双写 shadow；Phase 7.1 已把 `set_todos` / `report_progress` 的 ownership 翻转到 Task Runtime。Bridge MCP session 对应的 Task 必须先 durable 创建，随后 `TaskTodosUpdated` / `TaskProgressUpdated` 使用 strict persistence；只有 Task snapshot 成功更新后才投影到现有 `BridgeManager.todos/activities`。因此旧 Bridge 状态页现在只是最近一次 coordination Task 的兼容展示，不再是 todo/progress Source of Truth。普通 Bridge file/IDE execution 仍保持 fail-open shadow，等待后续 execution/artifact/Task Center 迁移。
 
 ## 8. Artifact
 

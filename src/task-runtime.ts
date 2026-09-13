@@ -155,7 +155,7 @@ export class TaskRuntime {
         at: this.now(),
         type: "TaskCreated",
         payload: { source: { ...source }, goal: boundText(initialGoal, MAX_GOAL_CHARS) },
-      });
+      }, true);
       return this.tasks.get(taskId)!;
     })();
     this.sourceCreates.set(sourceId, promise);
@@ -184,6 +184,11 @@ export class TaskRuntime {
     await this.append(taskId, "TaskTodosUpdated", { todos: todos.map(todo => ({ ...todo })) });
   }
 
+  async setTodosStrict(taskId: string, todos: readonly TaskTodo[]): Promise<TaskSnapshot> {
+    await this.append(taskId, "TaskTodosUpdated", { todos: todos.map(todo => ({ ...todo })) }, true);
+    return structuredClone(this.tasks.get(taskId)!);
+  }
+
   async updateContext(taskId: string, input: Partial<Pick<TaskContextState, "summary" | "constraints" | "decisions" | "relevantFiles">>): Promise<TaskContextState> {
     await this.initialize();
     const current = this.tasks.get(taskId)?.context;
@@ -201,6 +206,11 @@ export class TaskRuntime {
 
   async reportProgress(taskId: string, progress: Omit<TaskProgress, "at">): Promise<void> {
     await this.append(taskId, "TaskProgressUpdated", { progress: { ...progress, at: this.now() } });
+  }
+
+  async reportProgressStrict(taskId: string, progress: Omit<TaskProgress, "at">): Promise<TaskSnapshot> {
+    await this.append(taskId, "TaskProgressUpdated", { progress: { ...progress, at: this.now() } }, true);
+    return structuredClone(this.tasks.get(taskId)!);
   }
 
   async startInteraction(taskId: string, input: { interactionId: string; surface: "native-chat" | "bridge"; mode?: string; model?: string }): Promise<{ duplicate: boolean }> {

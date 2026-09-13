@@ -11,6 +11,8 @@ import * as vscode from "vscode";
 import { capabilityMcpFields } from "../../../src/capability-registry.js";
 import { FILE_TOOL_DEFINITIONS, invokeFileTool, isFileToolName } from "../../../src/file-tool-registry.js";
 import { BRIDGE_EXCLUDED_TOOL_NAMES, getIdeToolDefinition, IDE_TOOL_DEFINITIONS } from "../../../src/ide-tool-definitions.js";
+import type { TaskProgress, TaskTodo } from "../../../src/task-contract.js";
+import { normalizeBridgeProgress, normalizeBridgeTodos } from "./bridge-task-coordination.js";
 import type { IdeToolBroker } from "./ide-tool-broker.js";
 import { fetchWithExtensionHostFallbacks, resolveExtensionHostProxy } from "./extension-host-proxy.mjs";
 import type { TaskShadowRecorder } from "./task-shadow.js";
@@ -2068,22 +2070,15 @@ export class BridgeManager implements vscode.Disposable {
     extra: { signal?: AbortSignal; taskId?: string },
   ): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean; structuredContent?: Record<string, unknown> }> {
     if (toolName === SET_TODOS_TOOL.name) {
-      const result = this.handleSetTodos(args);
-      await this.taskShadow.setTodos(extra.taskId, this.todos);
-      return result;
+      const todos = normalizeBridgeTodos(args);
+      const snapshot = await this.taskShadow.setTodosOwned(extra.taskId, todos);
+      return this.projectTodos(snapshot.todos);
     }
     if (toolName === REPORT_PROGRESS_TOOL.name) {
-      const result = this.handleReportProgress(args);
-      const latest = this.activities[this.activities.length - 1];
-      if (latest?.status === "progress" && latest.message) {
-        await this.taskShadow.reportProgress(extra.taskId, {
-          message: latest.message,
-          phase: latest.phase,
-          percent: latest.percent,
-          todoId: latest.todoId,
-        });
-      }
-      return result;
+      const current = await this.taskShadow.getTaskOwned(extra.taskId);
+      const normalized = normalizeBridgeProgress(args, current.todos);
+      const snapshot = await this.taskShadow.reportProgressOwned(extra.taskId, normalized.progress);
+      return this.projectProgress(snapshot.progress!, snapshot.todos);
     }
 
     const activityId = this.pushActivity({
@@ -2185,66 +2180,24 @@ export class BridgeManager implements vscode.Disposable {
     this.output.appendLine(`[bridge] session destroyed: ${sessionId}`);
   }
 
-  private handleReportProgress(value: unknown): { content: Array<{ type: "text"; text: string }> } {
-    const input = asRecord(value);
-    const message = typeof input.message === "string" ? input.message.trim() : "";
-    if (!message) throw new Error("report_progress.message must be a non-empty string.");
-    if (message.length > 2_000) throw new Error("report_progress.message must be at most 2000 characters.");
-    const phase = typeof input.phase === "string" ? input.phase.trim().slice(0, 160) : undefined;
-    let percent: number | undefined;
-    if (input.percent !== undefined) {
-      if (!Number.isInteger(input.percent) || Number(input.percent) < 0 || Number(input.percent) > 100) {
-        throw new Error("report_progress.percent must be an integer from 0 to 100.");
-      }
-      percent = Number(input.percent);
-    }
-    const requestedTodoId = typeof input.todo_id === "string" ? input.todo_id.trim() : "";
-    let linkedTodo: BridgeTodo | undefined;
-    if (requestedTodoId) {
-      linkedTodo = this.todos.find((todo) => todo.id === requestedTodoId);
-      if (!linkedTodo) throw new Error(`report_progress.todo_id does not match a current todo: ${requestedTodoId}`);
-    } else {
-      linkedTodo = this.todos.find((todo) => todo.status === "in_progress");
-    }
+  private projectProgress(progress: TaskProgress, todos: readonly TaskTodo[]): { content: Array<{ type: "text"; text: string }> } {
+    this.todos = todos.map(todo => ({ ...todo }));
+    const linkedTodo = progress.todoId ? todos.find(todo => todo.id === progress.todoId) : undefined;
     this.pushActivity({
       tool: REPORT_PROGRESS_TOOL.name,
       status: "progress",
-      message,
-      phase,
-      percent,
-      todoId: linkedTodo?.id,
+      message: progress.message,
+      phase: progress.phase,
+      percent: progress.percent,
+      todoId: progress.todoId,
       todoTitle: linkedTodo?.title,
     });
-    this.output.appendLine(`[bridge-progress]${linkedTodo ? ` [${linkedTodo.id}]` : ""}${phase ? ` ${phase}:` : ""} ${message}${percent !== undefined ? ` (${percent}%)` : ""}`);
+    this.output.appendLine(`[bridge-progress]${linkedTodo ? ` [${linkedTodo.id}]` : ""}${progress.phase ? ` ${progress.phase}:` : ""} ${progress.message}${progress.percent !== undefined ? ` (${progress.percent}%)` : ""}`);
     return { content: [{ type: "text", text: linkedTodo ? `Progress reported to ShunCode for todo ${linkedTodo.id}.` : "Progress reported to ShunCode." }] };
   }
 
-  private handleSetTodos(value: unknown): { content: Array<{ type: "text"; text: string }> } {
-    const input = asRecord(value);
-    if (!Array.isArray(input.todos)) throw new Error("set_todos.todos must be an array.");
-    if (input.todos.length > MAX_TODOS) throw new Error(`set_todos.todos must contain at most ${MAX_TODOS} items.`);
-
-    const seen = new Set<string>();
-    const todos: BridgeTodo[] = input.todos.map((raw, index) => {
-      const item = asRecord(raw);
-      const id = typeof item.id === "string" ? item.id.trim() : "";
-      const title = typeof item.title === "string" ? item.title.trim() : "";
-      const status = item.status;
-      if (!id || id.length > 80) throw new Error(`set_todos.todos[${index}].id must be 1-80 characters.`);
-      if (seen.has(id)) throw new Error(`set_todos.todos contains duplicate id: ${id}`);
-      seen.add(id);
-      if (!title || title.length > 400) throw new Error(`set_todos.todos[${index}].title must be 1-400 characters.`);
-      if (status !== "pending" && status !== "in_progress" && status !== "completed") {
-        throw new Error(`set_todos.todos[${index}].status must be pending, in_progress, or completed.`);
-      }
-      return { id, title, status };
-    });
-
-    if (todos.filter((todo) => todo.status === "in_progress").length > 1) {
-      throw new Error("set_todos supports at most one in_progress todo.");
-    }
-
-    this.todos = todos;
+  private projectTodos(todos: readonly TaskTodo[]): { content: Array<{ type: "text"; text: string }> } {
+    this.todos = todos.map(todo => ({ ...todo }));
     this.revision += 1;
     const completed = todos.filter((todo) => todo.status === "completed").length;
     const current = todos.find((todo) => todo.status === "in_progress");

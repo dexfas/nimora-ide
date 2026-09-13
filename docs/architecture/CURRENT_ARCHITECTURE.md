@@ -151,7 +151,9 @@ Bridge 还增加：
 - `set_todos`
 - `report_progress`
 
-当前这些状态仍由 Bridge UI state 驱动，但 Phase 3 已通过 `TaskShadowRecorder` 双写独立 Task domain。Task journal 已记录 todos/progress/executions/artifacts；在 shadow consistency 验证完成前，Bridge state 仍是现有 UI Source of Truth，不做大爆炸式切换。
+Phase 7.1 已开始翻转 coordination ownership：`set_todos` / `report_progress` 不再先修改 `BridgeManager.todos/activities` 再 fail-open 双写，而是先通过 TaskRuntime strict journal 写入 per-session Task，成功后再把 Task snapshot 投影回旧 Bridge UI。strict persistence 失败时 Task live snapshot 与 Bridge UI 都不更新。普通 Bridge file/IDE tool execution 仍保持 Phase 3 的 fail-open shadow projection，尚未整体切换 ownership。
+
+现有 Bridge 状态页仍只有 manager-global `todos/activities` 展示，因此它在过渡期只是**最近一次 coordination Task 的兼容投影**，不是多 Task 的 Source of Truth，也不是最终 Task Center。TaskRuntime 中按 MCP session 建立的 Task 才是 todos/progress 的 durable owner。
 
 Native Chat 同样已 shadow-link 到 Task：优先使用稳定 `request.sessionResource` 把同一 Chat session 映射到同一 Task，并记录 interaction start/finish；现有 Chat history、checkpoint、branch state 行为没有改变。
 
