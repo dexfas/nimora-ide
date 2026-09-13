@@ -142,6 +142,22 @@ Core Agent Host / remote host
 
 现有协议审计确认无需新增“统一 wire”：AHP `ChatTurnStarted` 本身就是 client-dispatchable send；`ChatTurnCancelled` 是 interrupt；完成、错误、usage、reasoning、tool call/result 已由 chat action/state 表达。`AgentHostWorkerAdapter` 应只做 semantic translation 和 session ownership，不复制 AgentHost/session implementation。
 
+Phase 4.2 已实际新增 `src/agent-host-worker-adapter.ts`。它刻意位于 Nimora-owned source，而不是 `src/vs/platform/agentHost/**`：
+
+```text
+Nimora Worker Contract
+        ↓
+AgentHostWorkerAdapter
+        ↓ IAgentConnection
+existing AHP subscriptions/actions
+        ↓
+local IAgentHostService OR remote AgentHost connection
+```
+
+Adapter 使用 chat subscription 的 `onDidApplyAction` 作为 streaming event source，因此不会复制 AHP reducer/state ownership。它同时区分 **owned backend session** 与 **attached existing session**：前者在 Worker dispose 时释放 AgentHost session，后者只释放 subscription，避免误杀 Sessions UI 或其他 client 正在使用的持久 session。
+
+当前 descriptor 只声明已经实现的语义。AHP protocol 本身支持更多能力，但 Worker adapter 尚未完成 image input、checkpoint resume 与 per-send `allowedCapabilities` policy mapping，因此这些不会因为“底层理论上支持”就被虚报成 adapter capability。
+
 ## 7. Web Worker / WebMCP
 
 ### 正式 Adapter Layer

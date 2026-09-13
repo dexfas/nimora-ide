@@ -193,7 +193,7 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 
 ## 6. Phase 4 — Worker Contract
 
-**Status: In progress — Phase 4.1 semantic contract + ApiWorkerAdapter completed (2026-09-13)**
+**Status: In progress — Phase 4.1 ApiWorkerAdapter + Phase 4.2 AgentHostWorkerAdapter semantic layer completed (2026-09-13)**
 
 ### 目标
 
@@ -202,7 +202,7 @@ Shadow mode **不会阻止重复 tool execution**。Ledger 会记录 duplicate o
 ### 工作顺序
 
 1. `ApiWorkerAdapter` 包装现有 first-party Runtime；✅ contract/adapter 已落地，Native Chat 尚未切换 caller
-2. `AgentHostWorkerAdapter` 包装现有 IAgentHostService/AHP；
+2. `AgentHostWorkerAdapter` 包装现有 IAgentConnection/AHP；✅ semantic adapter 已落地，现有 Sessions/UI caller 尚未切换
 3. Worker Session Manager；
 4. Context handoff package；
 5. Web Worker adapter 最后接入。
@@ -223,12 +223,17 @@ Native Chat caller 切换前的 parity bridge 也已建立：`worker-runtime-tra
 
 Core 审计同时确认 AHP 已有天然映射点：client `ChatTurnStarted` = send，`ChatTurnCancelled` = interrupt，server `ChatTurnComplete/ChatError/ChatUsage/ChatReasoning/tool-call actions` = WorkerEvent。Phase 4.2 应包装这些语义，不重写 AHP。
 
+Phase 4.2 已将 `AgentHostWorkerAdapter` 放在 Nimora-owned `src/agent-host-worker-adapter.ts`，而不是 `src/vs/platform/agentHost/**`。它依赖 Core 已有 `IAgentConnection` / state subscription contract，因此 local `IAgentHostService` 与 remote AgentHost 都能复用同一个 semantic adapter，同时不扩大 Core Patch。Adapter 使用现有 chat subscription 作为唯一事件源，不创建第二套 AHP state store/轮询器。
+
+当前 AgentHost adapter 已实现 session create/attach ownership、AHP `ChatTurnStarted` send、`ChatTurnCancelled` interrupt、text/reasoning streaming、tool ready/result、usage、terminal/error 与 health 映射。它只在自己创建 backend session 时调用 `disposeSession`；attach 到已有 session 时只释放 subscription。尚未映射 Worker image input、checkpoint resume 和 `allowedCapabilities` policy input，因此 descriptor 明确不宣称这三项已完成。
+
 ### 测试
 
 - API adapter fake-runtime parity（streaming/reasoning/capability/checkpoint/cancel/health/tool invocation context/legacy trace projection）；✅
 - real API model session；⏳ caller 尚未切换
-- AgentHost local session；
-- cancel/resume/health；
+- AgentHost fake-AHP semantic parity（create/attach ownership、streaming/reasoning/tool/usage/cancel/health）；✅
+- AgentHost real local/remote provider session；⏳ 现有 Sessions/UI caller 尚未切换
+- cancel/resume/health；API cancel/resume/health ✅，AgentHost cancel/health ✅，AgentHost resume ⏳
 - worker switch with same Task context。
 
 ### 回滚
