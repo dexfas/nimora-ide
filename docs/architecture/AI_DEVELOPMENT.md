@@ -153,7 +153,7 @@ npm run test-shuncode-host-capability-policy
 
 `test-shuncode-host-capability-durable` 保护 strict Task journal、durable result envelope、进程重启后 result-only recovery、delivered 去重以及 ambiguous crash guard。它证明 Host execution 已具备 crash-safe at-most-once 基础，但仍不等于 WebMCP 已切到 host-managed dispatch；`IdeToolBroker` executor 与 approval/policy wiring 仍必须作为独立迁移阶段验证。
 
-`test-shuncode-host-capability-policy` 保护 metadata approval 的 fail-closed 语义和 IdeToolBroker provider boundary：`approval=none` 可以继续，`session` 等需要显式 grant；Extension Host executor 只能执行 canonical IDE tools，不能吞掉 Runtime/MCP-owned capability。该 smoke + Extension typecheck/bundle 证明真实 Broker object graph 可组合，但仍不代表自动 Worker dispatch 已开启。
+`test-shuncode-host-capability-policy` 保护 metadata approval 的 fail-closed 语义和 Host Capability Router：`approval=none` 可以继续，`session` 等需要显式 grant；IDE capability 必须走 IdeToolBroker，Runtime/file capability 必须走 canonical file provider，0 owner/多 owner 都拒绝。`test-shuncode-web-worker-stack` 还必须证明 host-requested `read_files` 不调用 IdeToolBroker。以上仍不代表 live/default Worker dispatch 已切换。
 
 修改 page Worker control / command transport / WorkerSession binding 后，还必须运行 `npm run typecheck-shuncode` 与 `npm run compile-shuncode`。真实源码载体验证应确认 Extension Host 同时激活第一方扩展与 `shuncode-integrated-browser-bridge`，隔离 control port 的 `/agent.js` 包含 worker control surface，并在 ShunCode output log 中出现 `Web worker registered: nimora.web-worker via webmcp.integrated-browser`。这只证明真实 Extension Host wiring，不等于 live provider E2E。
 

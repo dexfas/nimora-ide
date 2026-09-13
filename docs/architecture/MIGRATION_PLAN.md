@@ -291,6 +291,8 @@ Phase 5.4.5 已把真实 Extension Host `IdeToolBroker` 包装为 `HostCapabilit
 
 Phase 5.4.6 已建立**显式实验**的 host-requested end-to-end lane。只有 `WorkerInput.extensions.hostManagedCapabilities === true` 时，WebMCP page agent 才停止 page-local `invokeTool`，记录 pending host capability 并发出 `dispatch=host-requested`；默认输入继续 `observed`。`WorkerSessionManager` 为 host-requested call 分配 Nimora executionId 并附在 event extensions，但不再 shadow-start/finish/deliver 这条 execution；第一方 `_shuncode.worker.web.run` 仅在同一实验 flag 下把该 event 交给 `HostCapabilityExecutionService`，再通过 Manager result sink 回填网页。真实 Edge synthetic smoke 已证明实验 lane 不调用 page-local tool binding；stack smoke 已证明 `page/transport → Manager → strict Task claim → Host service → Broker → result-return → final Worker terminal` 闭环，并且 Host-owned execution 只由 strict owner 写 ledger。**live DeepSeek/default WebMCP 仍未切换 ownership。**
 
+Phase 5.4.7 把 Host execution 从单一 `IdeToolBroker` 提升为 provider-aware `HostCapabilityExecutorRouter`。Extension Host IDE tools 继续走 `IdeToolBrokerHostCapabilityExecutor`；`read_files/find_files/search_files/apply_patch` 复用 canonical `file-tool-registry.ts`，由 `FileToolHostCapabilityExecutor` 执行。Router 要求恰好一个 provider owner，0 owner 或多 owner 都 fail-closed。自动 stack smoke 已把 host-requested 工具改成真实 `read_files`，证明 Runtime/file provider 不会误落到 IdeToolBroker。默认 authorizer 仍生效，因此 `apply_patch` 虽然已有 provider route，但没有显式 session grant 时仍不会执行。
+
 ### 风险
 
 Web DOM 变化、重复 tool execution、result delivery 丢失。

@@ -3,13 +3,12 @@ import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 const require = createRequire(path.resolve(import.meta.dirname, '..', 'build', 'package.json'));
 const esbuild = require('esbuild') as typeof import('../build/node_modules/esbuild/lib/main.js');
 const taskDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-web-worker-stack-task-'));
 const bundleDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-web-worker-stack-bundle-'));
-const bundlePath = path.join(bundleDirectory, 'stack.mjs');
+const bundlePath = path.join(bundleDirectory, 'stack.cjs');
 const root = path.resolve(import.meta.dirname, '..');
 
 await esbuild.build({
@@ -28,12 +27,12 @@ await esbuild.build({
   outfile: bundlePath,
   bundle: true,
   platform: 'node',
-  format: 'esm',
+  format: 'cjs',
   target: ['es2022'],
   logLevel: 'silent',
 });
 
-const { WebMcpCommandTransport, WebWorkerAdapter, WorkerSessionManager, TaskRuntime, HostCapabilityExecutionService } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { WebMcpCommandTransport, WebWorkerAdapter, WorkerSessionManager, TaskRuntime, HostCapabilityExecutionService } = require(bundlePath);
 
 class FakeCommands {
   mode = 'delivered';
@@ -61,9 +60,9 @@ class FakeCommands {
               text: 'HOST_STACK_DONE',
               events: [
                 { seq: 1, type: 'status', name: 'sent' },
-                { seq: 2, type: 'capability_call', callId: 'host-stack-call', name: 'list_directory', arguments: { path: '.' }, dispatch: 'host-requested' },
-                { seq: 3, type: 'capability_result', callId: 'host-stack-call', name: 'list_directory', text: this.hostResultText, isError: false },
-                { seq: 4, type: 'status', name: 'capability_result_delivered', callId: 'host-stack-call', capability: 'list_directory' },
+                { seq: 2, type: 'capability_call', callId: 'host-stack-call', name: 'read_files', arguments: { files: [{ path: 'README.md' }] }, dispatch: 'host-requested' },
+                { seq: 3, type: 'capability_result', callId: 'host-stack-call', name: 'read_files', text: this.hostResultText, isError: false },
+                { seq: 4, type: 'status', name: 'capability_result_delivered', callId: 'host-stack-call', capability: 'read_files' },
                 { seq: 5, type: 'assistant_text', text: 'HOST_STACK_DONE' },
                 { seq: 6, type: 'completed', text: 'HOST_STACK_DONE' },
               ],
@@ -74,7 +73,7 @@ class FakeCommands {
               text: '',
               events: [
                 { seq: 1, type: 'status', name: 'sent' },
-                { seq: 2, type: 'capability_call', callId: 'host-stack-call', name: 'list_directory', arguments: { path: '.' }, dispatch: 'host-requested' },
+                { seq: 2, type: 'capability_call', callId: 'host-stack-call', name: 'read_files', arguments: { files: [{ path: 'README.md' }] }, dispatch: 'host-requested' },
               ],
             };
       }
@@ -162,7 +161,7 @@ try {
       brokerCalls.push({ name, args });
       return { text: 'HOST_BROKER_LIST_OK', isError: false };
     },
-  });
+  }, undefined, () => [root]);
   const descriptor = await manager.register(adapter);
   assert.equal(descriptor.id, 'nimora.web-worker');
   assert.equal(descriptor.kind, 'web');
@@ -225,7 +224,7 @@ try {
     }
   }
   assert.equal(hostCall.dispatch, 'host-requested');
-  assert.equal(hostCall.name, 'list_directory');
+  assert.equal(hostCall.name, 'read_files');
   assert.match(hostCall.extensions.executionId, new RegExp(`^worker:${hostSession.managedSessionId}:stack-turn-host:1$`));
   assert.equal(tasks.getTask(task.taskId).executions[hostCall.extensions.executionId], undefined, 'host-requested call must not be shadow-started before strict owner claim');
   await hostExecution.executeAndDeliver({
@@ -238,11 +237,11 @@ try {
     name: hostCall.name,
     arguments: hostCall.arguments,
   }, manager);
-  assert.deepEqual(brokerCalls, [{ name: 'list_directory', args: { path: '.' } }]);
+  assert.deepEqual(brokerCalls, [], 'runtime/file provider must not invoke IdeToolBroker');
   const hostOwnedExecution = tasks.getTask(task.taskId).executions[hostCall.extensions.executionId];
   assert.equal(hostOwnedExecution.status, 'succeeded');
   assert.equal(hostOwnedExecution.deliveryStatus, 'delivered');
-  assert.equal(hostOwnedExecution.resultPayload.text, 'HOST_BROKER_LIST_OK');
+  assert.match(hostOwnedExecution.resultPayload.text, /README/);
   const hostRemaining = [];
   for (;;) {
     const next = await hostIterator.next();
@@ -250,7 +249,7 @@ try {
     hostRemaining.push(next.value);
   }
   assert.equal(hostRemaining.at(-1).status, 'completed');
-  assert.equal(hostRemaining.find(event => event.type === 'capability_result')?.text, 'HOST_BROKER_LIST_OK');
+  assert.match(hostRemaining.find(event => event.type === 'capability_result')?.text ?? '', /README/);
   assert.equal(tasks.getTask(task.taskId).executions[hostCall.extensions.executionId].duplicateObservations, 0, 'Manager must not shadow-project host-owned execution after strict owner claim');
   await manager.dispose(hostSession.managedSessionId);
 

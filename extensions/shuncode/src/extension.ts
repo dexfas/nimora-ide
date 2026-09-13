@@ -57,8 +57,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("ShunCode");
   const ideToolBroker = new IdeToolBroker();
   const taskShadow = new TaskShadowRecorder(context, output);
-  const hostCapabilityExecution = new HostCapabilityExecutionService(taskShadow.executionRuntime(), ideToolBroker);
-  output.appendLine("[extension] host capability execution service staged; automatic Worker dispatch remains disabled");
+  const hostCapabilityExecution = new HostCapabilityExecutionService(
+    taskShadow.executionRuntime(),
+    ideToolBroker,
+    undefined,
+    () => vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath) ?? [],
+  );
+  output.appendLine("[extension] host capability execution service staged; automatic dispatch is opt-in only via hostManagedCapabilities");
   void hostCapabilityExecution;
   const webWorkerSessions = new WorkerSessionManager({ taskBindings: taskShadow, executionProjection: taskShadow });
   const webWorkerTransport = new WebMcpCommandTransport({

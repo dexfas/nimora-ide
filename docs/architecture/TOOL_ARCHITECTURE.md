@@ -68,6 +68,8 @@ IdeToolBroker (thin facade)
 
 Phase 5.4.5 在不复制 provider 实现的前提下新增 Host execution adapter：`IdeToolBrokerHostCapabilityExecutor` 直接复用 `IdeToolBroker.invokeDirect()`，因此未来 Worker host-managed 路径与 Bridge/Native Chat 仍共享同一 Workspace/Terminal/Diagnostics/LSP backend。executor 会拒绝不属于 `ide-tool-definitions` 或 metadata environment 不是 `extension-host` 的 capability；这为后续 Capability Router 保留清晰 provider 边界。对应 `CapabilityMetadataHostAuthorizer` 默认 fail-closed：只有 `approval=none` 无需额外 grant，其余能力必须由具体产品 surface 提供 grant resolver。
 
+Phase 5.4.7 已落地第一版 Host Capability Router，而不是把所有执行硬塞进 Extension Host：`HostCapabilityExecutorRouter` 要求唯一 owner；`IdeToolBrokerHostCapabilityExecutor` 处理 canonical IDE definitions，`FileToolHostCapabilityExecutor` 则直接复用 `file-tool-registry.ts` 的 `invokeFileTool()`。这使 host-managed Web Worker 已能执行 `read_files/find_files/search_files` 等只读 Runtime/file capability，同时 `apply_patch` 的 provider 虽可达，但仍受 metadata `approval=session` 拦截。后续 Gateway/browser/OS provider 应继续以同样方式注册，而不是扩大某一个巨型 executor。
+
 Terminal subsystem 没有为了“拆文件”而重写：原有 persistent PTY、ConPTY、echo gate、direct execution、output capture、interactive input 和 terminal reuse 逻辑整体迁入 `terminal-command-manager.ts`，并已通过真实 Extension Host terminal smoke。
 
 ## 3. 目标 Capability Definition

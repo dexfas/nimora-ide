@@ -143,6 +143,8 @@ Phase 5.4.5 增加 provider/policy boundary。`IdeToolBrokerHostCapabilityExecut
 
 Phase 5.4.6 增加 opt-in ownership lane。Page Worker 只有收到 `extensions.hostManagedCapabilities=true` 才把解析到的 tool call 标成 `host-requested`；此时必须有 stable callId，page 把该 call 放入 `pendingHostCapabilities`，不调用自己的 `invokeTool`，也不会在 Host result delivery 前结束 turn。Manager 对 host-owned call 只生成/附加 executionId，不写 shadow execution 状态；Host service 取得该 executionId 后 strict claim/execute/deliver。默认无 flag 的 protocol 仍映射为 `observed`，保持现有 page-local at-most-once/delivery ledger。
 
+Phase 5.4.7 明确 Host execution 的 provider routing contract：`HostCapabilityExecutorRouter` 根据 capability metadata + provider ownership 选择唯一 executor；没有匹配或多个匹配都拒绝执行。当前两条 route 是 Extension Host IDE provider 与 Runtime/file provider。Router 只负责“由谁执行”，approval authorizer 仍先于 executor 生效，所以 provider 可路由不等于 capability 已获授权。
+
 ## 8. Gateway federation contract
 
 Gateway 同时：
