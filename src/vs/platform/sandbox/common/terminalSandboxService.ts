@@ -46,6 +46,16 @@ export interface ITerminalSandboxWrapResult {
 	requiresAllowNetworkConfirmation?: boolean;
 }
 
+export interface ITerminalStrictSandboxOptions {
+	cwd: URI;
+	writeRoots: readonly URI[];
+	shell?: string;
+}
+
+export interface ITerminalStrictSandboxWrapResult extends ITerminalSandboxWrapResult {
+	cleanupPaths: string[];
+}
+
 export type TerminalSandboxFileAccessPermission = 'read' | 'write';
 
 export interface ITerminalSandboxFileAccessCheckResult {
@@ -118,6 +128,11 @@ export interface ITerminalSandboxService {
 	 * retains sandbox execution while using a network-unrestricted config.
 	 */
 	wrapCommand(command: string, requestUnsandboxedExecution?: boolean, shell?: string, cwd?: URI, commandDetails?: readonly ITerminalSandboxCommand[], requestAllowNetwork?: boolean): Promise<ITerminalSandboxWrapResult>;
+	/**
+	 * Wrap one command in a fail-closed sandbox whose writable filesystem is
+	 * limited to the exact roots supplied by the trusted caller.
+	 */
+	wrapStrictCommand?(command: string, options: ITerminalStrictSandboxOptions): Promise<ITerminalStrictSandboxWrapResult>;
 	checkFileAccess(permission: TerminalSandboxFileAccessPermission, paths: readonly string[], precheckInputs?: ITerminalSandboxPrecheckInputs): Promise<ITerminalSandboxFileAccessCheckResult>;
 	getSandboxConfigPath(forceRefresh?: boolean, precheckInputs?: ITerminalSandboxPrecheckInputs): Promise<string | undefined>;
 	getTempDir(): URI | undefined;
@@ -149,6 +164,10 @@ export class NullTerminalSandboxService implements ITerminalSandboxService {
 
 	async wrapCommand(command: string): Promise<ITerminalSandboxWrapResult> {
 		return { command, isSandboxWrapped: false };
+	}
+
+	async wrapStrictCommand(): Promise<ITerminalStrictSandboxWrapResult> {
+		throw new Error('Strict terminal sandbox is unavailable in this environment');
 	}
 
 	async checkFileAccess(): Promise<ITerminalSandboxFileAccessCheckResult> {

@@ -5,6 +5,7 @@ import { CapabilityMetadataHostAuthorizer } from "../../../src/host-capability-p
 import { TaskCapabilityGrantResolver } from "../../../src/task-capability-grant-resolver.js";
 import {
   HostCapabilityExecutionCoordinator,
+  type HostCapabilityExecutionAdmission,
   type HostCapabilityExecutionRequest,
   type HostCapabilityResultSink,
 } from "../../../src/host-capability-execution-coordinator.js";
@@ -12,6 +13,8 @@ import { TaskHostCapabilityExecutionStore } from "../../../src/task-host-capabil
 import type { TaskRuntime } from "../../../src/task-runtime.js";
 import type { IdeToolBroker } from "./ide-tool-broker.js";
 import { IdeToolBrokerHostCapabilityExecutor } from "./ide-host-capability-executor.js";
+import { projectHostCapabilityArtifacts } from "./task-host-capability-artifacts.js";
+import { TaskHostCapabilityExecutor } from "./task-host-capability-executor.js";
 
 /**
  * Dormant composition root for future host-managed Worker execution.
@@ -27,17 +30,18 @@ export class HostCapabilityExecutionService {
     workspaceRoots: () => readonly string[] = () => [],
   ) {
     this.coordinator = new HostCapabilityExecutionCoordinator({
-      durableStore: new TaskHostCapabilityExecutionStore(tasks),
+      durableStore: new TaskHostCapabilityExecutionStore(tasks, projectHostCapabilityArtifacts),
       authorizer: new CapabilityMetadataHostAuthorizer(grants ?? new TaskCapabilityGrantResolver(tasks)),
       executor: new HostCapabilityExecutorRouter([
-        new IdeToolBrokerHostCapabilityExecutor(broker),
-        new FileToolHostCapabilityExecutor({ workspaceRoots }),
+        new IdeToolBrokerHostCapabilityExecutor(broker, { tasks, workspaceRoots }),
+        new FileToolHostCapabilityExecutor({ workspaceRoots, tasks }),
+        new TaskHostCapabilityExecutor(tasks),
       ]),
     });
   }
 
-  executeOnce(request: HostCapabilityExecutionRequest) {
-    return this.coordinator.executeOnce(request);
+  executeOnce(request: HostCapabilityExecutionRequest, admission?: HostCapabilityExecutionAdmission) {
+    return this.coordinator.executeOnce(request, admission);
   }
 
   executeAndDeliver(request: HostCapabilityExecutionRequest, sink: HostCapabilityResultSink) {

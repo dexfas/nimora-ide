@@ -1,9 +1,9 @@
 import path from "node:path";
 import * as vscode from "vscode";
 import { projectTaskCenterState, type TaskCenterTaskDetail } from "../../../src/task-center-projection.js";
-import type { TaskRuntime } from "../../../src/task-runtime.js";
+import { readProjectMissionPresentation, type ProjectMissionPresentationOwners } from "../../../src/project-mission-presentation.js";
 import type { TaskShadowRecorder } from "./task-shadow.js";
-import { buildTaskSessionEntryTree, buildTaskSessionFileTree, formatTaskSessionMarkdown, presentTaskSession, presentTaskSessionArtifacts, type TaskSessionPresentationStatus } from "./task-center-session-presentation.js";
+import { buildTaskSessionEntryTree, buildTaskSessionFileTree, formatProjectMissionSessionMarkdown, formatTaskSessionMarkdown, presentProjectMissionSession, presentTaskSession, presentTaskSessionArtifacts, type TaskSessionPresentationStatus } from "./task-center-session-presentation.js";
 
 export const NIMORA_TASK_SESSION_TYPE = "nimora-task";
 export const MANAGED_TERMINAL_OPEN_COMMAND = "shuncode.terminal.openManaged";
@@ -23,12 +23,17 @@ function taskIdFromResource(resource: vscode.Uri): string | undefined {
   }
 }
 
-function vscodeStatus(status: TaskSessionPresentationStatus): vscode.ChatSessionStatus {
+function vscodeStatus(status: TaskSessionPresentationStatus): vscode.ChatSessionStatus | undefined {
   switch (status) {
     case "failed": return vscode.ChatSessionStatus.Failed;
     case "completed": return vscode.ChatSessionStatus.Completed;
-    case "needs_input": return vscode.ChatSessionStatus.NeedsInput;
-    case "in_progress": return vscode.ChatSessionStatus.InProgress;
+    // Nimora Work Sessions are passive projections over durable TaskRuntime
+    // state, not extension-host-owned chat executions. InProgress/NeedsInput
+    // are lifecycle statuses for interruptible chat requests and would make
+    // VS Code incorrectly veto Extension Host restart for an active Mission.
+    case "needs_input":
+    case "in_progress":
+      return undefined;
   }
 }
 
@@ -58,9 +63,9 @@ function safeWorkspaceFileUri(value: string, workspace: string | undefined): vsc
   return vscode.Uri.file(filePath);
 }
 
-function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatResponseMarkdownPart | vscode.ChatResponseFileTreePart | vscode.ChatResponseAnchorPart> {
+function createResponseParts(detail: TaskCenterTaskDetail, markdownContent: string): Array<vscode.ChatResponseMarkdownPart | vscode.ChatResponseFileTreePart | vscode.ChatResponseAnchorPart> {
   const parts: Array<vscode.ChatResponseMarkdownPart | vscode.ChatResponseFileTreePart | vscode.ChatResponseAnchorPart> = [
-    new vscode.ChatResponseMarkdownPart(new vscode.MarkdownString(formatTaskSessionMarkdown(detail))),
+    new vscode.ChatResponseMarkdownPart(new vscode.MarkdownString(markdownContent)),
   ];
   const artifacts = presentTaskSessionArtifacts(detail);
   const workspaceFiles = [...new Set(artifacts
@@ -131,11 +136,11 @@ function createResponseParts(detail: TaskCenterTaskDetail): Array<vscode.ChatRes
   return parts;
 }
 
-function createHistory(detail: TaskCenterTaskDetail, participantId: string): Array<vscode.ChatRequestTurn2 | vscode.ChatResponseTurn2> {
-  const prompt = detail.summary.goal?.trim() || "Nimora Task";
+function createHistory(detail: TaskCenterTaskDetail, participantId: string, markdownContent: string, promptOverride?: string): Array<vscode.ChatRequestTurn2 | vscode.ChatResponseTurn2> {
+  const prompt = promptOverride?.trim() || detail.summary.goal?.trim() || "Nimora Task";
   const request = new vscode.ChatRequestTurn2(prompt, undefined, [], participantId, [], undefined, `task:${detail.summary.taskId}`, undefined, undefined);
   const response = new vscode.ChatResponseTurn2(
-    createResponseParts(detail),
+    createResponseParts(detail, markdownContent),
     {},
     participantId,
   );
@@ -145,20 +150,26 @@ function createHistory(detail: TaskCenterTaskDetail, participantId: string): Arr
 export function registerTaskCenterSessions(
   context: vscode.ExtensionContext,
   taskShadow: TaskShadowRecorder,
+  projectMissionPresentationOwners: ProjectMissionPresentationOwners,
   participant: vscode.ChatParticipant,
+  missionEntry: vscode.ChatRequestHandler,
   participantId: string,
   output: vscode.OutputChannel,
 ): vscode.Disposable {
-  const runtime: TaskRuntime = taskShadow.executionRuntime();
+  const runtime = projectMissionPresentationOwners.tasks;
   const disposables: vscode.Disposable[] = [];
   let controller: vscode.ChatSessionItemController;
   let refreshQueued = false;
 
   const refresh = async (): Promise<void> => {
+    const semanticProjection = await readProjectMissionPresentation(projectMissionPresentationOwners);
     await runtime.initialize();
     const state = projectTaskCenterState(runtime.listTasks());
     const items = state.tasks.map(summary => {
-      const presentation = presentTaskSession(summary);
+      const mission = semanticProjection.missions.find(candidate => candidate.taskId === summary.taskId);
+      const presentation = mission
+        ? presentProjectMissionSession(summary, semanticProjection, mission)
+        : presentTaskSession(summary);
       const item = controller.createChatSessionItem(taskResource(summary.taskId), presentation.label);
       item.description = presentation.description;
       item.badge = presentation.badge;
@@ -171,6 +182,15 @@ export function registerTaskCenterSessions(
       };
       item.metadata = {
         nimoraTaskId: summary.taskId,
+        ...(mission ? {
+          nimoraProjectId: mission.projectId,
+          nimoraMissionId: mission.missionId,
+          missionPlane: mission.plane,
+          missionType: mission.missionType,
+          missionFinalized: mission.finalized,
+          missionPresentationState: mission.presentationState,
+          taskWorkStatus: mission.taskStatus,
+        } : {}),
         sourceKind: summary.sourceKind,
         workerCount: summary.workerCount,
         activeWorkerCount: summary.activeWorkerCount,
@@ -196,14 +216,28 @@ export function registerTaskCenterSessions(
         if (token.isCancellationRequested) throw new vscode.CancellationError();
         const taskId = taskIdFromResource(resource);
         if (!taskId) throw new Error("Invalid Nimora Task session resource.");
+        const semanticProjection = await readProjectMissionPresentation(projectMissionPresentationOwners);
         await runtime.initialize();
         const state = projectTaskCenterState(runtime.listTasks(), taskId);
         const detail = state.selected;
         if (!detail) throw new Error(`Nimora Task is no longer available: ${taskId}`);
+        const mission = semanticProjection.missions.find(candidate => candidate.taskId === taskId);
+        const markdownContent = mission
+          ? formatProjectMissionSessionMarkdown(detail, semanticProjection, mission)
+          : formatTaskSessionMarkdown(detail);
+        const missionPresentation = mission ? presentProjectMissionSession(detail.summary, semanticProjection, mission) : undefined;
         return {
-          title: detail.summary.goal || "Nimora Task",
-          history: createHistory(detail, participantId),
-          requestHandler: undefined,
+          title: missionPresentation?.label ?? detail.summary.goal ?? "Nimora Task",
+          history: createHistory(detail, participantId, markdownContent, missionPresentation?.label),
+          // Work Sessions remain a projection over Task/Mission truth. For an
+          // active canonical Mission, input is only a native ingress seam: it
+          // delegates to the exact same Mission entry handler as ordinary Chat
+          // and pins the request to this immutable nimora-task resource. The
+          // projection never mutates Task/Project/Mission state itself.
+          requestHandler: mission && !mission.finalized
+            ? async (request: any, chatContext: any, stream: any, requestToken: vscode.CancellationToken) =>
+                missionEntry({ ...request, sessionResource: resource }, chatContext, stream, requestToken)
+            : undefined,
         };
       },
     },

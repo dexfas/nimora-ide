@@ -5,7 +5,7 @@
 
 import { Color, RGBA } from '../../../../../base/common/color.js';
 import { localize } from '../../../../../nls.js';
-import { badgeBackground, badgeForeground, contrastBorder, editorBackground, editorSelectionBackground, editorWidgetBackground, foreground, registerColor, transparent } from '../../../../../platform/theme/common/colorRegistry.js';
+import { badgeBackground, badgeForeground, contrastBorder, editorBackground, editorSelectionBackground, editorWidgetBackground, foreground, focusBorder, registerColor, transparent } from '../../../../../platform/theme/common/colorRegistry.js';
 import { buttonBackground } from '../../../../../platform/theme/common/colors/inputColors.js';
 import { darken, lighten } from '../../../../../platform/theme/common/colorUtils.js';
 
@@ -108,7 +108,26 @@ export const chatInputWorkingBorderColor3 = registerColor(
 // Matches Voice Mode's listening glow (see `voiceGlow.ts`). Deliberately not
 // `charts.blue`, which resolves to `editorInfoForeground` — an indigo that reads
 // as purple once softened into a wash.
+
+
+export const chatVoiceGlowBaseColor = registerColor(
+	'chat.voiceGlowBaseColor',
+	focusBorder,
+	localize('chat.voiceGlowBaseColor', 'Base accent the Voice Mode ambient glow is derived from. The listening and speaking glows are hue-shifted from this color.'), true);
+
+export const chatVoiceListeningGlow = registerColor(
+	'chat.voiceListeningGlow',
+	{ dark: null, light: null, hcDark: null, hcLight: null },
+	localize('chat.voiceListeningGlow', 'Accent color of the Voice Mode glow while listening. Derived from {0} when unset.', 'chat.voiceGlowBaseColor'), true);
+
+export const chatVoiceSpeakingGlow = registerColor(
+	'chat.voiceSpeakingGlow',
+	{ dark: null, light: null, hcDark: null, hcLight: null },
+	localize('chat.voiceSpeakingGlow', 'Accent color of the Voice Mode glow while the agent is speaking. Derived from {0} when unset.', 'chat.voiceGlowBaseColor'), true);
+
+// Dictation shares Voice Mode's listening accent, so an open microphone reads the
+// same whichever feature opened it.
 export const chatDictationActiveMicGlow = registerColor(
 	'chat.dictationActiveMicGlow',
-	{ dark: '#58A6FF', light: '#2E8BE6', hcDark: '#8CC6FF', hcLight: '#00539C' },
+	chatVoiceGlowBaseColor,
 	localize('chat.dictationActiveMicGlow', 'Accent color of the glow shown on the microphone while dictation is listening.'));

@@ -216,6 +216,12 @@ export class ChatAgentResponseStream {
 					_report(dto);
 					return this;
 				},
+				voiceProgress(id: vscode.ChatResponseVoiceProgressStage, value: string) {
+					throwIfDone(this.voiceProgress);
+					checkProposedApiEnabled(that._extension, 'chatParticipantPrivate');
+					_report(typeConvert.ChatResponseVoiceProgressPart.from(new extHostTypes.ChatResponseVoiceProgressPart(id, value)));
+					return this;
+				},
 				warning(value) {
 					throwIfDone(this.progress);
 					checkProposedApiEnabled(that._extension, 'chatParticipantAdditions');
@@ -408,6 +414,8 @@ export class ChatAgentResponseStream {
 					if (part instanceof extHostTypes.ChatResponseReferencePart) {
 						// Ensure variable reference values get fixed up
 						this.reference2(part.value, part.iconPath, part.options);
+					} else if (part instanceof extHostTypes.ChatResponseVoiceProgressPart) {
+						this.voiceProgress(part.id, part.value);
 					} else if (part instanceof extHostTypes.ChatResponseProgressPart2) {
 						const dto = part.task ? typeConvert.ChatTask.from(part) : typeConvert.ChatResponseProgressPart.from(part);
 						_report(dto, part.task);
@@ -571,6 +579,7 @@ export class ExtHostChatAgents2 extends Disposable implements ExtHostChatAgentsS
 
 	private toSkill(dto: ISkillDto): vscode.ChatSkill {
 		return Object.freeze<vscode.ChatSkill>({
+			enabled: dto.enabled === true,
 			uri: URI.revive(dto.uri),
 			name: dto.name,
 			description: dto.description,

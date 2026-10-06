@@ -16,6 +16,7 @@ import { IChatService } from '../../../chat/common/chatService/chatService.js';
 import { ILanguageModelToolsService, ToolDataSource, ToolSet } from '../../../chat/common/tools/languageModelToolsService.js';
 import { IBrowserViewWorkbenchService } from '../../common/browserView.js';
 import { getBrowserPagesContext } from './browserToolHelpers.js';
+import { ActivateBrowserPageTool, ActivateBrowserPageToolData } from './activateBrowserPageTool.js';
 import { ClickBrowserTool, ClickBrowserToolData } from './clickBrowserTool.js';
 import { DragElementTool, DragElementToolData } from './dragElementTool.js';
 import { HandleDialogBrowserTool, HandleDialogBrowserToolData } from './handleDialogBrowserTool.js';
@@ -28,6 +29,7 @@ import { ReadBrowserTool, ReadBrowserToolData } from './readBrowserTool.js';
 import { RunPlaywrightCodeTool, RunPlaywrightCodeToolData } from './runPlaywrightCodeTool.js';
 import { ScreenshotBrowserTool, ScreenshotBrowserToolData } from './screenshotBrowserTool.js';
 import { TypeBrowserTool, TypeBrowserToolData } from './typeBrowserTool.js';
+import { registerWebMcpInternalBrowserOperationCommand } from '../webMcpInternalBrowserOperations.js';
 
 
 class BrowserChatAgentToolsContribution extends Disposable implements IWorkbenchContribution {
@@ -50,6 +52,7 @@ class BrowserChatAgentToolsContribution extends Disposable implements IWorkbench
 		@IPlaywrightService private readonly playwrightService: IPlaywrightService,
 	) {
 		super();
+		this._register(registerWebMcpInternalBrowserOperationCommand());
 
 		this._browserToolSet = this._register(this.toolsService.createToolSet(
 			ToolDataSource.Internal,
@@ -99,6 +102,10 @@ class BrowserChatAgentToolsContribution extends Disposable implements IWorkbench
 		this._toolsStore.add(this.toolsService.registerTool(TypeBrowserToolData, this.instantiationService.createInstance(TypeBrowserTool)));
 		this._toolsStore.add(this.toolsService.registerTool(RunPlaywrightCodeToolData, this.instantiationService.createInstance(RunPlaywrightCodeTool)));
 		this._toolsStore.add(this.toolsService.registerTool(HandleDialogBrowserToolData, this.instantiationService.createInstance(HandleDialogBrowserTool)));
+		// Extension-facing exact-page activation primitive. This intentionally is
+		// not added to the model-visible browser tool set; it only makes an
+		// already-shared BrowserEditorInput active without navigation or mutation.
+		this._toolsStore.add(this.toolsService.registerTool(ActivateBrowserPageToolData, this.instantiationService.createInstance(ActivateBrowserPageTool)));
 
 		// Note: this is not currently exposed directly to models. It is mostly exposed so extensions can use it to provide model context via the API.
 		this._toolsStore.add(this.toolsService.registerTool(ListBrowserPagesToolData, this.instantiationService.createInstance(ListBrowserPagesTool)));

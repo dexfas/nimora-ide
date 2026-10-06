@@ -249,6 +249,7 @@ export class MainThreadChatAgents2 extends Disposable implements MainThreadChatA
 
 	private _toSkillDto(skill: IAgentSkill): ISkillDto {
 		return {
+			enabled: !this._promptsService.getDisabledPromptFiles(PromptsType.skill).has(skill.uri),
 			uri: skill.uri,
 			name: skill.name,
 			description: skill.description,

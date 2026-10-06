@@ -1,5 +1,4 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { retryPolicyForTool } from './capability-contract.mjs';
 import { defineGatewayProvider } from './provider-registry.mjs';
 
@@ -8,7 +7,7 @@ const legacyRetryableReadOnlyTools = new Set([
 ]);
 
 async function defaultConnectClient(url) {
-  const client = new Client({ name: 'shuncode-browser-gateway', version: '0.1.0' }, { capabilities: {} });
+  const client = new Client({ name: 'shuncode-browser-gateway', version: '0.1.0' }, { capabilities: {}, versionNegotiation: { mode: 'auto' } });
   const transport = new StreamableHTTPClientTransport(new URL(url), {
     requestInit: { headers: { 'ngrok-skip-browser-warning': '1' } },
   });

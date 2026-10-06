@@ -5,6 +5,9 @@ import { createServer as createHttpServer, type IncomingMessage, type Server as 
 import path from "node:path";
 import { promisify } from "node:util";
 import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
+import { Server as ModernMcpServer, createMcpHandler, isLegacyRequest } from "@modelcontextprotocol/server";
+import { toNodeHandler, toWebRequest } from "@modelcontextprotocol/node";
+import { modernMcpTool, modernMcpToolResult } from "../../../src/mcp-v2-boundary.js";
 import { StreamableHTTPServerTransport, type EventStore } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, type CallToolResult, isInitializeRequest, type JSONRPCMessage, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import * as vscode from "vscode";
@@ -13,9 +16,14 @@ import { FILE_TOOL_DEFINITIONS, invokeFileTool, isFileToolName } from "../../../
 import { BRIDGE_EXCLUDED_TOOL_NAMES, getIdeToolDefinition, IDE_TOOL_DEFINITIONS } from "../../../src/ide-tool-definitions.js";
 import type { TaskProgress, TaskTodo } from "../../../src/task-contract.js";
 import { normalizeBridgeProgress, normalizeBridgeTodos } from "./bridge-task-coordination.js";
+import { REPORT_PROGRESS_TOOL, SET_TODOS_TOOL } from "./bridge-task-tool-definitions.js";
 import type { IdeToolBroker } from "./ide-tool-broker.js";
 import { fetchWithExtensionHostFallbacks, resolveExtensionHostProxy } from "./extension-host-proxy.mjs";
 import type { TaskShadowRecorder } from "./task-shadow.js";
+import type { MissionNativeMcpBindingService } from "./mission-native-mcp-binding.js";
+import { MissionNativeMcpRequestContext } from "./mission-native-mcp-request-context.js";
+
+export { REPORT_PROGRESS_TOOL, SET_TODOS_TOOL } from "./bridge-task-tool-definitions.js";
 
 const execFileAsync = promisify(execFile);
 const ROUTE_TOKEN_SECRET = "shuncode.bridge.routeToken";
@@ -29,7 +37,6 @@ const TUNNEL_PROVIDER_SETTING = "bridge.tunnelProvider";
 const NGROK_USE_HTTP_PROXY_SETTING = "bridge.ngrokUseHttpProxy";
 const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
 const MAX_ACTIVITY = 60;
-const MAX_TODOS = 24;
 /** Idle sessions are retained long enough for ChatGPT to pause and resume without being forced to reinitialize. */
 const SESSION_IDLE_TIMEOUT_MS = 60 * 60 * 1000;
 const SESSION_PRUNE_INTERVAL_MS = 60_000;
@@ -124,49 +131,6 @@ Tool guidance:
 - Prefer small, focused patches with enough unique context.
 - Run diagnostics and relevant tests after meaningful edits.
 - Report meaningful progress periodically during long work, but avoid progress updates for every tool call.`;
-
-export const SET_TODOS_TOOL = {
-  name: "set_todos",
-  description: "Set the complete durable task list for the current remote-agent job in ShunCode. Use this for multi-step work so the local user can see what is done, in progress, and still pending. Send the full list whenever the plan changes; keep at most one item in_progress. Use report_progress for transient details about the current step instead of creating tool-call-sized todos. Send an empty list to clear task state.",
-  inputSchema: {
-    type: "object",
-    required: ["todos"],
-    properties: {
-      todos: {
-        type: "array",
-        maxItems: MAX_TODOS,
-        description: "Complete ordered todo snapshot for the current job.",
-        items: {
-          type: "object",
-          required: ["id", "title", "status"],
-          properties: {
-            id: { type: "string", minLength: 1, maxLength: 80, description: "Stable id reused across later set_todos updates." },
-            title: { type: "string", minLength: 1, maxLength: 400, description: "Goal-level task title, not an individual tool call." },
-            status: { type: "string", enum: ["pending", "in_progress", "completed"] },
-          },
-          additionalProperties: false,
-        },
-      },
-    },
-    additionalProperties: false,
-  },
-} as const;
-
-export const REPORT_PROGRESS_TOOL = {
-  name: "report_progress",
-  description: "Report concise transient progress for the current Task. Progress is durably owned by Task Runtime and shown in Nimora Work Sessions. For multi-step work, maintain durable task state with set_todos and use report_progress for what you are doing right now. todo_id is optional: when omitted, ShunCode automatically associates progress with the sole in_progress todo. This tool does not modify workspace files.",
-  inputSchema: {
-    type: "object",
-    required: ["message"],
-    properties: {
-      message: { type: "string", minLength: 1, maxLength: 2000, description: "Human-readable progress update." },
-      phase: { type: "string", maxLength: 160, description: "Optional short phase label, such as Reading, Editing, Testing, or Done." },
-      percent: { type: "integer", minimum: 0, maximum: 100, description: "Optional completion estimate from 0 to 100 for the current activity/todo." },
-      todo_id: { type: "string", minLength: 1, maxLength: 80, description: "Optional todo id from set_todos. Omit when there is exactly one in_progress todo; ShunCode will link it automatically." },
-    },
-    additionalProperties: false,
-  },
-} as const;
 
 export const BRIDGE_TOOL_DEFINITIONS = [
   ...FILE_TOOL_DEFINITIONS,
@@ -322,6 +286,7 @@ function bridgePresentation(
 interface McpSession {
   transport: StreamableHTTPServerTransport;
   server: McpServer;
+  missionBindingToken?: string;
   lastActivity: number;
   activeRequests: number;
   activeStreams: number;
@@ -460,6 +425,7 @@ export class BridgeManager implements vscode.Disposable {
   private namedTunnelLocalPort = DEFAULT_CLOUDFLARE_NAMED_LOCAL_PORT;
   private routeToken = "";
   private readonly sessions = new Map<string, McpSession>();
+  private readonly missionNativeMcpRequests = new MissionNativeMcpRequestContext();
   private httpServer: HttpServer | undefined;
   private tunnelProcess: ChildProcessWithoutNullStreams | undefined;
   private localPort: number | undefined;
@@ -487,6 +453,9 @@ export class BridgeManager implements vscode.Disposable {
   private tunnelRecoveryGeneration: number | undefined;
   private tunnelGeneration = 0;
   private stoppingResources = false;
+  private readonly publicUrlEmitter = new vscode.EventEmitter<string | undefined>();
+  private lastEmittedPublicUrl: string | undefined;
+  readonly onDidChangePublicUrl = this.publicUrlEmitter.event;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -494,6 +463,7 @@ export class BridgeManager implements vscode.Disposable {
     private readonly ideToolBroker: IdeToolBroker,
     private readonly taskShadow: TaskShadowRecorder,
     private readonly authorizeStart: () => Promise<void>,
+    private readonly missionNativeMcp?: MissionNativeMcpBindingService,
   ) {}
 
   async initialize(): Promise<void> {
@@ -554,6 +524,35 @@ export class BridgeManager implements vscode.Disposable {
       todos: [],
       activities: this.activities.slice(-MAX_ACTIVITY),
       health: this.lastHealth,
+    };
+  }
+
+  private emitPublicUrlIfChanged(): void {
+    const publicUrl = this.getStatus().publicUrl;
+    if (publicUrl === this.lastEmittedPublicUrl) return;
+    this.lastEmittedPublicUrl = publicUrl;
+    this.publicUrlEmitter.fire(publicUrl);
+  }
+
+  getMissionNativeMcpUrls(bindingToken: string): { localUrl?: string; publicUrl?: string } {
+    const token = bindingToken.trim();
+    if (!token || !this.missionNativeMcp?.hasBindingToken(token)) throw new Error("Unknown Mission-native MCP binding token.");
+    const status = this.getStatus();
+    return {
+      localUrl: status.localUrl ? `${status.localUrl}/mission/${token}` : undefined,
+      publicUrl: status.publicUrl ? `${status.publicUrl}/mission/${token}` : undefined,
+    };
+  }
+
+  getCurrentMissionNativeMcpUrls(missionId: string): { localUrl?: string; publicUrl?: string } {
+    const id = missionId.trim();
+    if (!id || id.includes("/")) throw new Error("Mission-native MCP stable route requires one Mission id path segment.");
+    if (!this.missionNativeMcp?.getBindingForMission(id)) throw new Error("Mission-native MCP Mission has no current binding.");
+    const status = this.getStatus();
+    const encoded = encodeURIComponent(id);
+    return {
+      localUrl: status.localUrl ? `${status.localUrl}/mission-current/${encoded}` : undefined,
+      publicUrl: status.publicUrl ? `${status.publicUrl}/mission-current/${encoded}` : undefined,
     };
   }
 
@@ -1085,6 +1084,7 @@ export class BridgeManager implements vscode.Disposable {
       this.state = "running";
       const publicUrl = this.getStatus().publicUrl;
       this.output.appendLine(`[bridge] running ${publicUrl} -> 127.0.0.1:${this.localPort}`);
+      this.emitPublicUrlIfChanged();
       return this.getStatus();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1097,9 +1097,11 @@ export class BridgeManager implements vscode.Disposable {
 
   private async startHttpServer(): Promise<void> {
     const endpointPath = `/mcp/${this.routeToken}`;
+    const missionEndpointPrefix = `${endpointPath}/mission/`;
+    const currentMissionEndpointPrefix = `${endpointPath}/mission-current/`;
     const healthPath = `/healthz/${this.routeToken}`;
     const server = createHttpServer((request, response) => {
-      void this.handleHttpRequest(endpointPath, healthPath, request, response).catch((error) => {
+      void this.handleHttpRequest(endpointPath, missionEndpointPrefix, currentMissionEndpointPrefix, healthPath, request, response).catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         this.output.appendLine(`[bridge] HTTP error: ${message}`);
         writeJsonError(response, 500, message);
@@ -1249,6 +1251,7 @@ export class BridgeManager implements vscode.Disposable {
         if (this.tunnelProvider === "cloudflare") this.domain = "";
         this.state = "starting";
         this.revision += 1;
+        this.emitPublicUrlIfChanged();
         if (!child.killed) child.kill();
         this.beginTunnelRecovery();
       }
@@ -1262,6 +1265,7 @@ export class BridgeManager implements vscode.Disposable {
         if (this.tunnelProvider === "cloudflare") this.domain = "";
         this.state = "starting";
         this.revision += 1;
+        this.emitPublicUrlIfChanged();
         this.beginTunnelRecovery();
       }
     });
@@ -1460,6 +1464,7 @@ export class BridgeManager implements vscode.Disposable {
           this.lastError = undefined;
           this.revision += 1;
           this.output.appendLine(`[bridge] ${this.tunnelProvider} tunnel recovered: ${this.getStatus().publicUrl}`);
+          this.emitPublicUrlIfChanged();
           return;
         } catch (error) {
           this.lastError = error instanceof Error ? error.message : String(error);
@@ -1483,7 +1488,14 @@ export class BridgeManager implements vscode.Disposable {
     this.tunnelRecoveryPromise = trackedRecovery;
   }
 
-  private async handleHttpRequest(endpointPath: string, healthPath: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  private async handleHttpRequest(
+    endpointPath: string,
+    missionEndpointPrefix: string,
+    currentMissionEndpointPrefix: string,
+    healthPath: string,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     if (url.pathname === healthPath) {
       if (request.method !== "GET" && request.method !== "HEAD") {
@@ -1500,9 +1512,31 @@ export class BridgeManager implements vscode.Disposable {
       }
       return;
     }
+    let missionBindingToken: string | undefined;
     if (url.pathname !== endpointPath) {
-      writeJsonError(response, 404, "Not found");
-      return;
+      if (url.pathname.startsWith(missionEndpointPrefix)) {
+        const token = decodeURIComponent(url.pathname.slice(missionEndpointPrefix.length));
+        if (!token || token.includes("/") || !this.missionNativeMcp?.hasBindingToken(token)) {
+          writeJsonError(response, 404, "Mission-native MCP binding not found.");
+          return;
+        }
+        missionBindingToken = token;
+      } else if (url.pathname.startsWith(currentMissionEndpointPrefix)) {
+        const missionId = decodeURIComponent(url.pathname.slice(currentMissionEndpointPrefix.length));
+        if (!missionId || missionId.includes("/")) {
+          writeJsonError(response, 404, "Mission-native MCP current Mission route not found.");
+          return;
+        }
+        const binding = this.missionNativeMcp?.getBindingForMission(missionId);
+        if (!binding) {
+          writeJsonError(response, 404, "Mission-native MCP Mission has no current binding.");
+          return;
+        }
+        missionBindingToken = binding.token;
+      } else {
+        writeJsonError(response, 404, "Not found");
+        return;
+      }
     }
 
     response.setHeader("Access-Control-Allow-Origin", "*");
@@ -1520,24 +1554,34 @@ export class BridgeManager implements vscode.Disposable {
 
     if (request.method === "POST") {
       const body = await readJsonBody(request);
-      await this.handlePost(request, response, body, sessionId);
+      if (!(await isLegacyRequest(await toWebRequest(request, body)))) {
+        await this.handleModernPost(request, response, body, missionBindingToken);
+        return;
+      }
+      await this.handlePost(request, response, body, sessionId, missionBindingToken);
       return;
     }
 
     if (request.method === "GET") {
-      await this.handleGet(request, response, sessionId);
+      await this.handleGet(request, response, sessionId, missionBindingToken);
       return;
     }
 
     if (request.method === "DELETE") {
-      await this.handleDelete(request, response, sessionId);
+      await this.handleDelete(request, response, sessionId, missionBindingToken);
       return;
     }
 
     writeJsonError(response, 405, "Method not allowed.");
   }
 
-  private async handlePost(request: IncomingMessage, response: ServerResponse, body: unknown, sessionId: string | undefined): Promise<void> {
+  private async handlePost(
+    request: IncomingMessage,
+    response: ServerResponse,
+    body: unknown,
+    sessionId: string | undefined,
+    missionBindingToken?: string,
+  ): Promise<void> {
     // If sessionId is provided, route to existing session
     if (sessionId) {
       const session = this.sessions.get(sessionId);
@@ -1545,11 +1589,20 @@ export class BridgeManager implements vscode.Disposable {
         writeJsonError(response, 404, "Session not found. The MCP session may have expired.");
         return;
       }
+      if (session.missionBindingToken !== missionBindingToken) {
+        writeJsonError(response, 403, "MCP session is bound to a different capability route.");
+        return;
+      }
       session.lastActivity = Date.now();
       session.activeRequests += 1;
       this.activeRequests += 1;
       try {
-        await session.transport.handleRequest(request, response, body);
+        if (missionBindingToken) {
+          await this.missionNativeMcpRequests.run(request, response, () => session.transport.handleRequest(request, response, body),
+            error => this.output.appendLine("[bridge] native result submission confirmation failed; pending work remains blocked: " + (error instanceof Error ? error.message : String(error))));
+        } else {
+          await session.transport.handleRequest(request, response, body);
+        }
       } finally {
         session.activeRequests = Math.max(0, session.activeRequests - 1);
         session.lastActivity = Date.now();
@@ -1569,7 +1622,7 @@ export class BridgeManager implements vscode.Disposable {
     }
 
     // No session ID: validated initialization request. Create a new session.
-    const { transport, server } = this.createSession();
+    const { transport, server } = this.createSession(missionBindingToken);
     this.activeRequests += 1;
     try {
       await server.connect(transport);
@@ -1584,7 +1637,12 @@ export class BridgeManager implements vscode.Disposable {
     }
   }
 
-  private async handleGet(request: IncomingMessage, response: ServerResponse, sessionId: string | undefined): Promise<void> {
+  private async handleGet(
+    request: IncomingMessage,
+    response: ServerResponse,
+    sessionId: string | undefined,
+    missionBindingToken?: string,
+  ): Promise<void> {
     if (this.tunnelProvider === "cloudflare") {
       response.setHeader("Allow", "POST, DELETE, OPTIONS");
       writeJsonError(response, 405, "Standalone SSE is disabled for Cloudflare Quick Tunnel; use Streamable HTTP POST responses.");
@@ -1597,6 +1655,10 @@ export class BridgeManager implements vscode.Disposable {
     const session = this.sessions.get(sessionId);
     if (!session) {
       writeJsonError(response, 404, "Session not found. The MCP session may have expired.");
+      return;
+    }
+    if (session.missionBindingToken !== missionBindingToken) {
+      writeJsonError(response, 403, "MCP session is bound to a different capability route.");
       return;
     }
     session.lastActivity = Date.now();
@@ -1617,7 +1679,12 @@ export class BridgeManager implements vscode.Disposable {
     }
   }
 
-  private async handleDelete(request: IncomingMessage, response: ServerResponse, sessionId: string | undefined): Promise<void> {
+  private async handleDelete(
+    request: IncomingMessage,
+    response: ServerResponse,
+    sessionId: string | undefined,
+    missionBindingToken?: string,
+  ): Promise<void> {
     if (!sessionId) {
       writeJsonError(response, 400, "Bad Request: Mcp-Session-Id header is required for DELETE requests.");
       return;
@@ -1627,11 +1694,86 @@ export class BridgeManager implements vscode.Disposable {
       writeJsonError(response, 404, "Session not found.");
       return;
     }
+    if (session.missionBindingToken !== missionBindingToken) {
+      writeJsonError(response, 403, "MCP session is bound to a different capability route.");
+      return;
+    }
     await session.transport.handleRequest(request, response);
     this.destroySession(sessionId);
   }
 
-  private createSession(): { transport: StreamableHTTPServerTransport; server: McpServer } {
+  private async handleModernPost(request: IncomingMessage, response: ServerResponse, body: unknown, missionBindingToken?: string): Promise<void> {
+    const packageVersion = this.context.extension?.packageJSON?.version;
+    const shadowNamespace = `modern-http:${randomUUID()}`;
+    const handler = createMcpHandler(() => {
+      const server = new ModernMcpServer({ name: "shuncode-bridge", version: typeof packageVersion === "string" ? packageVersion : "0.0.0" },
+        { capabilities: { tools: {}, logging: {} }, instructions: BRIDGE_SERVER_INSTRUCTIONS });
+      server.setRequestHandler("tools/list", async () => ({ tools: (missionBindingToken
+        ? await this.missionNativeMcp!.listTools(missionBindingToken)
+        : BRIDGE_TOOL_DEFINITIONS.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, annotations: tool.annotations, _meta: tool._meta }))).map(modernMcpTool) }));
+      server.setRequestHandler("tools/call", async (call, extra) => {
+        const { name, arguments: args = {} } = call.params;
+        if (missionBindingToken) {
+          // The modern protocol has no initialize/session authority. The exact
+          // route + active Worker input own authority; typed request id is only
+          // an occurrence key, in a separate era namespace. Same-id replay
+          // consults canonical execution, while retry-never argument ambiguity
+          // remains rejected by the binding owner.
+          return modernMcpToolResult(await this.missionNativeMcp!.callTool(missionBindingToken, "modern-request", extra.mcpReq.id,
+            name, args, this.missionNativeMcpRequests.currentSignal(extra.mcpReq.signal),
+            (result, confirm) => this.missionNativeMcpRequests.prepareSubmission(extra.mcpReq.id, result, confirm)));
+        }
+        return modernMcpToolResult(await this.invokeBridgeToolOccurrence(name, args, shadowNamespace, extra.mcpReq.id, extra.mcpReq.signal));
+      });
+      return server;
+    }, { legacy: "reject", responseMode: "json" });
+    let sentEnvelope: unknown;
+    const node = toNodeHandler({ fetch: async (webRequest, options) => {
+      const result = await handler.fetch(webRequest, options);
+      if (missionBindingToken && result.headers.get("content-type")?.startsWith("application/json")) sentEnvelope = await result.clone().json();
+      return result;
+    } });
+    this.activeRequests += 1;
+    try {
+      if (missionBindingToken) await this.missionNativeMcpRequests.run(request, response, async () => {
+        await node(request, response, body);
+        // This is completed HTTP submission, not remote acceptance. A failed
+        // or aborted write never reaches confirmation in the request tracker.
+        await this.missionNativeMcpRequests.observeModernSentResponse(sentEnvelope);
+      }, error => this.output.appendLine("[bridge] native result submission confirmation failed (modern); pending work remains blocked: " + (error instanceof Error ? error.message : String(error))));
+      else await node(request, response, body);
+    } finally { this.activeRequests = Math.max(0, this.activeRequests - 1); await handler.close(); }
+  }
+
+  private async invokeBridgeToolOccurrence(toolName: string, args: Record<string, unknown>, namespace: string, requestId: string | number, signal: AbortSignal): Promise<CallToolResult> {
+    this.toolCallsSinceLastReport += 1;
+    const taskId = await this.taskShadow.ensureBridgeTask(namespace, vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
+    const execution = await this.taskShadow.beginExecution(taskId, `mcp:${namespace}:${JSON.stringify(requestId)}`, toolName, args);
+    const started = Date.now();
+    try {
+      const result = await this.handleToolCall(toolName, args, { signal, taskId });
+      const resultText = result.content.map(item => item.text).join("\n");
+      await this.taskShadow.finishExecution(execution, result.isError ? "failed" : "succeeded", { durationMs: Date.now() - started,
+        error: result.isError ? resultText : undefined, resultSummary: resultText });
+      if (!result.isError) {
+        if (toolName === "apply_patch") await this.taskShadow.recordChangeset(execution, result.structuredContent);
+        else {
+          await this.taskShadow.recordFileNavigationArtifact(execution, toolName, result.structuredContent);
+          if (toolName === "get_diagnostics") await this.taskShadow.recordDiagnosticsArtifact(execution, args, resultText);
+          else if (toolName === "list_directory") await this.taskShadow.recordDirectoryArtifact(execution, args, resultText);
+          else if (toolName === "lsp") await this.taskShadow.recordLspArtifact(execution, args, resultText);
+          else if (["run_command", "get_command_output", "send_command_input"].includes(toolName)) await this.taskShadow.recordTerminalArtifact(execution, toolName, args, resultText);
+        }
+      }
+      await this.taskShadow.markResultPrepared(execution);
+      return { content: result.content, isError: result.isError, structuredContent: result.structuredContent as Record<string, unknown> | undefined };
+    } catch (error) {
+      await this.taskShadow.finishExecution(execution, "failed", { durationMs: Date.now() - started, error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
+  }
+
+  private createSession(missionBindingToken?: string): { transport: StreamableHTTPServerTransport; server: McpServer } {
     const packageVersion = this.context.extension?.packageJSON?.version;
     const server = new McpServer(
       { name: "shuncode-bridge", version: typeof packageVersion === "string" && packageVersion ? packageVersion : "0.0.0" },
@@ -1648,6 +1790,7 @@ export class BridgeManager implements vscode.Disposable {
         this.sessions.set(sid, {
           transport,
           server,
+          missionBindingToken,
           lastActivity: Date.now(),
           activeRequests: 0,
           activeStreams: 0,
@@ -1660,19 +1803,40 @@ export class BridgeManager implements vscode.Disposable {
       },
     });
 
+    if (missionBindingToken) {
+      const send = transport.send.bind(transport);
+      transport.send = async (message, options) => {
+        await send(message, options);
+        await this.missionNativeMcpRequests.observeSentResponse(message);
+      };
+    }
+
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: BRIDGE_TOOL_DEFINITIONS.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        annotations: tool.annotations,
-        _meta: tool._meta,
-      })),
+      tools: missionBindingToken
+        ? await this.missionNativeMcp!.listTools(missionBindingToken)
+        : BRIDGE_TOOL_DEFINITIONS.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema,
+            annotations: tool.annotations,
+            _meta: tool._meta,
+          })),
     }));
 
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const toolName = request.params.name;
       const args = request.params.arguments ?? {};
+      if (missionBindingToken) {
+        return await this.missionNativeMcp!.callTool(
+          missionBindingToken,
+          extra.sessionId?.trim() || "",
+          extra.requestId,
+          toolName,
+          args,
+          this.missionNativeMcpRequests.currentSignal(extra.signal),
+          (result, confirm) => this.missionNativeMcpRequests.prepareSubmission(extra.requestId, result, confirm),
+        ) as CallToolResult;
+      }
       this.toolCallsSinceLastReport += 1;
       const sessionKey = extra.sessionId?.trim() || "unscoped";
       const taskId = await this.taskShadow.ensureBridgeTask(sessionKey, vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
@@ -1959,6 +2123,7 @@ export class BridgeManager implements vscode.Disposable {
     }
     this.localPort = undefined;
     if (this.tunnelProvider === "cloudflare") this.domain = "";
+    this.emitPublicUrlIfChanged();
     if (markStopped) {
       this.state = "stopped";
       this.lastError = undefined;
@@ -1972,6 +2137,7 @@ export class BridgeManager implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.publicUrlEmitter.dispose();
     void this.stopResources(true);
   }
 }

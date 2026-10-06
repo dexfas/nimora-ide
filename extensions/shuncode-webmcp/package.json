@@ -11,6 +11,7 @@
   "main": "./extension.js",
   "contributes": {
     "commands": [
+      { "command": "shuncode.webMcp.pairPersonalEdge", "title": "Web MCP: 配对 Personal Edge" },
       {
         "command": "shuncode.webMcp.connect",
         "title": "Web MCP: 连接当前内置浏览器聊天页"

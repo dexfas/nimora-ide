@@ -6,6 +6,8 @@ import * as readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client as ModernClient } from '@modelcontextprotocol/client';
+import { StdioClientTransport as ModernStdioTransport } from '@modelcontextprotocol/client/stdio';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtimeDir = path.join(repoRoot, 'extensions', 'shuncode', 'runtime');
@@ -57,17 +59,19 @@ async function smokeAgentHost(): Promise<void> {
 	console.log('[smoke] agent-host runtime/hello ok');
 }
 
-async function smokeMcpServer(): Promise<void> {
+async function smokeMcpServer(modern = false): Promise<void> {
 	const entry = path.join(runtimeDir, 'mcp-server.js');
 	const env = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
 	env.MCP_WORKSPACE_ROOTS = repoRoot;
-	const transport = new StdioClientTransport({
+	const Transport = modern ? ModernStdioTransport : StdioClientTransport;
+	const transport = new Transport({
 		command: process.execPath,
 		args: [entry],
 		cwd: repoRoot,
 		env,
 	});
-	const client = new Client({ name: 'shuncode-runtime-smoke', version: '1.0.0' });
+	const client = modern ? new ModernClient({ name: 'shuncode-runtime-smoke', version: '1.0.0' }, { versionNegotiation: { mode: 'pin', version: '2026-07-28' } })
+		: new Client({ name: 'shuncode-runtime-smoke', version: '1.0.0' });
 	try {
 		await client.connect(transport);
 		const listed = await client.listTools();
@@ -101,9 +105,10 @@ async function smokeMcpServer(): Promise<void> {
 	} finally {
 		await client.close();
 	}
-	console.log('[smoke] MCP listTools + search_files ok');
+	console.log(`[smoke] MCP ${modern ? '2026-07-28' : 'legacy'} stdio listTools + search_files ok`);
 }
 
 await smokeAgentHost();
 await smokeMcpServer();
+await smokeMcpServer(true);
 console.log('[smoke] ShunCode runtime smoke test passed');

@@ -3,12 +3,11 @@ import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 const require = createRequire(path.resolve(import.meta.dirname, '..', 'build', 'package.json'));
 const esbuild = require('esbuild') as typeof import('../build/node_modules/esbuild/lib/main.js');
 const bundleDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-worker-adapter-'));
-const bundlePath = path.join(bundleDirectory, 'worker-smoke.mjs');
+const bundlePath = path.join(bundleDirectory, 'worker-smoke.cjs');
 
 await esbuild.build({
   stdin: {
@@ -23,12 +22,12 @@ await esbuild.build({
   outfile: bundlePath,
   bundle: true,
   platform: 'node',
-  format: 'esm',
+  format: 'cjs',
   target: ['es2022'],
   logLevel: 'silent',
 });
 
-const { ApiWorkerAdapter, workerEventToRuntimeTrace } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { ApiWorkerAdapter, workerEventToRuntimeTrace } = require(bundlePath);
 
 class FakeRuntime {
   calls = [];
@@ -77,6 +76,19 @@ try {
   assert.equal(descriptor.kind, 'api');
   assert.equal(descriptor.availability, 'available');
   assert.equal(descriptor.capabilities.checkpoints, true);
+  assert.equal(descriptor.capabilityProjection.nativeByName, true);
+  assert.equal(descriptor.capabilityProjection.externalDefinitions, true);
+  assert.deepEqual(descriptor.capabilityProjection.executionRoutes.map(route => ({
+    routeId: route.routeId,
+    projectionMode: route.projectionMode,
+    schemaSourceId: route.schemaSourceId,
+    toolNames: [...route.toolNames],
+  })), [{
+    routeId: 'api.workspace-mcp.file-tools',
+    projectionMode: 'native-by-name',
+    schemaSourceId: 'file-tool-registry',
+    toolNames: ['read_files'],
+  }], 'API route claims must be bounded by exact runtime/hello.tools, not static transport shape');
 
   const session = await adapter.createSession({
     model: 'fake-model',

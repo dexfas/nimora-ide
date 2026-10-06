@@ -35,7 +35,7 @@ interface RpcNotification {
 interface PendingPeerRequest {
   resolve(value: unknown): void;
   reject(error: Error): void;
-  timer: NodeJS.Timeout;
+  timer: ReturnType<typeof setTimeout>;
   signal?: AbortSignal;
   onAbort?: () => void;
 }
@@ -150,8 +150,11 @@ function parseAgentCheckpoint(value: unknown): AgentCheckpoint | undefined {
   };
 }
 
-function parseAgentRunInput(params: unknown): RunAgentInput & { runId?: string } {
+function parseAgentRunInput(params: unknown): RunAgentInput & { runId?: string; hostManagedTools?: boolean } {
   const row = asRecord(params);
+  if (row.hostManagedTools !== undefined && typeof row.hostManagedTools !== "boolean") throw new Error("hostManagedTools must be boolean.");
+  if (row.terminalAfterExternalToolResult !== undefined && typeof row.terminalAfterExternalToolResult !== "boolean") throw new Error("terminalAfterExternalToolResult must be boolean.");
+  if (row.terminalAfterExternalToolResult === true && row.hostManagedTools !== true) throw new Error("Single-command acknowledgement requires the Mission host broker.");
   for (const key of ["baseUrl", "model", "workspaceRoot"] as const) {
     if (typeof row[key] !== "string" || !row[key].trim()) {
       throw new Error(`${key} must be a non-empty string`);
@@ -251,6 +254,8 @@ function parseAgentRunInput(params: unknown): RunAgentInput & { runId?: string }
     modeInstructions: typeof row.modeInstructions === "string" ? row.modeInstructions : undefined,
     checkpoint,
     runId: typeof row.runId === "string" ? row.runId : undefined,
+    hostManagedTools: row.hostManagedTools === true,
+    terminalAfterExternalToolResult: row.terminalAfterExternalToolResult === true,
   };
 }
 
@@ -421,6 +426,7 @@ async function dispatch(method: string, params: unknown): Promise<unknown> {
           streamingModelResponses: true,
           recoverableCheckpoints: true,
           extensionHostFetchProxy: true,
+          missionToolBroker: true,
         },
       };
     case "runtime/ping":
@@ -429,7 +435,7 @@ async function dispatch(method: string, params: unknown): Promise<unknown> {
       return { tools: [...TOOL_NAMES] };
     case "agent/run": {
       const parsed = parseAgentRunInput(params);
-      const { runId, ...input } = parsed;
+      const { runId, hostManagedTools, ...input } = parsed;
       const abortController = new AbortController();
       if (runId) activeRuns.set(runId, abortController);
       try {
@@ -439,12 +445,12 @@ async function dispatch(method: string, params: unknown): Promise<unknown> {
           ...input,
           signal: abortController.signal,
           externalTools: [
-            ...IDE_TOOL_DEFINITIONS.map((tool) => ({
+            ...(hostManagedTools ? [] : IDE_TOOL_DEFINITIONS).map((tool) => ({
               name: tool.name,
               description: tool.description,
               inputSchema: tool.inputSchema,
             })),
-            ...dynamicExternalTools.filter((tool) => !reservedExternalToolNames.has(tool.name)),
+            ...dynamicExternalTools.filter((tool) => hostManagedTools || !reservedExternalToolNames.has(tool.name)),
           ],
           executeExternalTool: async (name, args) => {
             if (!runId) throw new Error(`IDE-native tool ${name} requires an agent runId.`);
@@ -467,6 +473,14 @@ async function dispatch(method: string, params: unknown): Promise<unknown> {
             : undefined,
         }, {
           fetch: input.protocol === "codex-responses" ? fetchThroughExtensionHost : undefined,
+          // Mission calls use ONLY Phase-8 schemas and host-requested execution.
+          // An empty workspace client prevents the legacy local MCP child from
+          // bypassing canonical grants, input path policy or execution ownership.
+          ...(hostManagedTools ? { workspaceToolClient: {
+            listTools: async () => ({ tools: [] }),
+            callTool: async () => { throw new Error("Mission tools require the exact host broker."); },
+            close: async () => {},
+          } } : {}),
         });
       } finally {
         if (runId) activeRuns.delete(runId);

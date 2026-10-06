@@ -17,6 +17,9 @@ export function annotateSpecialMarkdownContent(response: Iterable<IChatProgressR
 
 	const result: IChatProgressRenderableResponseContent[] = [];
 	for (const item of response) {
+		if (item.kind === 'voiceProgress') {
+			continue;
+		}
 		const previousItemIndex = result.findLastIndex(p => p.kind !== 'textEditGroup' && p.kind !== 'undoStop');
 		const previousItem = result[previousItemIndex];
 		if (item.kind === 'inlineReference') {

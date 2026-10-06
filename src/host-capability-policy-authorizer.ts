@@ -10,6 +10,7 @@ export class HostCapabilityAuthorizationError extends Error {
     message: string,
     readonly capabilityId: string,
     readonly approval: CapabilityMetadata["approval"],
+    readonly stopTurn = false,
   ) {
     super(message);
     this.name = "HostCapabilityAuthorizationError";

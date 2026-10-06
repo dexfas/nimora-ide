@@ -141,6 +141,7 @@ export class AgentHostWorkerAdapter implements WorkerAdapter<AgentHostWorkerSess
 			label: 'Nimora Agent Host',
 			availability: root ? 'available' : 'degraded',
 			models: root?.agents.flatMap(agent => agent.models.map(model => model.id)),
+			capabilityProjection: { nativeByName: false, externalDefinitions: false, executionRoutes: [] },
 			capabilities: {
 				streaming: true,
 				reasoning: true,
@@ -255,16 +256,20 @@ export class AgentHostWorkerAdapter implements WorkerAdapter<AgentHostWorkerSess
 			}
 		}
 		return {
-			status: this.connection.rootState ? 'healthy' : 'degraded',
+      status: this.connection.rootState.value instanceof Error ? 'offline' : this.connection.rootState.value ? 'healthy' : 'degraded',
 			checkedAt: new Date().toISOString(),
 		};
 	}
 
 	private handleEnvelope(record: AgentHostSessionRecord, inputId: string, turnId: string, envelope: ActionEnvelope): void {
 		const active = record.active;
-		if (!active || active.inputId !== inputId || active.turnId !== turnId || active.seenTerminal || envelope.rejectionReason) return;
-		const action = envelope.action as ChatAction;
-		if ('turnId' in action && action.turnId !== turnId) return;
+    if (!active || active.inputId !== inputId || active.turnId !== turnId || active.seenTerminal) return;
+    const action = envelope.action as ChatAction;
+    if ('turnId' in action && action.turnId !== turnId) return;
+    if (envelope.rejectionReason) {
+      if ('turnId' in action && action.turnId === turnId) this.finish(record, { type: 'terminal', inputId, status: 'error', error: String(envelope.rejectionReason) });
+      return;
+    }
 
 		switch (action.type) {
 			case ActionType.ChatDelta:
@@ -287,10 +292,10 @@ export class AgentHostWorkerAdapter implements WorkerAdapter<AgentHostWorkerSess
 				active.queue.push({ type: 'provider_event', inputId, name: action.type, data: action });
 				break;
 			case ActionType.ChatToolCallReady:
-				this.emitToolCallReady(active.queue, active.toolNames, inputId, action);
+				this.emitToolCallReady(active.queue, active.toolNames, inputId, action, envelope.origin === undefined && !envelope.rejectionReason);
 				break;
 			case ActionType.ChatToolCallComplete:
-				this.emitToolCallComplete(active.queue, active.toolNames, inputId, action);
+				this.emitToolCallComplete(active.queue, active.toolNames, inputId, action, envelope.origin === undefined && !envelope.rejectionReason);
 				break;
 			case ActionType.ChatUsage:
 				active.queue.push({ type: 'usage', inputId, usage: { ...action.usage } });
@@ -311,7 +316,7 @@ export class AgentHostWorkerAdapter implements WorkerAdapter<AgentHostWorkerSess
 		}
 	}
 
-	private emitToolCallReady(queue: WorkerEventQueue, toolNames: ReadonlyMap<string, string>, inputId: string, action: ChatToolCallReadyAction): void {
+	private emitToolCallReady(queue: WorkerEventQueue, toolNames: ReadonlyMap<string, string>, inputId: string, action: ChatToolCallReadyAction, serverProduced: boolean): void {
 		queue.push({
 			type: 'capability_call',
 			inputId,
@@ -319,11 +324,11 @@ export class AgentHostWorkerAdapter implements WorkerAdapter<AgentHostWorkerSess
 			name: toolNames.get(action.toolCallId) ?? 'unknown',
 			arguments: parseToolInput(action.toolInput),
 			dispatch: 'observed',
-			extensions: { phase: 'ready', invocationMessage: stringOrMarkdown(action.invocationMessage), meta: action._meta },
+			extensions: { phase: 'ready', invocationMessage: stringOrMarkdown(action.invocationMessage), meta: action._meta, serverProduced },
 		});
 	}
 
-	private emitToolCallComplete(queue: WorkerEventQueue, toolNames: ReadonlyMap<string, string>, inputId: string, action: ChatToolCallCompleteAction): void {
+	private emitToolCallComplete(queue: WorkerEventQueue, toolNames: ReadonlyMap<string, string>, inputId: string, action: ChatToolCallCompleteAction, serverProduced: boolean): void {
 		queue.push({
 			type: 'capability_result',
 			inputId,
@@ -331,7 +336,7 @@ export class AgentHostWorkerAdapter implements WorkerAdapter<AgentHostWorkerSess
 			name: toolNames.get(action.toolCallId) ?? 'unknown',
 			text: toolResultText(action),
 			isError: !action.result.success,
-			extensions: { structuredContent: action.result.structuredContent, meta: action._meta },
+			extensions: { structuredContent: action.result.structuredContent, meta: action._meta, serverProduced },
 		});
 	}
 

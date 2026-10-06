@@ -13,6 +13,17 @@ export interface WorkerCapabilities {
   extensions?: Record<string, unknown>;
 }
 
+export type WorkerCapabilityProjectionMode = "native-by-name" | "external-schema";
+
+/** Concrete execution-route observation, never semantic/approval authority. */
+export interface WorkerCapabilityExecutionRoute {
+  routeId: string;
+  projectionMode: WorkerCapabilityProjectionMode;
+  schemaSourceId: string;
+  toolNames: readonly string[];
+  basis: string;
+}
+
 export interface WorkerDescriptor {
   id: string;
   provider: string;
@@ -21,6 +32,17 @@ export interface WorkerDescriptor {
   availability: WorkerAvailability;
   models?: readonly string[];
   capabilities: WorkerCapabilities;
+  /**
+   * Exact WorkerInput capability-projection surface. The booleans are transport
+   * shape facts only; executionRoutes are concrete per-tool/source route facts.
+   * Neither is semantic/approval authority, and both remain independent from
+   * capabilities.capabilityRequests.
+   */
+  capabilityProjection?: {
+    nativeByName: boolean;
+    externalDefinitions: boolean;
+    executionRoutes?: readonly WorkerCapabilityExecutionRoute[];
+  };
   extensions?: Record<string, unknown>;
 }
 
@@ -70,6 +92,7 @@ export interface WorkerCapabilityResultInput {
   isError?: boolean;
   durationMs?: number;
   data?: unknown;
+  extensions?: Record<string, unknown>;
 }
 
 export interface WorkerInput {

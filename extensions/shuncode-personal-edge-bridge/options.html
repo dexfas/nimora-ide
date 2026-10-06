@@ -1,0 +1,5 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Personal Edge 配对</title><link rel="stylesheet" href="options.css"></head>
+<body><main><h1>配对 Nimora</h1><p>在 Nimora 命令面板运行「Web MCP: 配对 Personal Edge」，将本机地址和私人口令填入下方。</p>
+<form id="pair"><label>本机 Gateway 地址<input id="endpoint" value="http://127.0.0.1:48321" required spellcheck="false"></label><label>私人口令<input id="token" type="password" required autocomplete="off" minlength="32"></label><button type="submit">验证并保存配对</button><button id="forget" type="button">解除配对</button></form>
+<p id="status" role="status" aria-live="polite"></p><p>配对后，在要共享的普通网页上点击扩展图标。只有徽标显示 ON 的那一个标签页可以被操作。重新打开浏览器后需要重新共享。</p></main><script src="options.js"></script></body></html>

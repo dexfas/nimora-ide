@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "nativeMcpBypassHosts": [
+    "chatgpt.com",
+    "chat.openai.com"
+  ]
+}

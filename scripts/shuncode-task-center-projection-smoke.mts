@@ -33,6 +33,13 @@ const task = {
   source: { kind: 'bridge', key: 'opaque-session-key', workspace: '/workspace' },
   status: 'ready',
   goal: 'Move Bridge presentation to Task',
+  mission: {
+    projectId: 'project-a',
+    rootMissionId: 'task-a',
+    plane: 'coordination',
+    missionType: 'root-coordination',
+    completionCriteria: ['Task identity is projected'],
+  },
   context: { constraints: [], decisions: [], relevantFiles: [] },
   createdAt: '2026-09-13T08:00:00.000Z',
   updatedAt: '2026-09-13T08:06:00.000Z',
@@ -65,6 +72,7 @@ const older = {
   taskId: 'task-older',
   source: { kind: 'native-chat', key: 'opaque-chat-key' },
   goal: 'Older task',
+  mission: undefined,
   updatedAt: '2026-09-13T07:00:00.000Z',
   todos: [],
   progress: undefined,
@@ -80,6 +88,12 @@ try {
   assert.deepEqual(state.tasks.map((item: { taskId: string }) => item.taskId), ['task-a', 'task-older'], 'tasks must be newest first');
   assert.equal(state.selectedTaskId, 'task-a', 'newest Task must be the default selection');
   assert.equal(state.tasks[0].sourceKind, 'bridge');
+  assert.equal(state.tasks[0].projectId, 'project-a');
+  assert.equal(state.tasks[0].missionId, 'task-a');
+  assert.equal(state.tasks[0].rootMissionId, 'task-a');
+  assert.equal(state.tasks[0].parentMissionId, undefined);
+  assert.equal(state.tasks[0].plane, 'coordination');
+  assert.equal(state.tasks[0].missionType, 'root-coordination');
   assert.equal('key' in state.tasks[0], false, 'Task Center summaries must not expose raw source/session keys');
   assert.deepEqual(state.tasks[0].todoCounts, { total: 2, pending: 0, inProgress: 1, completed: 1 });
   assert.equal(state.tasks[0].workerCount, 2);
@@ -98,6 +112,8 @@ try {
   const olderSelection = projectTaskCenterState([task, older], 'task-older');
   assert.equal(olderSelection.selectedTaskId, 'task-older');
   assert.equal(olderSelection.selected?.summary.sourceKind, 'native-chat');
+  assert.equal(olderSelection.selected?.summary.projectId, undefined, 'legacy Tasks must render without Project identity');
+  assert.equal(olderSelection.selected?.summary.missionId, undefined, 'legacy Tasks must render without Mission identity');
   assert.equal(projectTaskCenterState([task], 'missing').selected, undefined, 'stale explicit selection must fail closed instead of silently selecting another Task');
 
   selected.todos[0].title = 'mutated';

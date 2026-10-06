@@ -1,0 +1,7 @@
+{
+  "name": "shuncode-process-metadata-native",
+  "version": "0.0.0",
+  "private": true,
+  "gypfile": true,
+  "os": ["win32"]
+}

@@ -1785,6 +1785,7 @@ export interface IInstructionDto extends IChatResourceDto {
 }
 
 export interface ISkillDto extends IChatResourceDto {
+	readonly enabled?: boolean;
 	readonly userInvocable: boolean;
 	readonly disableModelInvocation: boolean;
 }

@@ -6,7 +6,7 @@
 import { Event } from '../../../base/common/event.js';
 import { CancellationToken } from '../../../base/common/cancellation.js';
 import { IChannel, IServerChannel } from '../../../base/parts/ipc/common/ipc.js';
-import { ISandboxDependencyStatus, ISandboxHelperService, type IWindowsMxcConfig, IWindowsMxcFilesystemPolicy, type IWindowsMxcPolicyContainment, type IWindowsMxcSandboxPolicy } from './sandboxHelperService.js';
+import { ISandboxDependencyStatus, ISandboxHelperService, type IWindowsMxcConfig, IWindowsMxcFilesystemPolicy, type IWindowsMxcPlatformSupport, type IWindowsMxcPolicyContainment, type IWindowsMxcSandboxPolicy } from './sandboxHelperService.js';
 
 interface IBuildWindowsMxcSandboxPayloadArgs {
 	commandLine: string;
@@ -30,6 +30,8 @@ export class SandboxHelperChannel implements IServerChannel {
 		switch (command) {
 			case 'checkSandboxDependencies':
 				return this.service.checkSandboxDependencies() as Promise<T>;
+			case 'getWindowsMxcPlatformSupport':
+				return (this.service.getWindowsMxcPlatformSupport?.() ?? Promise.resolve(undefined)) as Promise<T>;
 			case 'getWindowsMxcFilesystemPolicy':
 				return this.service.getWindowsMxcFilesystemPolicy() as Promise<T>;
 			case 'getWindowsMxcEnvironment':
@@ -51,6 +53,10 @@ export class SandboxHelperChannelClient implements ISandboxHelperService {
 
 	checkSandboxDependencies(): Promise<ISandboxDependencyStatus | undefined> {
 		return this.channel.call<ISandboxDependencyStatus | undefined>('checkSandboxDependencies');
+	}
+
+	getWindowsMxcPlatformSupport(): Promise<IWindowsMxcPlatformSupport | undefined> {
+		return this.channel.call<IWindowsMxcPlatformSupport | undefined>('getWindowsMxcPlatformSupport');
 	}
 
 	getWindowsMxcFilesystemPolicy(): Promise<IWindowsMxcFilesystemPolicy | undefined> {

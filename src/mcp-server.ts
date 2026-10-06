@@ -1,10 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { Server } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { capabilityMcpFields } from "./capability-registry.js";
 import { FILE_TOOL_DEFINITIONS, invokeFileTool } from "./file-tool-registry.js";
+import { modernMcpTool } from "./mcp-v2-boundary.js";
 
 function getWorkspaceRoots(): string[] {
   const configured = process.env.MCP_WORKSPACE_ROOTS?.trim();
@@ -26,15 +26,15 @@ export function createFileToolsServer(dependencies: FileToolsServerDependencies 
     { capabilities: { tools: {} } },
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: FILE_TOOL_DEFINITIONS.map((tool) => ({ ...tool, ...capabilityMcpFields(tool.name) })),
+  server.setRequestHandler("tools/list", async () => ({
+    tools: FILE_TOOL_DEFINITIONS.map((tool) => modernMcpTool({ ...tool, ...capabilityMcpFields(tool.name) })),
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+  server.setRequestHandler("tools/call", async (request, extra) => {
     try {
       const result = await (dependencies.invokeTool ?? invokeFileTool)(request.params.name, request.params.arguments, {
         workspaceRoots: (dependencies.getWorkspaceRoots ?? getWorkspaceRoots)(),
-        signal: extra.signal,
+        signal: extra.mcpReq.signal,
       });
       return {
         content: [{ type: "text" as const, text: result.text }],
@@ -55,9 +55,7 @@ export function createFileToolsServer(dependencies: FileToolsServerDependencies 
 }
 
 async function main(): Promise<void> {
-  const server = createFileToolsServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  serveStdio(() => createFileToolsServer());
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

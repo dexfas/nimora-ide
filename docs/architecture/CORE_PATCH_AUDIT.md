@@ -1,5 +1,23 @@
 # Code-OSS Core Patch Audit
 
+## 2026-10-05 — Read-only AgentHost Worker discovery
+
+The same integration also exposes optional `ChatSkill.enabled` through the existing proposed prompt-file API. Discovery previously returned loaded Skills without their disabled-file state. The MainThread DTO reads the existing `getDisabledPromptFiles(PromptsType.skill)` owner, ExtHost forwards only positive evidence, and Nimora defaults missing metadata to disabled. No separate enablement owner or implicit trust is introduced. This additive generic metadata hook can be removed when the upstream API carries equivalent current enablement; its three DTO/API transformations and disabled/missing-metadata cases need focused validation.
+
+- Necessary boundary: stable/proposed Extension APIs expose Chat models and Sessions UI, but no native AHP root/connection capability observation. The existing Workbench `IAgentHostService` is the owner; duplicating its session registry in the extension would be incorrect.
+- Thin hook: `_agentHost.workerSnapshot` projects only provider labels/model IDs and connection state via the pure `agentHostWorkerDiscovery` adapter outside Core. It does not authenticate, create a session, send a turn, export transcripts/secrets, dispatch tools or alter approval policy.
+- Mission pool: first-party discovery registers the AgentHost backend and candidate source. Every candidate remains `unavailable`: the current native `AgentHostWorkerAdapter` observes tools and its AHP contract cannot enforce Mission capability allowlists / host-requested delivery. This is a remaining execution gap, not a certification PASS. Missing hook/offline root is not interpreted as healthy.
+- Validation: `shuncode-component-integration-smoke.mts` executes actual Skill MainThread/ExtHost mapping bodies (enabled/disabled/missing metadata), native root whitelist/gated discovery, and mixed-pool assignment is covered by the real API Runtime E2E. All PASS; four modified Core source files transpile PASS. Current `compile-client` is **not PASS** (1177 diagnostic); no diagnostic in the new hook/helper/DTO additions, while the old `extHostChatAgents2.ts:146` response stream still lacks `voiceProgress`. Existing fake-AHP tests remain semantic parity; no active desktop reload/native Provider E2E was performed. First-party build does not prove the Core hook is loaded in the user's desktop.
+- Removal: delete the one read-only Workbench registration when an upstream Extension API supplies equivalent native AHP Worker metadata. Backend execution needs a separate real policy-capable connection contract; this hook deliberately grants none.
+
+## 2026-09-30 — Exact browser page pairing repair
+
+- Owner: generic BrowserView / Playwright substrate. The extension API and proposed APIs expose neither the IPC-to-CDP pairing nor its private queues; an extension adapter cannot repair a wrong underlying Page without bypassing the platform ownership boundary.
+- Observed: restored internal browser sessions applied a ChatGPT composer observation to DeepSeek while the ordinary browser tool read the correct DeepSeek page. The old generated `_tryMatch` was independently reproduced assigning reversed Page events to the wrong View IDs. This proves FIFO is unsafe; missing historical target-ID telemetry prevents claiming it is the sole historical cause.
+- Repair: add events carry the exact CDP `targetId`; Playwright pages obtain their page-session target info and match only that identity. The CDP proxy now honors page-session `Target.getTargetInfo` instead of returning the browser group identity. No URL, title, or FIFO fallback. Identity sessions detach, and late/closed/expired pages cannot be resurrected. Failed `addView` identity reads clean up their own registration.
+- Gate: `npm run test-shuncode-playwright-page-identity` covers reversed events, same-URL tabs, both arrival orders, missing/ambiguous IDs, page-session query routing, unknown sessions, close/timeout during identity observation and detach. Focused identity/close/timeout tests and canonical transpile-client PASS. After the real machine restart, Source Dev discovery correctly lists DeepSeek and ChatGPT as separate candidates; this is live discovery evidence, not provider execution acceptance. Canonical Worker recovery and live execution remain pending.
+- Removal: replace this patch when the upstream BrowserView substrate supplies equivalent target-identity matching and page-session CDP query behavior; retain the ordering/lifecycle regression.
+
 ## 1. 审计结论
 
 Nimora 与 Code-OSS 的耦合**确实偏深**，但不能简单得出“Core Patch 都应该移除”的结论。
@@ -281,3 +299,85 @@ Core model UI 应只认识 generic provider capabilities：authentication action
 6. 如果未来 upstream 提供等价 API，如何删除该 patch？
 
 没有答案时，默认**不进 Core**。
+
+## 13. Phase 11 Repair WO#1F — Fixed WebMCP internal browser operation seam
+
+**状态：** Phase 11 Cognition fresh reconciliation 已 ACCEPT Repair WO#1F；`P11-WO1-R6 = CLOSED`。这里记录 Core patch 必要性与升级面；**WO#1 仍未接受**，其剩余 authority 仅是 real Coordinator replacement + final ChatGPT native-MCP live proof。
+
+### 为什么公开 / proposed Extension API 不足
+
+Phase 11 production WebMCP lifecycle 需要对 Human 已显式 Share 的**精确 browser pageId**执行两个固定动作：read-only resource observation，以及 selected-candidate exact connect。现有 Extension-visible browser execution入口是 `vscode.lm.invokeTool('run_playwright_code', ...)`；它是面向用户的 arbitrary Playwright JavaScript tool，`prepareToolInvocation()` 正确地产生 interactive confirmation。自动 Worker discovery/connect 没有合法 chat invocation token，因此不能靠伪造 token、全局 auto-approve、`trusted/internal` caller flag 等方式绕过确认。
+
+Fresh source inspection 没有发现一个既能复用 integrated-browser `IPlaywrightService`、又能在不经过 LanguageModelToolsService confirmation flow 的 Extension API。重新造第二 browser runtime 会破坏 exact shared-page authority，也扩大升级/安全面。因此 WO#1F 采用一个窄 Workbench adapter，而不是弱化 `run_playwright_code` 的确认。
+
+### Core 只承担什么
+
+新增 `webMcpInternalBrowserOperations.ts` 只负责机械边界：
+
+- exact `pageId` 必须仍存在；
+- BrowserView 必须仍处于 `Shared`，且 `IPlaywrightService.isPageTracked(pageId)` 为真；
+- operation 开始前 current href 必须与第一次 list/target 的 expected href 相同；
+- first-party fixed policy 标记的 native-MCP bypass host 在任何 page execution 前拒绝；
+- operation ID 只允许 `listSharedPages` / `observe` / `connect`；
+- structured caller input 使用 allowlist，拒绝未知字段，不接受 caller-supplied `code` / `script` / `expression` / function source；
+- bounded `IPlaywrightService.invokeFunction()` 与 `waitForDeferredResult()`；deferred continuation 绑定 exact operation/page/href，不能 replay 原 operation；
+- fixed executable assets / policy 只能从已安装的 first-party `shuncode.shuncode-integrated-browser-bridge` extension location 读取。
+
+Core 不知道 Project、Mission、Coordinator、Worker assignment、DeepSeek policy 或 host capability semantics。ChatGPT native-MCP host 列表也不硬编码在 Core，而由 first-party WebMCP policy JSON 所有。
+
+### Product semantics ownership
+
+WebMCP resource fields、site adapter、runtime v25、composer/auth/running eligibility、agent/runtime installation、allowed prime、post-injection/post-prime lineage/session-generation fences仍由 `extensions/shuncode-webmcp/**` 的 repository-owned fixed assets 实现。`observe` 只读取既有 href/origin/site/composer/auth/runtime/session/worker-turn facts，不 inject、不 prime、不 send、不读 provider transcript、不导航；fixture regression 的 observation mutation count 为 0。
+
+普通 `run_playwright_code` 没有修改，仍保留原 `confirmationMessages`。WO#1F therefore adds no generic arbitrary-JavaScript privilege.
+
+### Upstream alternative / 删除路径
+
+当前 upstream-equivalent primitives 是 `IPlaywrightService` + BrowserView sharing/tracking；缺的是一个 Extension-safe fixed-operation facade。若未来 upstream 提供“exact shared page + fixed structured operation + bounded/deferred execution”的公开/proposed API，可删除此 Workbench adapter，并让 `shuncode-webmcp` 直接消费 upstream surface；不得退回 confirmation bypass。
+
+### 升级冲突面
+
+Core delta 被限制为：
+
+- 一个 `src/vs/workbench/contrib/browserView/electron-browser/webMcpInternalBrowserOperations.ts` adapter；
+- `browserTools.contribution.ts` 一处注册 wiring。
+
+主要升级依赖：`IPlaywrightService` timed/deferred contract、`IBrowserViewWorkbenchService` known-view/model/sharing contract、`BrowserViewSharingState`、`IExtensionService` extension location 与 `IFileService`。WebMCP product assets/policy 的变化留在 extension，不继续扩散到 generic browser/chat Core。
+
+### 当前验证证据
+
+Practice 在当前 Reality 上已证明：focused WO#1F matrix PASS；新增 internal-operation regression 证明 arbitrary `run_playwright_code` confirmation retained、caller-controlled executable source = false、DeepSeek-like observation success / mutation=0、auth/composer/running/native-bypass fail-closed、stable exact-connect fixture success；既有 exact-connect race 8 cases PASS；WO#1E bounded/deferred regression PASS。
+
+真实 source Development Host live validation 还发现并在 WO#1F 边界内修复了两个 adapter contract bug：一是 `CommandsRegistry` 的 `ServicesAccessor` 不能跨异步生命周期持有，因此 command 入口现在同步 capture 所需 services 后再进入 async helper；二是 `IPlaywrightService.invokeFunction(..., args)` 会把 `args` spread 到 compiled function 参数，因此 fixed operation callback 使用 `(page, payload)`，而不是再次读取 `args[0]`。两项均有直接 regression 覆盖。
+
+最终 live read-only proof 使用 Human 已重新 Share 的真实 DeepSeek integrated-browser page `537252b3-fe6d-46bf-b24a-a735f86b8d2e`：production `workerListResources` 在 549ms 内成功返回 `site=deepseek`、`composerFound=true`、`isDeepSeekAuthPage=false`、`nativeMcpBypass=false`、`ready=true`、`resourceIdentity=7a09939449aee42ddb0cbad47eecf27338bb10912d5cba7a46e17f10319138f2`；随后 exact `workerProbeResource({ pageId })` 在 47ms 内返回同一 pageId 和同一 resourceIdentity。该 live proof 只执行 read-only list/probe；没有 `workerConnect`、provider send、Coordinator replacement、auto-share 或 ChatGPT target action。
+
+Completion 前 fresh formal gate：12 个 affected focused suites PASS；从当前 `package.json` 动态发现并执行的 `test-shuncode-*` 为 58/58 PASS；`typecheck-shuncode` PASS；`compile-shuncode` PASS；ShunCode diagnostics = 0 error / 0 warning；`git --no-pager diff --check` PASS；branch = `main`；HEAD = `79ab464acd0eac9eb623e2f6df2a1276088ece19`；cumulative dirty entries = 114。Phase 11 Cognition 随后独立重放 current production read-only path：同一 exact DeepSeek page 的 `workerListResources` 在 51ms 成功、`workerProbeResource` 在 46ms 成功，resourceIdentity 精确一致；另有 Cognition-owned adversarial probe、12/12 focused、58/58 dynamic suites、typecheck/compile、diagnostics 0。基于这些 fresh evidence，Repair WO#1F 已 ACCEPT，`P11-WO1-R6` 已 CLOSED；这仍不等于 WO#1 已接受。
+
+## 14. Phase 11 Repair WO#1G — Fixed post-connect WebMCP Worker control
+
+**状态：** Phase 11 Cognition fresh reconciliation 已 ACCEPT Repair WO#1G；`P11-WO1-R7 = CLOSED`。WO#1 仍未接受，仅因为 final real provider/live evidence chain 尚未完成。
+
+### 为什么继续复用同一个 Core seam
+
+WO#1F 已建立唯一合理的 first-party fixed-operation facade：exact Human-shared / Playwright-tracked BrowserView + repository-owned executable asset + bounded/deferred `IPlaywrightService`。WO#1G 发现 post-connect `send / poll / interrupt / resolve / health / disconnect` 仍走 `vscode.lm.invokeTool('run_playwright_code', ...)`，因此正常 Worker lifecycle 会重新进入 interactive arbitrary-code confirmation。
+
+Repair 没有增加任何 confirmation bypass，也没有新增第二 browser runtime。`_workbench.browser.webMcpInternalOperation` 只把 operation ID 扩展为当前 Reality 的：`listSharedPages / observe / connect / control`。`control` caller schema 仍是 fixed structured data；action 只允许 `send / poll / interrupt / resolve / health / disconnect`。caller 不能提供 executable source，也没有 `trusted` / `skipConfirmation` / fake invocation token / generic JavaScript field。
+
+### Core 机械边界
+
+Core 对 `control` 只新增：exact open pageId、Human-shared、Playwright-tracked、native-MCP bypass fail-closed、plain structured control payload、unknown action/field fail-closed、bounded `invokeFunction()`，以及 exact `operationId + pageId + structured control identity` deferred ownership。continuation 只能等待同一个 `deferredResultId`；changed/wrong deferred identity 拒绝；timeout/UNKNOWN 不 replay 原 operation。
+
+Core 仍不知道 Project / Mission / Coordinator / Worker assignment / DeepSeek semantics。runtime v25、exact WorkerSession/sessionId、runtime/status/stored page-session compatibility、origin/site lineage、turn/input semantics及六个 control action 的语义仍由 first-party `extensions/shuncode-webmcp/webmcp-internal-browser-operations.js` 拥有。
+
+普通 `run_playwright_code` 未被 WO#1G 修改，原 confirmation messages 仍在；没有 global/workspace auto-approve，也没有 generic privileged JavaScript command。若未来 upstream 提供 exact shared-page + fixed structured operation + bounded/deferred execution API，可删除此 Workbench adapter，而不是退回 confirmation bypass。
+
+### Practice evidence
+
+新增 `test-shuncode-webmcp-fixed-control` 直接证明六个 control action 全部不再调用 `run_playwright_code`，health read-only、send exactly once、poll exact inputId、wrong-turn interrupt zero side effect、resolve dedupe preserved、disconnect semantics preserved、deferred no-replay、UNKNOWN no-replay、full-path bounded、ChatGPT route untouched。affected focused suites 15/15 PASS；动态全部 `test-shuncode-*` 59/59 PASS；`typecheck-shuncode` / `compile-shuncode` / diagnostics 0/0 / `git diff --check` / `transpile-client` PASS。
+
+Source Development Host reload 后，Practice 按 accepted WO#1D fresh machine owner-death proof canonically retired durable-only orphan `c019575f-82dc-4d4f-8ff7-2cc7a127668b`；Human 重新 Share existing authenticated DeepSeek page 后，canonical same-Mission assignment produced managedSessionId `03ba1b30-1515-4deb-ba8a-3dc2f68f2fe6` / adapterSessionId `5e921808-3d10-43de-8c87-fe12c971dc2a`, durable/live = 1/1, runtime v25/pageSession identity exact-match.
+
+Repair acceptance 前唯一真实 post-connect control proof 是 `_shuncode.worker.web.health(current managedSessionId)`：42ms bounded return，`status=healthy`，page runtime v25，exact pageSessionId，`workerTurn=null`，pending deliveries/capabilities = 0；interactive arbitrary-code confirmation = none；real provider send = 0；ChatGPT action = 0。Practice did not execute real send/poll/interrupt/resolve/disconnect。
+
+Phase 11 Cognition 随后独立 fresh replay 当前 production health：managedSessionId `03ba1b30-1515-4deb-ba8a-3dc2f68f2fe6` 在 46ms 返回 `healthy`，runtime v25，exact pageSessionId `5e921808-3d10-43de-8c87-fe12c971dc2a`，workerTurn/pendingDeliveries/pendingHostCapabilities 均为空/0。Cognition-owned adversarial probe另行证明 health mutation=0、send execution count=1、unknown action fail-closed、wrong session before-action reject、六种 control 全部不走 `run_playwright_code`、ordinary arbitrary Playwright confirmation retained、deferred owner 绑定完整 structured control identity 且 continuation 只等待同一 execution。fresh formal gate = 15/15 focused PASS、59/59 dynamic `test-shuncode-*` PASS、typecheck/compile/transpile-client PASS、diagnostics 0、diff-check PASS。基于这些 fresh evidence，Repair WO#1G 已 ACCEPT，`P11-WO1-R7` 已 CLOSED。

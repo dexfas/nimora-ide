@@ -70,6 +70,8 @@ export interface IElementAncestor {
 
 export interface IBrowserElementSelectionOptions {
 	readonly highlightFocusedElement?: boolean;
+	readonly continuous?: boolean;
+	readonly mode?: BrowserElementSelectionMode;
 }
 
 export interface IElementData {
@@ -95,7 +97,16 @@ export interface IBrowserViewTheme {
 	readonly focusBorder?: string;
 	readonly buttonBackground?: string;
 	readonly buttonForeground?: string;
+	readonly widgetBackground?: string;
+	readonly widgetForeground?: string;
+	readonly widgetBorder?: string;
+	readonly widgetShadow?: string;
+	readonly contrastBorder?: string;
+	readonly descriptionForeground?: string;
+	readonly inputPlaceholderForeground?: string;
+	readonly toolbarHoverBackground?: string;
 	readonly font?: string;
+	readonly reducedMotion?: boolean;
 }
 
 /**
@@ -654,4 +665,30 @@ export interface IBrowserViewService {
 	 * @param config The configuration to apply.
 	 */
 	updateWindowConfiguration(windowId: number, config: IBrowserViewWindowConfiguration): Promise<void>;
+}
+
+export enum BrowserElementSelectionMode {
+	Select = 'select',
+	Comment = 'comment'
+}
+
+export interface IBrowserElementCommentsUpdate {
+	readonly comments?: readonly IBrowserElementComment[];
+	readonly pendingCommentIdsToDiscard?: readonly string[];
+}
+
+export interface IBrowserViewPreloadLocalizedStrings {
+	readonly addComment: string;
+	readonly addCommentPlaceholder: string;
+	readonly commentOnSelectedElement: string;
+	readonly elementComment: string;
+	readonly elementCommentWithBody: string;
+	readonly emptyElementComment: string;
+	readonly removeComment: string;
+	readonly removeElementComment: string;
+}
+
+export interface IBrowserElementComment {
+	readonly elementId: string;
+	readonly body: string;
 }

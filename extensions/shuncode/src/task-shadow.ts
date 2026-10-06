@@ -2,18 +2,17 @@ import path from "node:path";
 import * as vscode from "vscode";
 import { getCapabilityMetadata } from "../../../src/capability-registry.js";
 import { TaskRuntime } from "../../../src/task-runtime.js";
-import type { TaskArtifactRef, TaskInteractionOutcome, TaskProgress, TaskSnapshot, TaskTodo } from "../../../src/task-contract.js";
+import type { TaskArtifactRef, TaskEvent, TaskInteractionOutcome, TaskProgress, TaskSnapshot, TaskTodo } from "../../../src/task-contract.js";
 import type { WorkerExecutionProjectionStore, WorkerTaskBindingStore } from "../../../src/worker-session-manager.js";
 import { taskDiagnosticsArtifact, taskDirectoryArtifact, taskFileNavigationArtifact, taskLspArtifact } from "./task-file-artifacts.js";
 import { taskTerminalArtifact } from "./task-terminal-artifacts.js";
+import { taskChangesetArtifact } from "./task-changeset-artifacts.js";
 
 export interface ShadowExecutionHandle {
   taskId: string;
   executionId: string;
   duplicate: boolean;
 }
-
-const MAX_CHANGESET_CONTENT_CHARS = 24_000;
 
 /**
  * Fail-open compatibility layer for Phase 3 shadow mode. Task journaling must
@@ -22,15 +21,25 @@ const MAX_CHANGESET_CONTENT_CHARS = 24_000;
 export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingStore, WorkerExecutionProjectionStore {
   private readonly taskChangeEmitter = new vscode.EventEmitter<TaskSnapshot>();
   readonly onDidChangeTask = this.taskChangeEmitter.event;
+  private readonly taskObservationEmitter = new vscode.EventEmitter<{ task: TaskSnapshot; event: TaskEvent }>();
+  readonly onDidRecordTask = this.taskObservationEmitter.event;
   private readonly runtime: TaskRuntime;
   private readonly ready: Promise<void>;
   private initializationError: Error | undefined;
 
-  constructor(context: vscode.ExtensionContext, private readonly output: vscode.OutputChannel) {
+  constructor(
+    context: vscode.ExtensionContext,
+    private readonly output: vscode.OutputChannel,
+    runtimeIncarnationId: string,
+  ) {
     this.runtime = new TaskRuntime({
       storageDirectory: path.join(context.globalStorageUri.fsPath, "task-runtime-v1"),
       log: message => this.output.appendLine(message),
-      onDidChange: task => this.taskChangeEmitter.fire(task),
+      onDidChange: (task, event) => { this.taskChangeEmitter.fire(task); this.taskObservationEmitter.fire({ task, event }); },
+      workerOwnerProvenance: () => ({
+        ownerRuntimeIncarnationId: runtimeIncarnationId,
+        ownerProcessId: process.pid,
+      }),
     });
     this.ready = this.runtime.initialize().catch(error => {
       this.initializationError = error instanceof Error ? error : new Error(String(error));
@@ -134,33 +143,12 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
   }
 
   async recordChangeset(handle: ShadowExecutionHandle | undefined, structuredContent: unknown): Promise<TaskArtifactRef | undefined> {
-    if (!handle || !structuredContent || typeof structuredContent !== "object" || Array.isArray(structuredContent)) return undefined;
-    const row = structuredContent as Record<string, unknown>;
-    const files = Array.isArray(row.files)
-      ? row.files.flatMap(file => {
-        if (!file || typeof file !== "object" || Array.isArray(file)) return [];
-        const item = file as Record<string, unknown>;
-        const candidate = typeof item.destination_path === "string" ? item.destination_path : typeof item.path === "string" ? item.path : undefined;
-        return candidate ? [candidate] : [];
-      })
-      : [];
-    const summary = row.summary && typeof row.summary === "object" && !Array.isArray(row.summary) ? row.summary as Record<string, unknown> : {};
-    const rawDiff = typeof row.diff === "string" ? row.diff.trim() : "";
-    const content = rawDiff.length > MAX_CHANGESET_CONTENT_CHARS ? rawDiff.slice(0, MAX_CHANGESET_CONTENT_CHARS) : rawDiff;
+    if (!handle) return undefined;
+    const artifact = taskChangesetArtifact(structuredContent);
+    if (!artifact) return undefined;
     return this.safe("record changeset", () => this.runtime.recordArtifact(handle.taskId, {
-      kind: "changeset",
-      title: files.length === 1 ? `Changed ${files[0]}` : `Changed ${files.length} workspace files`,
+      ...artifact,
       executionId: handle.executionId,
-      metadata: {
-        files,
-        filesChanged: typeof summary.files_changed === "number" ? summary.files_changed : files.length,
-        additions: typeof summary.additions === "number" ? summary.additions : undefined,
-        deletions: typeof summary.deletions === "number" ? summary.deletions : undefined,
-        diffTruncated: row.diff_truncated === true,
-        content: content || undefined,
-        contentLanguage: content ? "diff" : undefined,
-        contentTruncated: row.diff_truncated === true || rawDiff.length > MAX_CHANGESET_CONTENT_CHARS,
-      },
     }));
   }
 
@@ -226,6 +214,24 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
     await this.runtime.detachWorkerSession(taskId, managedSessionId);
   }
 
+  async retireWorkerSessionStrict(taskId: string, managedSessionId: string, input: { retiredAt: string; reason?: string }): Promise<unknown> {
+    await this.ready;
+    if (this.initializationError) throw this.initializationError;
+    return await this.runtime.retireWorkerSessionStrict(taskId, managedSessionId, input);
+  }
+
+  async isWorkerAdapterSessionRetired(workerId: string, adapterSessionId: string): Promise<boolean> {
+    await this.ready;
+    if (this.initializationError) throw this.initializationError;
+    return await this.runtime.isWorkerAdapterSessionRetired(workerId, adapterSessionId);
+  }
+
+  async assertWorkerSessionContinuationAllowed(taskId: string, operation?: string): Promise<void> {
+    await this.ready;
+    if (this.initializationError) throw this.initializationError;
+    await this.runtime.assertWorkerSessionContinuationAllowed(taskId, operation);
+  }
+
   async beginWorkerExecution(taskId: string, input: {
     executionId: string;
     managedSessionId: string;
@@ -276,6 +282,7 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
   dispose(): void {
     void this.runtime.flush().catch(error => this.logFailure("flush", error));
     this.taskChangeEmitter.dispose();
+    this.taskObservationEmitter.dispose();
   }
 
   private async safe<T>(operation: string, run: () => Promise<T>): Promise<T | undefined> {
@@ -283,6 +290,7 @@ export class TaskShadowRecorder implements vscode.Disposable, WorkerTaskBindingS
       return await run();
     } catch (error) {
       this.logFailure(operation, error);
+      if (error instanceof Error && /^Mission .* is terminal \(/.test(error.message)) throw error;
       return undefined;
     }
   }

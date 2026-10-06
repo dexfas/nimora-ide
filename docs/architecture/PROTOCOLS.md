@@ -1,5 +1,13 @@
 # Protocols and Contracts
 
+> **2026-10-07 API Coordinator wire 更新**：R16 现场证实模型为 argumentless command 加入 `dummy` 字段，原 gate 正确拒绝。API adapter 对 host exact-empty single command 使用 required `invocation_id` 单值 enum，严格 admission 后才解码为 canonical `{}`；不剥离任意字段，不改变 Web/native 或文件工具参数，不替代 grant/receipt。源码、真实 Runtime/local HTTP 与负向已验证，R17 在冻结 R16 UI 的隔离目录构建，真实账号另计。见 [精确合同与隔离构建](API_COORDINATOR_WIRE_ENVELOPE_2026-10-07.md)。
+
+> **R16 当前执行更新**：R15 全包/回解/portable 已通过；新 API Coordinator 回执已走通，但 Runtime `answer` 未投影到 canonical terminal `text`，两次 Root 回答被当成空内容而停止，文件工具0，原回合与Project保留、Workers正常退休。R16 已修正映射，真实完整 domain→Runtime→Cognition/Practice→三次工具/投递→Evidence→archive 组合fixture及39/39回归 PASS，正在正常构建。完整账号与RC尚未验收；[当前事实](MULTI_PROVIDER_AUTONOMY_2026-10-06.md)优先于下方较早快照。
+
+> **2026-10-06 资源/API 单命令合同**：root `context.constraints` 的 `NIMORA_RESOURCE_POLICY_V1:` 由 Human 产品入口持久化，偏好不能替代授权；TaskRuntime strict CAS、分配/接班/发送前重核继续使用原 owners。Profile metadata 非秘密，密钥仅 SecretStorage，session 冻结配置。Runtime 增加仅 Mission host broker 可用的 `terminalAfterExternalToolResult`：一个 external command 结果投递后撤掉工具、等待 Provider 的 tools-free response；非法参数/多调用/重复调用禁止执行。它不把本地 pipe ACK 当 Provider receipt，也不授予新工具或重放权。39/39 受影响回归 PASS，R15 包/live 独立计。详见 [完整合同](MULTI_PROVIDER_AUTONOMY_2026-10-06.md)。
+
+> **2026-10-05 第一方协议装配更新**：第一方 Runtime/stdio、Bridge modern HTTP 与 Gateway exposure/upstream 已使用官方 MCP v2 分包；stdio 与第一方 client 显式选择 2026-07-28，upstream auto 保留 legacy 兼容。Bridge legacy/json/sse 与 modern request 都进入原 Mission-native authorization/execution/delivery owner；官方 wire completion metadata 不参与 canonical result digest，不能变成工具重试或 Provider receipt 权威。上游 Code-OSS SDK v1 保留。详见 [装配记录与验证](COMPONENT_INTEGRATION_2026-10-05.md)。
+
 ## 1. 原则
 
 当前 Nimora 的协议已经足够多。目标不是再造一个“万能协议”，而是明确每种 contract 的 owner、稳定性和转换边界，避免同一个 Tool Request / Session / Progress 概念被多套私有结构重复表达。

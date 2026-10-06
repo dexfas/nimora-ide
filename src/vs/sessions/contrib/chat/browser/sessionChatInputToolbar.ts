@@ -23,6 +23,7 @@ import { IChat, isActiveSessionStatus } from '../../../services/sessions/common/
 import { IActiveSession } from '../../../services/sessions/common/sessionsManagement.js';
 import { LastTurnChangesMultiDiffSourceResolver } from './lastTurnChangesMultiDiffSourceResolver.js';
 import { SessionBackgroundActivitiesControl } from './sessionBackgroundActivitiesControl.js';
+import { SessionBrowsersControl } from './sessionBrowsersControl.js';
 import type { ISessionChatPillsDebugData } from './sessionChatInputToolbarDebug.js';
 import './media/sessionChatInputToolbar.css';
 
@@ -88,6 +89,7 @@ export class SessionChatInputToolbar extends Disposable {
 	private readonly _chat = observableValue<IChat | undefined>('chat', undefined);
 	private readonly _debugData = observableValue<ISessionChatPillsDebugData | undefined>(this, undefined);
 	private readonly _backgroundActivities: SessionBackgroundActivitiesControl;
+	private readonly _browsers: SessionBrowsersControl;
 
 	/** The session that owns the reflected chat, from an explicit override or resolved from the chat. */
 	private readonly _session: IObservable<IActiveSession | undefined> = derived(reader => {
@@ -152,17 +154,19 @@ export class SessionChatInputToolbar extends Disposable {
 			changesEnabled: derived(reader => this._debugData.read(reader) !== undefined || this._active.read(reader) && turnStatusPillsEnabled.read(reader)),
 			previewEnabled: derived(reader => this._debugData.read(reader) !== undefined || this._active.read(reader) && turnStatusPillsEnabled.read(reader)),
 			openChanges: () => this._debugData.get() ? undefined : this._openChanges(),
-			openPreviewFile: file => this._debugData.get() ? undefined : openChatPreviewFile(file, this._commandService, this._openerService, this._logService),
+			openFile: file => this._debugData.get() ? undefined : openChatPreviewFile(file, this._commandService, this._openerService, this._logService),
 		};
 
 		const pills = this._register(instantiationService.createInstance(ChatTurnPillsWidget, model));
 		this.element.appendChild(pills.element);
+		this._browsers = this._register(instantiationService.createInstance(SessionBrowsersControl, this._session, this._chat, turnStatusPillsEnabled));
+		this.element.appendChild(this._browsers.element);
 
 		this._backgroundActivities = this._register(instantiationService.createInstance(SessionBackgroundActivitiesControl, this._session, this._chat, turnStatusPillsEnabled));
 		this.element.appendChild(this._backgroundActivities.element);
 
 		this._register(autorun(reader => {
-			this.element.classList.toggle('hidden', !pills.isVisible.read(reader) && !this._backgroundActivities.isVisible.read(reader));
+			this.element.classList.toggle('hidden', !pills.isVisible.read(reader) && !this._browsers.isVisible.read(reader) && !this._backgroundActivities.isVisible.read(reader));
 		}));
 	}
 
@@ -190,6 +194,7 @@ export class SessionChatInputToolbar extends Disposable {
 
 	setDebugData(data: ISessionChatPillsDebugData | undefined): void {
 		this._debugData.set(data, undefined);
+		this._browsers.setDebugData(data);
 		this._backgroundActivities.setDebugData(data);
 	}
 

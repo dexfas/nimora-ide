@@ -591,9 +591,12 @@ export function registerShunCodeNativeChat(
   modelProviders: Readonly<Record<string, ShunCodeLanguageModelProvider>>,
   branchStore: BranchStateStore,
   taskShadow: TaskShadowRecorder,
+  missionEntry?: vscode.ChatRequestHandler,
 ): vscode.ChatParticipant {
   const checkpointStore = new AgentCheckpointStore(context, output);
   const handler: vscode.ChatRequestHandler = async (request: any, chatContext: any, stream: any, token: vscode.CancellationToken) => {
+    const explicitLegacyControl = normalizeBranchIntent(request) || isCheckpointResumePrompt(String(request?.prompt ?? ""));
+    if (missionEntry && !explicitLegacyControl) return missionEntry({ ...request, prompt: promptWithReferences(String(request?.prompt ?? ""), request.references) }, chatContext, stream, token);
     const prompt = String(request?.prompt ?? "");
     const modeName = resolveShunCodeMode(request?.modeInstructions2?.name);
     const folder = vscode.workspace.workspaceFolders?.[0];

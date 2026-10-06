@@ -3,6 +3,7 @@ import { capabilityRegistrySnapshot, type CapabilityMetadata } from "../../../sr
 import { PromptingTaskCapabilityGrantResolver } from "../../../src/prompting-task-capability-grant-resolver.js";
 import type { TaskCapabilityGrant, TaskSnapshot } from "../../../src/task-contract.js";
 import type { TaskRuntime } from "../../../src/task-runtime.js";
+import type { HostCapabilityExecutionRequest } from "../../../src/host-capability-execution-coordinator.js";
 
 function riskDetail(capability: CapabilityMetadata): string {
   const parts = [`Risk: ${capability.risk}`];
@@ -19,7 +20,8 @@ function isActiveGrant(task: TaskSnapshot, grant: TaskCapabilityGrant): boolean 
   return !!session && !session.detachedAt && session.attachedAt === grant.workerSessionAttachedAt;
 }
 
-export function createInteractiveCapabilityGrantResolver(tasks: TaskRuntime, output: vscode.OutputChannel): PromptingTaskCapabilityGrantResolver {
+export function createInteractiveCapabilityGrantResolver(tasks: TaskRuntime, output: vscode.OutputChannel,
+  shouldPrompt: (request: HostCapabilityExecutionRequest) => boolean = () => true): PromptingTaskCapabilityGrantResolver {
   return new PromptingTaskCapabilityGrantResolver(tasks, {
     async requestGrant({ capability, scope }) {
       const scopeLabel = scope === "worker-session" ? "this AI session" : "this task";
@@ -36,7 +38,7 @@ export function createInteractiveCapabilityGrantResolver(tasks: TaskRuntime, out
       output.appendLine(`[permissions] ${approved ? "approved" : "denied"} capability=${capability.id} scope=${scope}`);
       return approved;
     },
-  });
+  }, shouldPrompt);
 }
 
 interface GrantQuickPickItem extends vscode.QuickPickItem {

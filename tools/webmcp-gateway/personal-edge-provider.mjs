@@ -94,6 +94,14 @@ export function createPersonalEdgeProvider({
     assertToken(input.token);
     const clientId = String(input.clientId || '').trim();
     if (!clientId) throw new PersonalEdgeControlError(400, 'clientId is required');
+    if (client.clientId && (client.clientId !== clientId || client.shared && (input.shared !== true || Number(client.tab?.id) !== Number(input.tab?.id)))) {
+      for (const pending of pendingResults.values()) {
+        clearTimer(pending.timer);
+        pending.reject(new Error('Personal Edge sharing changed; command outcome is unconfirmed. Do not replay.'));
+      }
+      pendingResults.clear(); commandQueue.length = 0;
+      for (const waiter of [...pollWaiters]) waiter.finish(null);
+    }
     client = {
       clientId,
       shared: input.shared === true,

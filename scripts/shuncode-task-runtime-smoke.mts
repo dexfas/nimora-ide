@@ -9,6 +9,7 @@ const require = createRequire(path.resolve(import.meta.dirname, '..', 'build', '
 const esbuild = require('esbuild') as typeof import('../build/node_modules/esbuild/lib/main.js');
 
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-task-runtime-'));
+const provenanceDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-task-runtime-provenance-'));
 const bundleDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-task-runtime-bundle-'));
 const bundlePath = path.join(bundleDirectory, 'task-runtime.mjs');
 await esbuild.build({
@@ -110,6 +111,38 @@ try {
     durationMs: 9,
   });
 
+  await runtime.attachWorkerSession(task.taskId, {
+    managedSessionId: 'managed-abandon',
+    workerId: 'nimora.web-worker',
+    adapterSessionId: 'provider-abandon',
+  });
+  await runtime.beginExecution(task.taskId, {
+    executionId: 'worker:managed-abandon:turn-1:1',
+    toolName: 'read_files',
+    origin: { kind: 'worker', managedSessionId: 'managed-abandon', workerId: 'nimora.web-worker', inputId: 'abandon-turn', callId: 'abandon-call' },
+  });
+  await runtime.finishExecution(task.taskId, 'worker:managed-abandon:turn-1:1', 'succeeded', { resultSummary: 'prepared but provider turn was consumed' });
+  await runtime.markResultPrepared(task.taskId, 'worker:managed-abandon:turn-1:1', {
+    kind: 'worker-capability', inputId: 'abandon-turn', callId: 'abandon-call', name: 'read_files', text: 'prepared result', isError: false,
+  });
+  await assert.rejects(
+    () => runtime.abandonPendingDeliveryStrict(task.taskId, 'worker:managed-abandon:turn-1:1', 'consumed provider turn; do not replay'),
+    /still current/,
+    'a current WorkerSession must retain delivery ownership and cannot be reconciled away',
+  );
+  await runtime.retireWorkerSessionStrict(task.taskId, 'managed-abandon', { reason: 'consumed-provider-turn' });
+  const abandonedDelivery = await runtime.abandonPendingDeliveryStrict(task.taskId, 'worker:managed-abandon:turn-1:1', 'consumed provider turn; do not replay');
+  assert.equal(abandonedDelivery.deliveryStatus, 'abandoned');
+  assert.equal(abandonedDelivery.deliveryAbandonmentReason, 'consumed provider turn; do not replay');
+  assert.ok(abandonedDelivery.deliveryAbandonedAt);
+  const idempotentAbandonment = await runtime.abandonPendingDeliveryStrict(task.taskId, 'worker:managed-abandon:turn-1:1', 'consumed provider turn; do not replay');
+  assert.equal(idempotentAbandonment.deliveryAbandonedAt, abandonedDelivery.deliveryAbandonedAt, 'same explicit reconciliation must be idempotent');
+  await assert.rejects(
+    () => runtime.abandonPendingDeliveryStrict(task.taskId, 'worker:managed-abandon:turn-1:1', 'different reason'),
+    /different reason/,
+    'reconciliation reason is durable truth and cannot be rewritten',
+  );
+
   await runtime.recordArtifact(task.taskId, {
     kind: 'changeset',
     title: 'Workspace patch',
@@ -124,6 +157,8 @@ try {
   assert.deepEqual(beforeRestart.context.constraints, ['No duplicate side effects', 'Keep VS Code as foundation']);
   assert.equal(beforeRestart.context.summary, 'Gateway refactor is in progress.');
   assert.equal(beforeRestart.workerSessions['worker-session-1']?.workerId, 'nimora.api-runtime');
+  assert.equal(beforeRestart.workerSessions['worker-session-1']?.ownerRuntimeIncarnationId, undefined, 'legacy attachment without provenance must remain valid');
+  assert.equal(beforeRestart.workerSessions['worker-session-1']?.ownerProcessId, undefined, 'legacy attachment without provenance must remain valid');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.status, 'succeeded');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.deliveryStatus, 'pending');
   assert.equal(beforeRestart.executions['mcp:session-a:7']?.duplicateObservations, 1);
@@ -194,10 +229,45 @@ try {
   assert.deepEqual(afterRestart.executions, beforeRestartFinal.executions);
   assert.deepEqual(afterRestart.artifacts, beforeRestartFinal.artifacts);
 
+  let provenanceId = 0;
+  const provenanceRuntime = new TaskRuntime({
+    storageDirectory: provenanceDirectory,
+    newId: () => `provenance-id-${++provenanceId}`,
+    now,
+    workerOwnerProvenance: () => ({ ownerRuntimeIncarnationId: 'runtime-incarnation-a', ownerProcessId: 4242 }),
+  });
+  await provenanceRuntime.initialize();
+  const provenanceTask = await provenanceRuntime.ensureTask({ kind: 'bridge', key: 'provenance-session' }, 'Persist owner provenance');
+  await assert.rejects(
+    () => provenanceRuntime.attachWorkerSession(provenanceTask.taskId, {
+      managedSessionId: 'forged-provenance-managed',
+      workerId: 'nimora.web-worker',
+      adapterSessionId: 'forged-provider-session',
+      ownerRuntimeIncarnationId: 'caller-forged-runtime',
+      ownerProcessId: 9999,
+    }),
+    /trusted-host metadata and cannot be supplied by the attachment caller/,
+    'caller/provider input must not be able to declare durable owner provenance',
+  );
+  const provenanceAttach = await provenanceRuntime.attachWorkerSession(provenanceTask.taskId, {
+    managedSessionId: 'provenance-managed-1',
+    workerId: 'nimora.web-worker',
+    adapterSessionId: 'provider-session-a',
+  });
+  assert.equal(provenanceAttach.workerSession.ownerRuntimeIncarnationId, 'runtime-incarnation-a');
+  assert.equal(provenanceAttach.workerSession.ownerProcessId, 4242);
+  await provenanceRuntime.flush();
+  const provenanceRestarted = new TaskRuntime({ storageDirectory: provenanceDirectory });
+  await provenanceRestarted.initialize();
+  const replayedProvenance = provenanceRestarted.findTaskBySource({ kind: 'bridge', key: 'provenance-session' });
+  assert.equal(replayedProvenance.workerSessions['provenance-managed-1'].ownerRuntimeIncarnationId, 'runtime-incarnation-a', 'new-format runtime incarnation provenance must survive replay');
+  assert.equal(replayedProvenance.workerSessions['provenance-managed-1'].ownerProcessId, 4242, 'new-format owner PID provenance must survive replay');
+
   console.log(`[smoke] task runtime replay + execution ledger ok (events=${afterRestart.eventCount})`);
 } finally {
   await Promise.all([
     fs.rm(directory, { recursive: true, force: true }),
+    fs.rm(provenanceDirectory, { recursive: true, force: true }),
     fs.rm(bundleDirectory, { recursive: true, force: true }),
   ]);
 }

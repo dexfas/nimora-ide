@@ -1,6 +1,6 @@
 ﻿import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import {
   DEEPSEEK_CONTEXT_WINDOW_TOKENS,
   DEEPSEEK_DEFAULT_REASONING_EFFORT,
@@ -140,6 +140,9 @@ export interface RunAgentInput {
   modeInstructions?: string;
   externalTools?: AgentToolDefinition[];
   executeExternalTool?: (name: string, args: Record<string, unknown>) => Promise<AgentToolExecutionResult>;
+  /** Exact single host-bound command; after delivery, only a tools-free
+   * provider acknowledgement may finish this turn. Never a local receipt. */
+  terminalAfterExternalToolResult?: boolean;
   checkpoint?: AgentCheckpoint;
   signal?: AbortSignal;
   onTrace?: (item: AgentTraceItem) => void;
@@ -560,8 +563,8 @@ function modelTimeoutSettings(input: RunAgentInput): ModelTimeoutSettings {
 
 class ModelRequestTimeoutController {
   readonly controller = new AbortController();
-  private firstTokenTimer: NodeJS.Timeout | undefined;
-  private idleTimer: NodeJS.Timeout | undefined;
+  private firstTokenTimer: ReturnType<typeof setTimeout> | undefined;
+  private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly onExternalAbort: (() => void) | undefined;
   private _hasFirstToken = false;
 
@@ -1464,7 +1467,7 @@ async function createMcpClient(
   requestOptions: AgentWorkspaceToolRequestOptions,
 ): Promise<AgentWorkspaceToolClient> {
   const mcpServerScript = fileURLToPath(new URL("./mcp-server.js", import.meta.url));
-  const client = new Client({ name: "shuncode-file-tools-test-ui", version: "0.6.7" });
+  const client = new Client({ name: "shuncode-file-tools-test-ui", version: "0.6.7" }, { versionNegotiation: { mode: { pin: "2026-07-28" } } });
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [mcpServerScript],
@@ -1489,7 +1492,7 @@ async function createMcpClient(
         })),
       };
     },
-    callTool: (params, options) => client.callTool(params, undefined, options),
+    callTool: (params, options) => client.callTool(params, options),
     close: () => client.close(),
   };
 }
@@ -1734,6 +1737,10 @@ export async function runOpenAICompatibleAgent(
       firstStep = 1;
     }
 
+    let acknowledgementOnly = false;
+    if (input.terminalAfterExternalToolResult && (availableTools.length !== 1 || !externalToolNames.has(availableTools[0].name))) {
+      throw new Error("Single-command acknowledgement requires exactly one external tool.");
+    }
     for (let step = firstStep; ; step += 1) {
       input.signal?.throwIfAborted();
       const checkpoint = createAgentCheckpoint(input, messages, step, toolNames);
@@ -1769,7 +1776,7 @@ export async function runOpenAICompatibleAgent(
             ...(anthropicSystemPrompt(messages) ? { system: anthropicSystemPrompt(messages) } : {}),
             max_tokens: anthropicMaxOutputTokens,
             ...(anthropicThinkingEnabled ? { thinking: { type: "enabled", budget_tokens: anthropicThinkingBudget } } : {}),
-            ...(anthropicTools.length > 0 ? { tools: anthropicTools, tool_choice: { type: "auto" } } : {}),
+            ...(!acknowledgementOnly && anthropicTools.length > 0 ? { tools: anthropicTools, tool_choice: { type: "auto" } } : {}),
             stream: true,
           }
         : responses
@@ -1781,7 +1788,7 @@ export async function runOpenAICompatibleAgent(
             stream: true,
             ...(responsesReasoningEffort ? { reasoning: { effort: responsesReasoningEffort } } : {}),
             ...(codexServiceTier ? { service_tier: codexServiceTier } : {}),
-            ...(codexTools.length > 0 ? { tools: codexTools, tool_choice: "auto", parallel_tool_calls: true } : {}),
+            ...(!acknowledgementOnly && codexTools.length > 0 ? { tools: codexTools, tool_choice: "auto", parallel_tool_calls: true } : {}),
           }
         : {
             model: input.model,
@@ -1789,7 +1796,7 @@ export async function runOpenAICompatibleAgent(
             ...(deepSeek ? { thinking: { type: thinking }, max_tokens: Math.min(maxOutputTokens, availableOutputTokens) } : {}),
             ...(deepSeekReasoningEffort ? { reasoning_effort: deepSeekReasoningEffort } : {}),
             ...(genericReasoningEffort ? { reasoning_effort: genericReasoningEffort } : {}),
-            ...(tools.length > 0 ? {
+            ...(!acknowledgementOnly && tools.length > 0 ? {
               tools,
               ...(!deepSeekThinking ? { tool_choice: "auto" } : {}),
             } : {}),
@@ -1865,6 +1872,8 @@ export async function runOpenAICompatibleAgent(
       });
 
       const toolCalls: OpenAICompatibleToolCall[] = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+      if (acknowledgementOnly && toolCalls.length) throw new Error("Provider attempted another command after the delivered host result; no replay.");
+      if (input.terminalAfterExternalToolResult && toolCalls.length > 1) throw new Error("Host-bound single command received multiple provider calls; none executed.");
       if (toolCalls.length === 0) {
         return {
           status: "completed",
@@ -1907,7 +1916,10 @@ export async function runOpenAICompatibleAgent(
         try {
           args = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
         } catch {
-          args = {};
+          throw new Error("Provider tool arguments are not valid JSON; no tool was invoked.");
+        }
+        if (!args || typeof args !== "object" || Array.isArray(args) || Object.getPrototypeOf(args) !== Object.prototype) {
+          throw new Error("Provider tool arguments must be a plain object; no tool was invoked.");
         }
 
         emitTrace({ type: "tool_call", step, data: { id: call.id, name: toolName, arguments: args } });
@@ -2008,6 +2020,11 @@ export async function runOpenAICompatibleAgent(
           tool_call_id: call.id,
           content: toolText,
         });
+      }
+      if (input.terminalAfterExternalToolResult) {
+        const result = completedCalls[0]?.toolResult;
+        if (completedCalls.length !== 1 || (result && typeof result === "object" && "isError" in result && result.isError)) throw new Error("Host-bound command result failed; no acknowledgement or replay.");
+        acknowledgementOnly = true;
       }
     }
   } finally {

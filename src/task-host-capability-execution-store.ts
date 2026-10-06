@@ -4,7 +4,8 @@ import type {
   HostCapabilityExecutionDurableStore,
   HostCapabilityExecutionRequest,
 } from "./host-capability-execution-coordinator.js";
-import type { TaskExecution, TaskExecutionResultPayload } from "./task-contract.js";
+import { createHash } from "node:crypto";
+import type { TaskArtifactRef, TaskExecution, TaskExecutionResultPayload } from "./task-contract.js";
 import { TaskRuntime, taskArgumentsDigest, type BeginExecutionInput } from "./task-runtime.js";
 import type { WorkerCapabilityResultInput } from "./worker-contract.js";
 
@@ -53,6 +54,7 @@ function workerResult(payload: TaskExecutionResultPayload, request: HostCapabili
     text: payload.text,
     isError: payload.isError,
     durationMs: payload.durationMs,
+    extensions: request.occurrenceId ? { occurrenceId: request.occurrenceId } : undefined,
   };
 }
 
@@ -71,8 +73,13 @@ function recoveryFromExecution(execution: TaskExecution, request: HostCapability
 }
 
 /** Durable TaskRuntime-backed state for future host-owned Worker capability execution. */
+export type HostCapabilityArtifactProjector = (
+  request: HostCapabilityExecutionRequest,
+  result: WorkerCapabilityResultInput,
+) => readonly Omit<TaskArtifactRef, "artifactId" | "createdAt" | "executionId">[];
+
 export class TaskHostCapabilityExecutionStore implements HostCapabilityExecutionDurableStore {
-  constructor(private readonly tasks: TaskRuntime) {}
+  constructor(private readonly tasks: TaskRuntime, private readonly projectArtifacts?: HostCapabilityArtifactProjector) {}
 
   async recover(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata): Promise<HostCapabilityDurableRecovery> {
     await this.tasks.initialize();
@@ -97,6 +104,25 @@ export class TaskHostCapabilityExecutionStore implements HostCapabilityExecution
       error: result.isError ? result.text : undefined,
       resultSummary: result.text,
     });
+    // Only trusted executor results produce artifacts. An artifact persistence
+    // failure leaves result admission uncertain; it never authorizes tool replay.
+    if (!result.isError && this.projectArtifacts) {
+      const artifacts = this.projectArtifacts(request, result);
+      for (const [index, artifact] of artifacts.entries()) {
+        const artifactId = `host-capability:${createHash("sha256").update(`${request.executionId}\0${index}\0${artifact.kind}`).digest("hex")}`;
+        const existing = this.tasks.getTask(taskId)?.artifacts.find(row => row.artifactId === artifactId);
+        // TaskRuntime journals JSON values: optional undefined fields disappear.
+        // Compare that same representation after recovery, without changing the
+        // execution argument digest contract.
+        const value = JSON.parse(JSON.stringify({ ...artifact, artifactId, executionId: request.executionId })) as Omit<TaskArtifactRef, "createdAt">;
+        if (existing) {
+          const { createdAt: _createdAt, ...stored } = existing;
+          if (taskArgumentsDigest(stored) !== taskArgumentsDigest(value)) throw new Error(`Host capability artifact identity mismatch: ${artifactId}`);
+        } else {
+          await this.tasks.recordArtifactStrict(taskId, value);
+        }
+      }
+    }
     await this.tasks.markResultPreparedStrict(taskId, request.executionId, {
       kind: "worker-capability",
       inputId: request.inputId,

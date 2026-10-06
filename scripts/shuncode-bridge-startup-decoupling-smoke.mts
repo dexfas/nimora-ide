@@ -19,8 +19,14 @@ assert.doesNotMatch(
 );
 assert.match(
   extensionSource,
-  /get<boolean>\("persistentMode", false\)[\s\S]{0,500}Promise\.all\(\[bridgeReady, bridgeLicenseReady\]\)\.then\(\(\) => bridgeAccess\.start\(\)\)/,
+  /persistentBridgeStartupEnabled && vscode\.workspace\.workspaceFolders\?\.length[\s\S]{0,500}Promise\.all\(\[bridgeReady, bridgeLicenseReady\]\)\.then\(\(\) => bridgeAccess\.start\(\)\)/,
   'Persistent Bridge mode must start directly from the extension after dependencies are ready',
+);
+assert.match(extensionSource, /persistent Bridge startup skipped: no workspace folder is open/);
+assert.doesNotMatch(
+  extensionSource,
+  /if \(persistentBridgeStartupEnabled\) \{[\s\S]{0,500}bridgeAccess\.start\(\)/,
+  'Persistent Bridge startup must not run from an empty workspace window',
 );
 assert.match(extensionSource, /persistent Bridge startup enabled; starting Bridge without opening Chat/);
 assert.doesNotMatch(

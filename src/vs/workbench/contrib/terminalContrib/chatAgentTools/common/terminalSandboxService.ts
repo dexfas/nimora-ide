@@ -12,7 +12,9 @@ import { FileAccess } from '../../../../../base/common/network.js';
 import { dirname } from '../../../../../base/common/path.js';
 import { OperatingSystem, OS } from '../../../../../base/common/platform.js';
 import { arch } from '../../../../../base/common/process.js';
+import { ExtUri } from '../../../../../base/common/resources.js';
 import { URI } from '../../../../../base/common/uri.js';
+import { generateUuid } from '../../../../../base/common/uuid.js';
 import { localize } from '../../../../../nls.js';
 import { IConfigurationChangeEvent, IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { IEnvironmentService } from '../../../../../platform/environment/common/environment.js';
@@ -22,10 +24,11 @@ import { ILogService } from '../../../../../platform/log/common/log.js';
 import { IProductService } from '../../../../../platform/product/common/productService.js';
 import { IRemoteAgentEnvironment } from '../../../../../platform/remote/common/remoteAgentEnvironment.js';
 import { SANDBOX_HELPER_CHANNEL_NAME, SandboxHelperChannelClient } from '../../../../../platform/sandbox/common/sandboxHelperIpc.js';
-import { ISandboxDependencyStatus, ISandboxHelperService, type IWindowsMxcConfig, IWindowsMxcFilesystemPolicy, type IWindowsMxcPolicyContainment, type IWindowsMxcSandboxPolicy } from '../../../../../platform/sandbox/common/sandboxHelperService.js';
+import { assertWindowsMxcStableIsolationSupport, ISandboxDependencyStatus, ISandboxHelperService, type IWindowsMxcConfig, IWindowsMxcFilesystemPolicy, type IWindowsMxcPlatformSupport, type IWindowsMxcPolicyContainment, type IWindowsMxcSandboxPolicy } from '../../../../../platform/sandbox/common/sandboxHelperService.js';
 import { ITerminalSandboxEngineHost, ITerminalSandboxRuntimeInfo, TerminalSandboxEngine } from '../../../../../platform/sandbox/common/terminalSandboxEngine.js';
+import { AgentSandboxEnabledValue, AgentSandboxSettingId } from '../../../../../platform/sandbox/common/settings.js';
 import { readSandboxSetting, SANDBOX_SETTING_KEYS } from './sandboxSettingsReader.js';
-import { ITerminalSandboxService, TerminalSandboxPreCheckRemediation, type ISandboxDependencyInstallOptions, type ISandboxDependencyInstallResult, type ITerminalSandboxCommand, type ITerminalSandboxFileAccessCheckResult, type ITerminalSandboxPrecheckInputs, type ITerminalSandboxPrerequisiteCheckResult, type ITerminalSandboxResolvedNetworkDomains, type ITerminalSandboxWrapResult, type TerminalSandboxFileAccessPermission } from '../../../../../platform/sandbox/common/terminalSandboxService.js';
+import { ITerminalSandboxService, TerminalSandboxPreCheckRemediation, type ISandboxDependencyInstallOptions, type ISandboxDependencyInstallResult, type ITerminalSandboxCommand, type ITerminalSandboxFileAccessCheckResult, type ITerminalSandboxPrecheckInputs, type ITerminalSandboxPrerequisiteCheckResult, type ITerminalSandboxResolvedNetworkDomains, type ITerminalSandboxWrapResult, type ITerminalStrictSandboxOptions, type ITerminalStrictSandboxWrapResult, type TerminalSandboxFileAccessPermission } from '../../../../../platform/sandbox/common/terminalSandboxService.js';
 import { TerminalCapability } from '../../../../../platform/terminal/common/capabilities/capabilities.js';
 import { IWorkspaceContextService } from '../../../../../platform/workspace/common/workspace.js';
 import { ChatModel } from '../../../chat/common/model/chatModel.js';
@@ -73,7 +76,7 @@ export class TerminalSandboxService extends Disposable implements ITerminalSandb
 		@ILifecycleService lifecycleService: ILifecycleService,
 		@ISandboxHelperService private readonly _sandboxHelperService: ISandboxHelperService,
 		@IChatService private readonly _chatService: IChatService,
-		@IInstantiationService instantiationService: IInstantiationService,
+		@IInstantiationService private readonly _instantiationService: IInstantiationService,
 	) {
 		super();
 		this._remoteEnvDetailsPromise = this._remoteAgentService.getEnvironment();
@@ -95,7 +98,7 @@ export class TerminalSandboxService extends Disposable implements ITerminalSandb
 			getSandboxSetting: <T>(settingId: string): T | undefined => this._readSandboxSetting<T>(settingId),
 			onDidChangeSandboxSettings: Event.map(onDidChangeSandboxSettings, () => undefined),
 		};
-		this._engine = this._register(instantiationService.createInstance(TerminalSandboxEngine, host));
+		this._engine = this._register(this._instantiationService.createInstance(TerminalSandboxEngine, host));
 
 		this._register(this._workspaceContextService.onDidChangeWorkspaceFolders(() => this._onDidChangeRoots.fire()));
 
@@ -127,6 +130,91 @@ export class TerminalSandboxService extends Disposable implements ITerminalSandb
 
 	wrapCommand(command: string, requestUnsandboxedExecution?: boolean, shell?: string, cwd?: URI, commandDetails?: readonly ITerminalSandboxCommand[], requestAllowNetwork?: boolean): Promise<ITerminalSandboxWrapResult> {
 		return this._engine.wrapCommand(command, requestUnsandboxedExecution, shell, cwd, commandDetails, requestAllowNetwork);
+	}
+
+	async wrapStrictCommand(command: string, options: ITerminalStrictSandboxOptions): Promise<ITerminalStrictSandboxWrapResult> {
+		if (typeof command !== 'string' || !command.trim()) {
+			throw new Error('Strict terminal sandbox requires a non-empty command');
+		}
+		if (!options?.cwd || !Array.isArray(options.writeRoots) || options.writeRoots.length === 0) {
+			throw new Error('Strict terminal sandbox requires cwd and at least one exact write root');
+		}
+		const os = await this._resolveOS();
+		if (os === OperatingSystem.Windows) {
+			assertWindowsMxcStableIsolationSupport(await this._resolveWindowsMxcPlatformSupport());
+		}
+		const extUri = new ExtUri(() => os === OperatingSystem.Windows);
+		const writeRoots = [...new Map(options.writeRoots.map(root => [extUri.getComparisonKey(root), root])).values()];
+		if (writeRoots.some(root => root.scheme !== 'file') || options.cwd.scheme !== 'file') {
+			throw new Error('Strict terminal sandbox only accepts local file roots');
+		}
+		if (!writeRoots.some(root => extUri.isEqualOrParent(options.cwd, root))) {
+			throw new Error('Strict terminal sandbox cwd must stay inside an exact write root');
+		}
+
+		const baseTempDir = await this._resolveSandboxTempDir();
+		if (!baseTempDir) {
+			throw new Error('Strict terminal sandbox could not resolve an isolated temp root');
+		}
+		const strictTempDir = URI.joinPath(baseTempDir, 'strict', generateUuid());
+		const host: ITerminalSandboxEngineHost = {
+			getOS: () => this._resolveOS(),
+			getRuntimeInfo: () => this._resolveRuntimeInfo(),
+			getUserHome: () => this._resolveUserHome(),
+			getSandboxTempDir: async () => strictTempDir,
+			getWorkspaceStorageReadRoot: async () => undefined,
+			getWriteRoots: () => writeRoots,
+			onDidChangeRoots: Event.None,
+			checkSandboxDependencies: () => this._resolveSandboxDependencyStatus(),
+			getWindowsMxcFilesystemPolicy: async () => {
+				const policy = await this._resolveWindowsMxcFilesystemPolicy();
+				if (!policy) return undefined;
+				return {
+					readonlyPaths: policy.readonlyPaths.filter(value => !this._isWindowsDriveRoot(value)),
+					readwritePaths: [],
+				};
+			},
+			getWindowsMxcEnvironment: () => this._resolveWindowsMxcEnvironment(),
+			buildWindowsMxcSandboxPayload: (commandLine, policy, workingDirectory, containerName, containment) => this._resolveWindowsMxcSandboxPayload(commandLine, policy, workingDirectory, containerName, containment),
+			getSandboxSetting: <T>(settingId: string): T | undefined => {
+				switch (settingId) {
+					case AgentSandboxSettingId.AgentSandboxEnabled:
+					case AgentSandboxSettingId.AgentSandboxWindowsEnabled:
+						return AgentSandboxEnabledValue.On as T;
+					case AgentSandboxSettingId.AgentSandboxAllowNetwork:
+					case AgentSandboxSettingId.AgentSandboxAllowUnsandboxedCommands:
+					case AgentSandboxSettingId.AgentSandboxRetryWithAllowNetworkRequests:
+						return false as T;
+					case AgentSandboxSettingId.AgentSandboxLinuxFileSystem:
+					case AgentSandboxSettingId.AgentSandboxMacFileSystem:
+					case AgentSandboxSettingId.AgentSandboxWindowsFileSystem:
+						return {} as T;
+					case AgentSandboxSettingId.AgentSandboxWindowsSchemaVersion:
+						return this._readSandboxSetting<T>(settingId);
+					default:
+						return undefined;
+				}
+			},
+			onDidChangeSandboxSettings: Event.None,
+		};
+		const engine = this._instantiationService.createInstance(TerminalSandboxEngine, host);
+		try {
+			const prereqs = await engine.checkForSandboxingPrereqs(true);
+			if (!prereqs.enabled || prereqs.failedCheck || !prereqs.sandboxConfigPath) {
+				const detail = prereqs.detail ? `: ${prereqs.detail}` : '';
+				throw new Error(`Strict terminal sandbox prerequisite failed (${prereqs.failedCheck ?? 'disabled'})${detail}`);
+			}
+			const wrapped = await engine.wrapCommand(command, false, options.shell, options.cwd, [], false);
+			if (!wrapped.isSandboxWrapped) {
+				throw new Error('Strict terminal sandbox refused to return an unsandboxed command');
+			}
+			return { ...wrapped, cleanupPaths: [strictTempDir.fsPath] };
+		} catch (error) {
+			await engine.cleanupTempDir();
+			throw error;
+		} finally {
+			engine.dispose();
+		}
 	}
 
 	checkFileAccess(permission: TerminalSandboxFileAccessPermission, paths: readonly string[], precheckInputs?: ITerminalSandboxPrecheckInputs): Promise<ITerminalSandboxFileAccessCheckResult> {
@@ -202,6 +290,11 @@ export class TerminalSandboxService extends Disposable implements ITerminalSandb
 		return value.replace(/\//g, '\\');
 	}
 
+	private _isWindowsDriveRoot(value: string): boolean {
+		const normalized = value.replace(/\//g, '\\').replace(/\\+$/g, '');
+		return /^[A-Za-z]:$/.test(normalized);
+	}
+
 	private async _resolveUserHome(): Promise<URI | undefined> {
 		const remoteEnv = await this._resolveRemoteEnv();
 		if (remoteEnv?.userHome) {
@@ -260,6 +353,17 @@ export class TerminalSandboxService extends Disposable implements ITerminalSandb
 			});
 		}
 		return this._sandboxHelperService.getWindowsMxcFilesystemPolicy();
+	}
+
+	private async _resolveWindowsMxcPlatformSupport(): Promise<IWindowsMxcPlatformSupport | undefined> {
+		const connection = this._remoteAgentService.getConnection();
+		if (connection) {
+			return connection.withChannel(SANDBOX_HELPER_CHANNEL_NAME, channel => {
+				const sandboxHelper = new SandboxHelperChannelClient(channel);
+				return sandboxHelper.getWindowsMxcPlatformSupport?.();
+			});
+		}
+		return this._sandboxHelperService.getWindowsMxcPlatformSupport?.();
 	}
 
 	private async _resolveWindowsMxcEnvironment(): Promise<string[] | undefined> {

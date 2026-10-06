@@ -1,0 +1,23 @@
+name = "nimora-current-route"
+main = "worker.mjs"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "ROUTE_RELAY"
+class_name = "NimoraCurrentRouteRelay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["NimoraCurrentRouteRelay"]
+
+# Configure two independent credentials after deployment preparation:
+#   npx wrangler secret put ROUTE_PATH_TOKEN
+#   npx wrangler secret put ROUTE_UPDATE_SECRET
+#
+# ROUTE_PATH_TOKEN is the stable capability path used by ChatGPT:
+#   https://<worker>.<account>.workers.dev/r/<ROUTE_PATH_TOKEN>/mcp
+#
+# ROUTE_UPDATE_SECRET authorizes ShunCode to change the upstream pointer.
+# Never commit either secret. ShunCode stores only ROUTE_UPDATE_SECRET in
+# VS Code SecretStorage; the path token is carried by the configured relay URL.

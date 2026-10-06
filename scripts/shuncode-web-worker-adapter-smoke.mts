@@ -89,11 +89,26 @@ try {
   assert.equal(descriptor.capabilities.streaming, true);
   assert.equal(descriptor.capabilities.reasoning, true);
   assert.equal(descriptor.capabilities.imageInput, false);
+  assert.deepEqual(descriptor.capabilityProjection, {
+    nativeByName: false,
+    externalDefinitions: false,
+    executionRoutes: [],
+  }, 'forwarding allowedCapabilities is not a bounded page allowlist contract');
 
-  const session = await adapter.createSession({ model: 'web-model', contextHandle: 'task-context', transport: { lane: 'A' } });
+  const exactTarget = {
+    pageId: 'page-exact', resourceIdentity: 'b'.repeat(64),
+    origin: 'https://fake.example', href: 'https://fake.example/chat', site: 'fake.example',
+  };
+  const session = await adapter.createSession({
+    model: 'web-model',
+    contextHandle: 'task-context',
+    extensions: { webMcpTarget: exactTarget },
+    transport: { lane: 'A' },
+  });
   assert.equal(session.sessionId, 'page-session-1');
   assert.equal(session.extensions.origin, 'https://fake.example');
   assert.equal(transport.connectOptions.extensions.lane, 'A');
+  assert.deepEqual(transport.connectOptions.extensions.webMcpTarget, exactTarget, 'opaque exact target must survive WebWorkerAdapter option merging');
 
   const events = [];
   for await (const event of adapter.send(session, {

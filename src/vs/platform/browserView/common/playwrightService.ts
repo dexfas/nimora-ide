@@ -90,17 +90,19 @@ export interface IPlaywrightService {
 	 * Run a function with access to a Playwright page and return a result for tool output, including error handling.
 	 * The first function argument is always the Playwright `page` object, and additional arguments can be passed after.
 	 *
-	 * When {@link timeoutMs} is provided, the call races against that timeout.
+	 * When {@link timeoutMs} is provided, it bounds observable completion of the timed call,
+	 * including bounded best-effort page-summary production after the page function settles/defers.
 	 * If the timeout fires before the function completes, or the function is otherwise interrupted,
 	 * the in-flight promise is stored as a *deferred result* and the returned object includes a
 	 * {@link deferredResultId} that can be passed to {@link waitForDeferredResult} to resume waiting.
+	 * The underlying page execution is not automatically re-executed or treated as complete when deferred.
 	 * When {@link timeoutMs} is omitted the function runs to completion with no deferral.
 	 *
 	 * @param sessionId Identifies the session making the request.
 	 * @param pageId The browser view ID identifying the page to operate on.
 	 * @param fnDef The function code to execute. Should contain the function definition but not its invocation, e.g. `async (page, arg1, arg2) => { ... }`.
 	 * @param args Additional arguments to pass to the function after the `page` object.
-	 * @param timeoutMs Maximum time (in ms) to wait for the function to complete before deferring. When omitted the call awaits indefinitely.
+	 * @param timeoutMs Maximum observable time (in ms) for the timed invocation, including its bounded summary. When omitted the call awaits indefinitely.
 	 * @returns The result of the function execution, including a page summary and optionally a deferredResultId if the call did not complete.
 	 */
 	invokeFunction(sessionId: string, pageId: string, fnDef: string, args?: unknown[], timeoutMs?: number): Promise<IInvokeFunctionResult>;
@@ -110,7 +112,7 @@ export interface IPlaywrightService {
 	 *
 	 * @param sessionId Identifies the session making the request.
 	 * @param deferredResultId The ID returned from a timed-out {@link invokeFunction} call.
-	 * @param timeoutMs Maximum time (in ms) to wait before returning a deferred result again.
+	 * @param timeoutMs Maximum observable time (in ms) to wait before returning the same deferred identity again, including bounded summary production.
 	 * @returns The same shape as {@link invokeFunction}. If the result is still not
 	 * available after the timeout, {@link deferredResultId} is returned again.
 	 */

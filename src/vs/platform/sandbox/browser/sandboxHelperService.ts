@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { InstantiationType, registerSingleton } from '../../instantiation/common/extensions.js';
-import { ISandboxDependencyStatus, ISandboxHelperService, type IWindowsMxcConfig, IWindowsMxcFilesystemPolicy, type IWindowsMxcPolicyContainment, type IWindowsMxcSandboxPolicy } from '../common/sandboxHelperService.js';
+import { ISandboxDependencyStatus, ISandboxHelperService, type IWindowsMxcConfig, IWindowsMxcFilesystemPolicy, type IWindowsMxcPlatformSupport, type IWindowsMxcPolicyContainment, type IWindowsMxcSandboxPolicy } from '../common/sandboxHelperService.js';
 
 class NullSandboxHelperService implements ISandboxHelperService {
 	declare readonly _serviceBrand: undefined;
@@ -21,6 +21,10 @@ class NullSandboxHelperService implements ISandboxHelperService {
 	}
 
 	async getWindowsMxcFilesystemPolicy(): Promise<IWindowsMxcFilesystemPolicy | undefined> {
+		return undefined;
+	}
+
+	async getWindowsMxcPlatformSupport(): Promise<IWindowsMxcPlatformSupport | undefined> {
 		return undefined;
 	}
 

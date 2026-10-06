@@ -96,7 +96,6 @@ import { ChatAgentLocation, ChatConfiguration, ChatModeKind, ChatPermissionLevel
 import { isAutoApprovePolicyRestricted, isAutoApproveValuePolicyRestricted } from '../../../common/agentHostConfigPolicy.js';
 import { IChatEditingSession, IModifiedFileEntry, ModifiedFileEntryState } from '../../../common/editing/chatEditingService.js';
 import { ILanguageModelChatMetadata, ILanguageModelChatMetadataAndIdentifier, ILanguageModelsService } from '../../../common/languageModels.js';
-import { ModelIdentifierResolution, getRegisteredLanguageModels, resolveModelIdentifierFromLanguageModels } from '../../../common/modelSelection.js';
 import { ChatInputModelSelectionController, IChatInputModelSelectionRuntime } from './chatInputModelSelectionController.js';
 import { ChatModelConfigurationStore } from './chatModelConfigurationStore.js';
 import { ChatModelSelectionDiagnostics } from './chatModelSelectionDiagnostics.js';
@@ -179,6 +178,7 @@ export interface IChatInputStyles {
 }
 
 export interface IChatInputPartOptions {
+	onDidChangeInputOnboardingVisible?: (visible: boolean) => void;
 	defaultMode?: IChatMode;
 	renderFollowups: boolean;
 	renderStyle?: 'compact';
@@ -733,7 +733,6 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 			getAllModels: () => this.getAllMergedModels(),
 			requiresCustomModels: sessionType => this.chatSessionsService.requiresCustomModelsForSessionType(sessionType),
 			getConfiguredModelValue: () => this.getConfiguredModelValue(),
-			resolveModelIdentifier: identifier => this.resolveModelIdentifier(identifier),
 			subscribeToModelChanges: listener => this.languageModelsService.onDidChangeLanguageModels(listener),
 			getBoundConversationKey: () => this._inputModelSessionResource?.toString(),
 			getVisibleConversationKey: () => this._widget?.viewModel?.model.sessionResource.toString(),
@@ -1049,10 +1048,6 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 			storedSelection,
 			selection => logChangesToStateModel(this._inputModel, `[INIT-SELECTED-MODEL] restore decision persistedSelection=${storedSelection}, selection=${selection.kind}, resultModel=${selection.kind === 'apply' ? selection.model.identifier : undefined}, storageKey=${selectedModelStorageKey}, currentSessionType=${this._currentSessionType}, getCurrentSessionType=${this.getCurrentSessionType()}`, this._inputModel?.state.get(), undefined, this.logService),
 		);
-	}
-
-	private resolveModelIdentifier(identifier: string): ModelIdentifierResolution {
-		return resolveModelIdentifierFromLanguageModels(this.getModels(), identifier, this.languageModelsService, getRegisteredLanguageModels(this.languageModelsService));
 	}
 
 	public setEditing(enabled: boolean, editingSentRequest: ChatContextKeys.EditingRequestType | undefined) {
@@ -3023,8 +3018,11 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		this.chatToolConfirmationCarouselContainer = elements.chatToolConfirmationCarouselContainer;
 		dom.hide(this.chatToolConfirmationCarouselContainer);
 		this.chatInputNotificationContainer = elements.chatInputNotificationContainer;
-		this._register(this.voiceModeOnboardingService.registerHost(elements.voiceModeOnboardingContainer, this.container, () => this.focus()));
-		this._register(this.dictationOnboardingService.registerHost(elements.dictationOnboardingContainer, this.container));
+		const onDidChangeInputOnboardingVisible = () => this.options.onDidChangeInputOnboardingVisible?.(
+			this.voiceModeOnboardingService.isVisible || this.dictationOnboardingService.isVisible
+		);
+		this._register(this.voiceModeOnboardingService.registerHost(elements.voiceModeOnboardingContainer, this.container, () => this.focus(), elements.chatGettingStartedTipContainer, onDidChangeInputOnboardingVisible));
+		this._register(this.dictationOnboardingService.registerHost(elements.dictationOnboardingContainer, this.container, elements.chatGettingStartedTipContainer, onDidChangeInputOnboardingVisible));
 		this.chatGoalBannerContainer = elements.chatGoalBannerContainer;
 		this.contextUsageWidgetContainer = elements.contextUsageWidgetContainer;
 		this.statusToolbarContainer = elements.statusToolbarContainer;

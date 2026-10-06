@@ -123,6 +123,51 @@ Phase 5.4.4 额外建立 future execution-owner 的 strict persistence contract�
 
 Phase 5.4.8 把 authorization state 也纳入 Task Source of Truth：`TaskSnapshot.capabilityGrants` 保存 durable grant/revoke audit。`grantCapabilityStrict()` / `revokeCapabilityGrantStrict()` fail-closed；session grant 绑定当前 WorkerSession 的 attach generation，Task grant 则只在本 Task 内有效。Resolver 在每次 Host authorization 时读取当前 snapshot，因此 revoke/detach 立即生效。全局 `always` grant 故意不存进 Task journal。
 
+Mission Work Phase 1 又在**同一套 Task journal/replay**上增加了 optional Mission identity，而没有建立第二套 Mission Runtime。旧 `TaskCreated` payload、`TaskSnapshot.version = 1`、`TaskEvent.version = 1` 均保持不变；新事件仅为：
+
+```text
+TaskMissionConfigured
+        ↓
+TaskSnapshot.mission?
+  ├─ projectId
+  ├─ rootMissionId
+  ├─ parentMissionId?
+  ├─ plane = coordination | cognition | practice
+  ├─ missionType
+  └─ completionCriteria[]
+```
+
+Mission ID 直接等于现有 `taskId`。配置使用 strict persistence：第一次成功后成为 immutable identity metadata；再次提交相同 canonical metadata 不写新事件，冲突配置拒绝。Root Mission 要求 `taskId === rootMissionId` 且无 parent；Child Mission 要求已配置 root/parent 且二者属于同一 Project/root chain。若 legacy Task 在配置 Mission 前已经有 Worker ref，`TaskMissionConfigured` 会在同一次 strict write 中携带当前 Worker refs 作为 durable adoption，避免早期 fail-open attach 只存在于内存。Mission 配置后的 `TaskWorkerAttached` 本身也改为 strict persistence。legacy journal 启动时不会 bulk migrate，未配置的 Task 始终保持 `mission === undefined`。Project→Mission membership 的唯一 durable link 是 `TaskSnapshot.mission.projectId`，ProjectStore 不保存镜像 `missionIds`。
+
+Mission Work Phase 4 WO#1 又把 `TaskSourceKind` 从 transport-only 的 `native-chat | bridge` additive 扩展为 `native-chat | bridge | mission`。`mission` 只表示由 Nimora-owned Mission semantic operation 创建 Task 的 provider-neutral provenance；`MissionFeedbackService` 用稳定 feedback-operation key 调用既有 `ensureTask()`，因此重启/retry 会复用同一 Task。它不新增 Mission membership、parentage 或 workflow state：membership 仍只来自 `TaskSnapshot.mission.projectId`，`parent_of` 仍由 Mission metadata 派生，跨 Mission feedback provenance 仍由 `MissionCollaborationStore` 的 typed relation/exchange facts 持久化。
+
+Mission Work Phase 2 继续复用同一 Task journal，并加入显式 finalization / retirement，而不是把 `status=completed` 当成隐式推断：
+
+```text
+TaskMissionFinalized
+  ├─ completedAt
+  ├─ handoffRequired
+  └─ handoff? (report artifact, atomic with completion)
+        ↓
+TaskSnapshot.status = completed
+TaskSnapshot.missionFinalization = completed
+
+TaskWorkerRetired
+  └─ managedSessionId + retiredAt + reason
+        ↓
+durable logical death of that Worker ref
+
+TaskMissionArchived
+        ↓
+TaskSnapshot.missionFinalization = archived
+```
+
+`finalizeMissionStrict()` / `archiveMissionStrict()` / `retireWorkerSessionStrict()` 都使用 strict persistence。required Handoff 缺失、仍有 running interaction/execution、archive 时仍存在任何没有 `retiredAt` 的 Worker ref，都会拒绝状态推进。Finalized/archived Mission 是不可逆终态：todos/progress/context/artifacts、interaction/execution lifecycle、capability grants 与 Worker attach/detach 等 working-state writes 都拒绝；replay reducer 同样冻结终态后的 late work event，且不会接受 running Mission 的 forged finalization/archive 或重复 retirement 降级。Finalization 的 Handoff policy 也是 terminal identity 的一部分：已经完成的 Mission 若以冲突的 `handoffRequired` 重试会 fail closed。
+
+Final Handoff 不再由 service 先拍 snapshot 再提交。`finalizeMissionStrict()` 接受在 task-exclusive 临界区内执行的 handoff factory，从最终 durable working snapshot 生成 bounded provider-neutral report；artifact metadata 绑定 `missionId/projectId + sourceTaskEventId/sourceTaskEventCount + contentDigest`，artifact id 在同一 Task 内拒绝碰撞。只要 finalization 携带 Handoff，replay 就强制要求 event-level 与 artifact-level 的 source event id/count 全部存在、彼此一致，并精确匹配 Handoff 生成前的 Task revision；不能通过同时省略两层 binding 来绕过校验。Replay 同时会对实际 `metadata.content` 重新计算 SHA-256；缺失/伪造 content、错误 Mission/Project/revision、digest disagreement 都不能建立 finalization。合法的 no-Handoff finalization 不受该 source-binding 要求影响。`TaskMissionFinalized` 也只有在 Mission 已经 `TaskMissionConfigured` 后才是合法 replay transition，非法 Finalized-before-Configured 是 no-op，不能冻结后续合法配置。这样 snapshot 与 `TaskMissionFinalized` 之间不存在可插入的 context mutation，同时 replay 与 live precondition 保持一致。
+
+Worker failure 与 Mission death 分离：普通 `TaskWorkerDetached` 当下不写 `retiredAt`，替代 Worker 可以继续同一 Mission。对于 provider-native identity，durable death 由 replayed Task state 统一派生：只要某个拥有该 `workerId + adapterSessionId` 的 Mission 已 `TaskMissionFinalized`，或对应 Worker ref 已 `TaskWorkerRetired`，该 identity 就已经永久死亡。`MissionFinalizationService` 先在 task-exclusive lane 安装 Mission-level finalization admission fence 并取得封闭的 Worker-history identity snapshot，然后释放 task lock，再按排序后的 provider-native barriers 执行 finalization。这样 snapshot 之后的新 create/attach/rebind/send continuation 会在 Task authority 上 fail closed，即使新 provider identity 不在初始 barrier 集合中也不能越界；同时不会形成 task-lock → provider-lock 的嵌套。若已有 send 先取得 native barrier 和 active-send lease，finalizer 会释放 provider barriers、等待 lease cleanup、再重新取得全部 barriers并重验，而不是持 barrier 等待造成死锁。该已 admission turn 的 host-result continuation 使用单独的 narrow Task check：Manager 必须先证明精确 pending call 与仍存活的 send lease，然后 Task authority 只忽略临时 finalization fence、绝不忽略 durable terminal state；因此 turn 可以完成自身但不能借此开始新工作。若 A 的旧 identity 当前包装在 B，B 的 retirement bookkeeping 写失败不会复活该 identity或阻止 A archive；Manager 记录 cleanup/ownership warning并移除旧 routing，B Mission 本身仍可获得真正新的 Worker。
+
 ## 5. Context Engine
 
 Context Engine 属于 Task Runtime，负责：

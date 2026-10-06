@@ -582,6 +582,8 @@ legacy branch reader 保留，旧数据只读兼容至少一个版本周期。
 
 ## 12. Phase 10 — Context / Skill Dynamic Routing
 
+> Historical migration-plan numbering only. The active Mission Work program has absorbed this capability goal into **Mission Work Phase 8 — Mission-aware Context / Skill / Capability routing** after Project/Mission/Coordinator/Assignment semantics were independently established. Use `MISSION_WORK_ROADMAP.md` for current authority, Work Orders and Phase numbering; retain this section as the earlier capability/dependency intent rather than a competing route.
+
 ### 目标
 
 解决规模化后 context 膨胀。

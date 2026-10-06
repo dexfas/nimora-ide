@@ -18,6 +18,8 @@ await esbuild.build({
       export { PromptingTaskCapabilityGrantResolver } from './src/prompting-task-capability-grant-resolver.ts';
       export { CapabilityMetadataHostAuthorizer, HostCapabilityAuthorizationError } from './src/host-capability-policy-authorizer.ts';
       export { getCapabilityMetadata } from './src/capability-registry.ts';
+      export { preapproveWorkerSessionCapabilities, isAutomationApprovedSession } from './src/worker-session-capability-preapproval.ts';
+      export { dispatchHostCapabilityRequest } from './src/host-capability-request-dispatcher.ts';
     `,
     resolveDir: root,
     sourcefile: 'capability-approval-entry.ts',
@@ -37,6 +39,9 @@ const {
   CapabilityMetadataHostAuthorizer,
   HostCapabilityAuthorizationError,
   getCapabilityMetadata,
+  preapproveWorkerSessionCapabilities,
+  isAutomationApprovedSession,
+  dispatchHostCapabilityRequest,
 } = require(bundlePath);
 
 const requestFor = (taskId, managedSessionId, executionId) => ({
@@ -126,7 +131,51 @@ try {
   assert.equal(await restartedResolver.isGranted({ ...approvedRequest, executionId: 'exec-restarted' }, runCommand), true);
   assert.equal(restartPrompts, 0, 'replayed durable grant must authorize without prompting after restart');
 
-  console.log('[smoke] prompting capability approval dedupe/approve/deny/restart/always-fail-closed ok');
+  const automation = await preapproveWorkerSessionCapabilities(restarted, {
+    taskId: task.taskId, managedSessionId: 'managed-approved', workerId: 'nimora.web-worker',
+    capabilityIds: ['workspace.apply-patch', 'terminal.run-command'],
+  });
+  let automationPrompts = 0;
+  const automationResolver = new PromptingTaskCapabilityGrantResolver(restarted, {
+    async requestGrant() { automationPrompts++; throw Error('Mid-run approval must not open'); },
+  }, request => !isAutomationApprovedSession(restarted, request, [automation]));
+  for (let index = 0; index < 3; index++) {
+    assert.equal(await automationResolver.isGranted(approvedRequest, runCommand), true);
+    assert.equal(await automationResolver.isGranted({ ...approvedRequest, name: 'apply_patch' }, getCapabilityMetadata('apply_patch')), true);
+  }
+  assert.equal(automationPrompts, 0, 'both preapproved capabilities execute repeatedly without prompts');
+  const afterRestart = new TaskRuntime({ storageDirectory: directory });
+  await afterRestart.initialize();
+  assert.equal(isAutomationApprovedSession(afterRestart, approvedRequest, [automation]), true);
+  const replayedAutomation = new PromptingTaskCapabilityGrantResolver(afterRestart, {
+    async requestGrant() { throw Error('Unexpected restart prompt'); },
+  }, request => !isAutomationApprovedSession(afterRestart, request, [automation]));
+  assert.equal(await replayedAutomation.isGranted(approvedRequest, runCommand), true);
+  const outside = getCapabilityMetadata('send_command_input');
+  const results = [];
+  const dispatch = request => dispatchHostCapabilityRequest({ executeAndDeliver: async req => {
+    await new CapabilityMetadataHostAuthorizer(replayedAutomation).authorize(req, outside);
+    throw Error('Unauthorized executor must not run');
+  } }, request, { submitCapabilityResult: async (_session, result) => { results.push(result); } });
+  const denied = await dispatch({ ...approvedRequest, name: 'send_command_input' });
+  assert.equal(denied.status, 'denied');
+  assert.equal(results[0].extensions.hostAuthorizationStoppedTurn, true);
+  assert.equal(automationPrompts, 0);
+  const grant = Object.values(afterRestart.getTask(task.taskId).capabilityGrants).find(row => row.capabilityId === runCommand.id && !row.revokedAt);
+  await afterRestart.revokeCapabilityGrantStrict(task.taskId, grant.grantId);
+  await assert.rejects(() => replayedAutomation.isGranted(approvedRequest, runCommand), error => error.stopTurn === true);
+  await assert.rejects(() => preapproveWorkerSessionCapabilities(afterRestart, {
+    taskId: task.taskId, managedSessionId: 'managed-approved', workerId: 'wrong-worker', capabilityIds: [runCommand.id],
+  }), /归属/);
+  const countBeforeUnknown = Object.keys(afterRestart.getTask(task.taskId).capabilityGrants).length;
+  await assert.rejects(() => preapproveWorkerSessionCapabilities(afterRestart, {
+    taskId: task.taskId, managedSessionId: 'managed-approved', workerId: 'nimora.web-worker', capabilityIds: [runCommand.id, 'unknown'],
+  }), /不能批量授权/);
+  assert.equal(Object.keys(afterRestart.getTask(task.taskId).capabilityGrants).length, countBeforeUnknown);
+  await afterRestart.detachWorkerSession(task.taskId, 'managed-approved');
+  assert.equal(isAutomationApprovedSession(afterRestart, approvedRequest, [automation]), false, 'automation approval never follows a replacement Worker');
+
+  console.log('[smoke] capability approval + upfront bundle/no mid-run prompt/revocation/denial stop/replay/owner fences ok');
 } finally {
   await Promise.all([
     fs.rm(directory, { recursive: true, force: true }),

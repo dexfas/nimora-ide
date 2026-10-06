@@ -16,7 +16,6 @@
 export type {
 	JsonRpcErrorResponse,
 	JsonRpcNotification,
-	JsonRpcParseErrorResponse,
 	JsonRpcRequest,
 	JsonRpcResponse,
 	JsonRpcSuccessResponse,
@@ -120,6 +119,11 @@ export function isJsonRpcResponse(msg: ProtocolMessage): msg is AhpSuccessRespon
 }
 
 // ---- VS Code-specific types ------------------------------------------------
+
+/** Transport parse failures have no request identity (JSON-RPC 2.0). */
+export interface JsonRpcParseErrorResponse extends Omit<JsonRpcErrorResponse, 'id'> {
+	readonly id: null;
+}
 
 /**
  * Error with a JSON-RPC error code for protocol-level failures.

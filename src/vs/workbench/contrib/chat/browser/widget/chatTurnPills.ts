@@ -16,18 +16,19 @@ import { basename, isEqual } from '../../../../../base/common/resources.js';
 import { ThemeIcon } from '../../../../../base/common/themables.js';
 import { URI } from '../../../../../base/common/uri.js';
 import { localize } from '../../../../../nls.js';
-import { ICommandService } from '../../../../../platform/commands/common/commands.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
+import { ICommandService } from '../../../../../platform/commands/common/commands.js';
+import { ILogService } from '../../../../../platform/log/common/log.js';
 import { IContextMenuService } from '../../../../../platform/contextview/browser/contextView.js';
 import { FileKind } from '../../../../../platform/files/common/files.js';
 import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
-import { ILogService } from '../../../../../platform/log/common/log.js';
 import { IOpenerService } from '../../../../../platform/opener/common/opener.js';
 import { observableConfigValue } from '../../../../../platform/observable/common/platformObservableUtils.js';
 import { defaultButtonStyles } from '../../../../../platform/theme/browser/defaultStyles.js';
 import { AnimatedCounterWidget } from '../../../../browser/animatedCounterWidget.js';
 import { DEFAULT_LABELS_CONTAINER, ResourceLabels } from '../../../../browser/labels.js';
 import { ChatConfiguration } from '../../common/constants.js';
+import { getEditorOverrideForChatResource } from './chatEditorAssociations.js';
 import '../media/chatTurnPills.css';
 
 const CHANGES_PILL_ACTION_ID = 'chat.turnPills.changes';
@@ -91,10 +92,7 @@ export function previewFilesEqual(a: readonly IPreviewFile[], b: readonly IPrevi
 	return true;
 }
 
-/**
- * Open a previewable file: markdown files open as a markdown preview, falling
- * back to the default opener when it is not available (e.g. web).
- */
+/** Opens a turn file with the editor configured for resources opened from chat. */
 export async function openChatPreviewFile(file: IPreviewFile, commandService: ICommandService, openerService: IOpenerService, logService: ILogService): Promise<void> {
 	try {
 		await commandService.executeCommand('markdown.showPreview', file.uri);
@@ -102,6 +100,15 @@ export async function openChatPreviewFile(file: IPreviewFile, commandService: IC
 		logService.trace('[ChatTurnPills] Falling back to default opener for preview', err);
 		await openerService.open(file.uri);
 	}
+}
+
+export async function openChatTurnFile(file: IPreviewFile, openerService: IOpenerService, configurationService: IConfigurationService): Promise<void> {
+	await openerService.open(file.uri, {
+		fromUserGesture: true,
+		editorOptions: {
+			override: getEditorOverrideForChatResource(file.uri, configurationService),
+		},
+	});
 }
 
 /** The data and interactions a {@link ChatTurnPillsWidget} reflects. */
@@ -113,7 +120,7 @@ export interface IChatTurnPillsModel {
 	/** When `false` the preview pill stays hidden regardless of the data. */
 	readonly previewEnabled: IObservable<boolean>;
 	openChanges(): void;
-	openPreviewFile(file: IPreviewFile): void;
+	openFile(file: IPreviewFile): void;
 }
 
 /** The former per-pill setting shape, retained for existing user settings. */
@@ -216,7 +223,7 @@ class ChangesPillActionViewItem extends BaseActionViewItem {
  * The preview pill: renders the primary previewable file as a resource label
  * (file icon + name). When more than one previewable file exists, a separator
  * and a dropdown chevron are shown; the chevron lists every previewable file.
- * Activating the label opens the primary file's preview.
+ * Activating the label opens the primary file.
  */
 class PreviewPillActionViewItem extends BaseActionViewItem {
 
@@ -292,7 +299,7 @@ class PreviewPillActionViewItem extends BaseActionViewItem {
  *   changes.
  * - **Preview** — shown when the turn created or edited a markdown file.
  *   Rendered as a resource label for the primary file. Activating it opens that
- *   file as a markdown preview; when several exist, a dropdown lists them all.
+ *   file; when several exist, a dropdown lists them all.
  * The data and the open actions are supplied by the {@link IChatTurnPillsModel}
  * so the same widget serves surfaces with different data sources.
  */
@@ -325,7 +332,7 @@ export class ChatTurnPillsWidget extends Disposable {
 		this._resourceLabels = this._register(this._instantiationService.createInstance(ResourceLabels, DEFAULT_LABELS_CONTAINER));
 
 		this._changesAction = this._register(new Action(CHANGES_PILL_ACTION_ID, localize('chatTurnPills.changes.tooltip', "View Current Turn Changes"), undefined, true, async () => this._model.openChanges()));
-		this._previewAction = this._register(new Action(PREVIEW_PILL_ACTION_ID, localize('chatTurnPills.preview.label', "Open Preview"), undefined, true, async () => this._openPrimaryPreview()));
+		this._previewAction = this._register(new Action(PREVIEW_PILL_ACTION_ID, localize('chatTurnPills.preview.label', "Open Preview"), undefined, true, async () => this._openPrimaryFile()));
 
 		this._toolbar = this._register(new ToolBar(this.element, this._contextMenuService, {
 			orientation: ActionsOrientation.HORIZONTAL,
@@ -335,7 +342,7 @@ export class ChatTurnPillsWidget extends Disposable {
 					return new ChangesPillActionViewItem(action, options, this._model.stats, this._instantiationService);
 				}
 				if (action.id === PREVIEW_PILL_ACTION_ID) {
-					return new PreviewPillActionViewItem(action, options, this._model.previewFiles, this._resourceLabels, file => this._model.openPreviewFile(file), anchor => this._showAllPreviews(anchor));
+					return new PreviewPillActionViewItem(action, options, this._model.previewFiles, this._resourceLabels, file => this._model.openFile(file), anchor => this._showAllFiles(anchor));
 				}
 				return undefined;
 			},
@@ -372,14 +379,14 @@ export class ChatTurnPillsWidget extends Disposable {
 		this.element.classList.toggle('hidden', actions.length === 0);
 	}
 
-	private _openPrimaryPreview(): void {
+	private _openPrimaryFile(): void {
 		const primaryFile = this._model.previewFiles.get().at(0);
 		if (primaryFile) {
-			this._model.openPreviewFile(primaryFile);
+			this._model.openFile(primaryFile);
 		}
 	}
 
-	private _showAllPreviews(anchor: HTMLElement): void {
+	private _showAllFiles(anchor: HTMLElement): void {
 		const files = this._model.previewFiles.get();
 		if (files.length === 0) {
 			return;
@@ -389,8 +396,8 @@ export class ChatTurnPillsWidget extends Disposable {
 			getActions: () => files.map(file => toAction({
 				id: `${PREVIEW_PILL_ACTION_ID}.${file.uri.toString()}`,
 				label: basename(file.uri),
-				class: ThemeIcon.asClassName(Codicon.openPreview),
-				run: () => this._model.openPreviewFile(file),
+				class: ThemeIcon.asClassName(Codicon.goToFile),
+				run: () => this._model.openFile(file),
 			})),
 		});
 	}

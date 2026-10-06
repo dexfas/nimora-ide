@@ -52,6 +52,44 @@ assert.equal(JSON.stringify(lineCalls[0].arguments.files), JSON.stringify([{ pat
 assert.equal(lineCalls[0].arguments.depth, 2);
 assert.equal(lineCalls[0].arguments.enabled, true);
 assert.equal(lineCalls[0].arguments.patch, 'line one\nline two');
+const versionMapCall = core.extractCalls(`[SHUNCODE_TOOL]
+id=version-map
+name=apply_patch
+arg.expected_versions={"TEST_REPORT.md":"sha256:abc","src/note.v1.txt":"sha256:def"}
+[/SHUNCODE_TOOL]`);
+assert.equal(JSON.stringify(versionMapCall[0].arguments.expected_versions), JSON.stringify({ 'TEST_REPORT.md': 'sha256:abc', 'src/note.v1.txt': 'sha256:def' }), 'literal filename keys survive line transport without dot nesting');
+
+const realPhase11R16R17Call = core.extractCalls(`[SHUNCODE_TOOL]
+id=deliver-phase11-proof-021
+name=nimora.coordinator.deliverExplicitMissionInput
+arg={}
+[/SHUNCODE_TOOL]`);
+assert.equal(realPhase11R16R17Call.length, 1, 'real DeepSeek line protocol with bare arg={} must remain a visible capability occurrence');
+assert.equal(realPhase11R16R17Call[0].id, 'deliver-phase11-proof-021');
+assert.equal(realPhase11R16R17Call[0].name, 'nimora.coordinator.deliverExplicitMissionInput');
+assert.equal(Reflect.ownKeys(realPhase11R16R17Call[0].arguments).length, 0, 'bare arg={} must not create provider semantic argument authority');
+
+const prototypeAttack = core.extractCalls(`[SHUNCODE_TOOL]
+id=proto-attack
+name=nimora.coordinator.deliverExplicitMissionInput
+arg.__proto__.phase11R17Polluted=yes
+[/SHUNCODE_TOOL]`);
+assert.equal(prototypeAttack.length, 0, '__proto__ dotted paths must reject the entire provider tool request');
+
+const constructorPrototypeAttack = core.extractCalls(`[SHUNCODE_TOOL]
+id=constructor-proto-attack
+name=nimora.coordinator.deliverExplicitMissionInput
+arg.constructor.prototype.phase11R17Polluted=yes
+[/SHUNCODE_TOOL]`);
+assert.equal(constructorPrototypeAttack.length, 0, 'constructor.prototype dotted paths must reject the entire provider tool request');
+
+const postPrototypeAttack = core.extractCalls(`[SHUNCODE_TOOL]
+id=post-proto-safe
+name=nimora.coordinator.deliverExplicitMissionInput
+[/SHUNCODE_TOOL]`);
+assert.equal(postPrototypeAttack.length, 1, 'safe argumentless invocation must still parse after rejected prototype-path attacks');
+assert.equal(Reflect.ownKeys(postPrototypeAttack[0].arguments).length, 0);
+assert.equal(postPrototypeAttack[0].arguments.phase11R17Polluted, undefined, 'parser processing must not mutate its shared Object prototype');
 
 const incomplete = core.extractCalls('[SHUNCODE_TOOL]\nid=incomplete\nname=run_command\narg.command=echo hi');
 assert.equal(incomplete.length, 0, 'streaming/incomplete calls must never execute before the closing marker');
@@ -91,7 +129,14 @@ const deepSeek = createSiteAdapter({
 });
 assert.equal(deepSeek.id, 'deepseek');
 assert.equal(deepSeek.isDeepSeekAuthPage, false);
-assert.match(deepSeek.transportRule(), /Do NOT use JSON/);
+assert.match(deepSeek.transportRule(), /Do NOT use an outer JSON tool-call object/);
+assert.match(deepSeek.transportRule(), /arg.expected_versions=/);
+assert.match(deepSeek.transportRule(), /ONE FOUR-BACKTICK text fence/);
+assert.doesNotMatch(deepSeek.transportRule(), /or a Markdown code fence/);
+const fencedPatch = '*** Begin Patch\n*** Update File: TEST_REPORT.md\n@@\n 7. Existing ordered list\n+\n+**Source:** independent browser checks\n+```html\n+<button>Example</button>\n+```\n*** End Patch';
+const fencedPatchCalls = core.extractCalls('````text\n[SHUNCODE_TOOL]\nid=fenced-patch\nname=apply_patch\narg.expected_versions={"TEST_REPORT.md":"sha256:abc"}\narg.patch<<SHUNCODE_EOF\n' + fencedPatch + '\nSHUNCODE_EOF\n[/SHUNCODE_TOOL]\n````');
+assert.equal(fencedPatchCalls.length, 1);
+assert.equal(fencedPatchCalls[0].arguments.patch, fencedPatch, 'fenced line protocol preserves ordered-list context, Markdown additions, blank additions, HTML and nested fences exactly');
 assert.equal(deepSeek.pacingMode, 'disabled-user-preference');
 await deepSeek.beforeAutomaticSend();
 assert.equal(deepSeek.captureRateLimitNotices().size, 0);

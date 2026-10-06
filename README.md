@@ -1,5 +1,11 @@
 # Nimora IDE
 
+## Windows Beta 下载与使用
+
+[2026-10-07 UI Beta 发行包](https://github.com/dexfas/nimora-ide/releases/tag/nimora-beta-20261007-ui)已将 Nimora Product Shell 与最新 Mission/API 后端合并。完整解压后双击 `Start-Nimora.cmd`，无需安装 Node.js 或下载源码。首次使用需打开并信任单个项目文件夹，在“AI 资源”配置网页登录/共享或 API 端点、模型和密钥，再创建目标并确认启动。随包 `README-Nimora.txt` 提供中文说明。
+
+这是有人监督的 Beta：39 项集成回归、48 个界面检查、真实打包 UI 和 ZIP 回解独立运行验证通过；全部 Provider 现场资格和 Stable OS sandbox 认证仍独立开放，API 尚无严格金额预算或单 Worker 调用次数硬上限。发布文件与 SHA256 见 [发行说明](docs/releases/2026-10-07-ui-beta.md)，完整证据范围见 [UI 收尾记录](docs/architecture/UI_RELEASE_CLOSEOUT_2026-10-07.md)。
+
 Nimora IDE 是一个基于 **Code - OSS / Visual Studio Code** 的开源 AI 编程环境。本仓库以 VS Code `1.132.0` 为上游基线，整理了一套现有 AI IDE 发行构建中可验证恢复的第一方源码，并把 WebMCP、Browser MCP Gateway 与 Personal Edge Bridge 一并纳入开源目录。
 
 > **项目公开名称是 Nimora IDE。** 为保持与已恢复发行源码、扩展 ID、协议和运行时路径兼容，仓库中仍保留部分历史 `shuncode` / `ShunCode` 内部标识；这些兼容标识不代表公开项目名称。当前仓库是从现有发行安装包、随包 TypeScript 源码和 source map 重建的开源工作副本，不会修改本机已安装程序。
@@ -106,4 +112,3 @@ npm start
 Code - OSS 上游代码继续遵循原仓库的 MIT License 和第三方声明，详见 [LICENSE.txt](LICENSE.txt) 与 [ThirdPartyNotices.txt](ThirdPartyNotices.txt)。ShunCode 新增源码按仓库 MIT 条款公开；上游归属和重建说明见 [NOTICE-SHUNCODE.md](NOTICE-SHUNCODE.md)。
 
 原 VS Code README 已保留在 [docs/UPSTREAM_VSCODE_README.md](docs/UPSTREAM_VSCODE_README.md)。
-

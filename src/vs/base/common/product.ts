@@ -97,6 +97,9 @@ export interface IDictationRuntimeProductConfig {
 }
 
 export interface IProductConfiguration {
+	/** Bundle identity used by ShunCode startup recovery. */
+	readonly shuncodeBuildId?: string;
+	readonly shuncodeVersion?: string;
 	readonly version: string;
 	readonly date?: string;
 	readonly quality?: string;

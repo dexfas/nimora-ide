@@ -18,6 +18,8 @@ await esbuild.build({
       export { HostCapabilityExecutionCoordinator } from './src/host-capability-execution-coordinator.ts';
       export { TaskHostCapabilityExecutionStore } from './src/task-host-capability-execution-store.ts';
       export { TaskRuntime } from './src/task-runtime.ts';
+      export { FileToolHostCapabilityExecutor } from './src/file-host-capability-executor.ts';
+      export { projectHostCapabilityArtifacts } from './extensions/shuncode/src/task-host-capability-artifacts.ts';
     `,
     resolveDir: root,
     sourcefile: 'durable-host-execution-entry.ts',
@@ -28,10 +30,16 @@ await esbuild.build({
   platform: 'node',
   format: 'esm',
   target: ['es2022'],
+  plugins: [{ name: 'actual-ripgrep-path', setup(build) {
+    build.onResolve({ filter: /^@vscode\/ripgrep$/ }, () => ({ path: 'actual-ripgrep-path', namespace: 'actual-ripgrep-path' }));
+    build.onLoad({ filter: /.*/, namespace: 'actual-ripgrep-path' }, () => ({
+      contents: `export const rgPath = ${JSON.stringify(require('@vscode/ripgrep').rgPath)};`, loader: 'js',
+    }));
+  } }],
   logLevel: 'silent',
 });
 
-const { HostCapabilityExecutionCoordinator, TaskHostCapabilityExecutionStore, TaskRuntime } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { HostCapabilityExecutionCoordinator, TaskHostCapabilityExecutionStore, TaskRuntime, FileToolHostCapabilityExecutor, projectHostCapabilityArtifacts } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
 
 const requestFor = (taskId, executionId = 'durable-exec-1', callId = 'durable-call-1') => ({
   executionId,
@@ -149,7 +157,91 @@ try {
   assert.equal(failureExecutions, 1, 'volatile result must never permit a second side-effect execution');
   await fs.rm(resultFailureDirectory, { force: true });
 
-  console.log('[smoke] durable host claim/result/delivery restart recovery + ambiguous crash guard ok');
+  // Actual file executor -> canonical Task artifacts -> replay. The executor
+  // performs a real bounded patch in a temporary workspace, exactly once.
+  const workspace = path.join(directory, 'workspace');
+  await fs.mkdir(workspace);
+  await fs.writeFile(path.join(workspace, 'artifact.txt'), 'BEFORE\n');
+  const artifactTask = await runtime4.ensureTask({ kind: 'bridge', key: 'durable-artifacts' }, 'Artifact ownership');
+  const artifactStore = new TaskHostCapabilityExecutionStore(runtime4, projectHostCapabilityArtifacts);
+  const fileExecutor = new FileToolHostCapabilityExecutor({ workspaceRoots: () => [workspace] });
+  let artifactExecutions = 0;
+  let artifactResult;
+  const artifactCoordinator = new HostCapabilityExecutionCoordinator({
+    durableStore: artifactStore,
+    authorizer: { async authorize() {} },
+    executor: { async execute(input, capability) {
+      artifactExecutions += 1;
+      const result = await fileExecutor.execute(input, capability);
+      artifactResult = { ...result, inputId: input.inputId, callId: input.callId, name: input.name };
+      return result;
+    } },
+  });
+  const patchRequest = {
+    ...requestFor(artifactTask.taskId, 'artifact-patch', 'artifact-patch-call'),
+    name: 'apply_patch',
+    arguments: { patch: '*** Begin Patch\n*** Update File: artifact.txt\n@@\n-BEFORE\n+AFTER\n*** End Patch' },
+  };
+  await artifactCoordinator.executeOnce(patchRequest);
+  assert.equal(await fs.readFile(path.join(workspace, 'artifact.txt'), 'utf8'), 'AFTER\n');
+  const changeset = runtime4.getTask(artifactTask.taskId).artifacts[0];
+  assert.equal(changeset.kind, 'changeset');
+  assert.equal(changeset.executionId, patchRequest.executionId);
+  assert.ok(changeset.metadata.content.includes('+AFTER'));
+  assert.ok(changeset.metadata.files.some(file => file.endsWith('artifact.txt')));
+  // Optional undefined builder fields and property ordering must not make an
+  // identical persisted artifact collide during result admission recovery.
+  await artifactStore.recordResult(patchRequest, {}, artifactResult);
+  assert.equal(runtime4.getTask(artifactTask.taskId).artifacts.length, 1);
+  const readRequest = requestFor(artifactTask.taskId, 'artifact-read', 'artifact-read-call');
+  readRequest.arguments = { files: [{ path: 'artifact.txt' }] };
+  await artifactCoordinator.executeOnce(readRequest);
+  assert.equal(runtime4.getTask(artifactTask.taskId).artifacts[1].kind, 'file');
+  assert.equal(artifactExecutions, 2);
+  const artifactReplay = new TaskRuntime({ storageDirectory: directory });
+  await artifactReplay.initialize();
+  assert.deepEqual(artifactReplay.getTask(artifactTask.taskId).artifacts, runtime4.getTask(artifactTask.taskId).artifacts);
+  const replayCoordinator = new HostCapabilityExecutionCoordinator({
+    durableStore: new TaskHostCapabilityExecutionStore(artifactReplay, projectHostCapabilityArtifacts),
+    authorizer: { async authorize() { throw new Error('must recover before authorization'); } },
+    executor: { async execute() { throw new Error('must not reapply patch'); } },
+  });
+  await replayCoordinator.executeOnce(patchRequest);
+  assert.equal(artifactReplay.getTask(artifactTask.taskId).artifacts.length, 2);
+
+  // Fail at the artifact journal write, after the real executor and durable
+  // execution finish. This must prevent result admission and automatic replay.
+  const artifactFailureDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'nimora-artifact-failure-'));
+  try {
+    const artifactFailureRuntime = new TaskRuntime({
+      storageDirectory: artifactFailureDirectory,
+      onDidChange(_task, event) {
+        if (event.type === 'TaskExecutionFinished') {
+          artifactFailureRuntime.recordArtifactStrict = async () => { throw new Error('artifact persistence unavailable'); };
+        }
+      },
+    });
+    await artifactFailureRuntime.initialize();
+    const failedTask = await artifactFailureRuntime.ensureTask({ kind: 'bridge', key: 'artifact-failure' });
+    const failedRequest = requestFor(failedTask.taskId, 'artifact-failure', 'artifact-failure-call');
+    let writes = 0;
+    const failure = new HostCapabilityExecutionCoordinator({
+      durableStore: new TaskHostCapabilityExecutionStore(artifactFailureRuntime, projectHostCapabilityArtifacts),
+      authorizer: { async authorize() {} },
+      executor: { async execute() { writes += 1; return { text: 'actual result', data: { files: [{ path: 'artifact.txt', status: 'success' }] } }; } },
+    });
+    await assert.rejects(() => failure.executeOnce(failedRequest), /automatic re-execution is forbidden/);
+    assert.equal(artifactFailureRuntime.getTask(failedTask.taskId).artifacts.length, 0);
+    assert.equal(artifactFailureRuntime.getTask(failedTask.taskId).executions[failedRequest.executionId].resultPayload, undefined);
+    await assert.rejects(() => failure.executeOnce(failedRequest), /ambiguous/);
+    const failedReplay = new TaskRuntime({ storageDirectory: artifactFailureDirectory });
+    await failedReplay.initialize();
+    assert.equal((await new TaskHostCapabilityExecutionStore(failedReplay).recover(failedRequest, { id: 'workspace.read-files', risk: 'read' })).state, 'ambiguous');
+    assert.equal(writes, 1);
+  } finally {
+    await fs.rm(artifactFailureDirectory, { recursive: true, force: true });
+  }
+  console.log('[smoke] durable results/artifacts survive restart; exact-once patch and artifact failure guard ok');
 } finally {
   await Promise.all([
     fs.rm(directory, { recursive: true, force: true }),

@@ -126,6 +126,7 @@ try {
   assert.equal(descriptor.kind, 'agent-host');
   assert.equal(descriptor.availability, 'available');
   assert.deepEqual(descriptor.models, ['fake-model']);
+  assert.deepEqual(descriptor.capabilityProjection, { nativeByName: false, externalDefinitions: false, executionRoutes: [] });
 
   const session = await adapter.createSession({ provider: 'fake', model: 'fake-model', workspaceRoot: '/workspace' });
   assert.equal(session.sessionId, connection.sessionUri.toString());
@@ -166,6 +167,16 @@ try {
 
   const health = await adapter.health(session);
   assert.equal(health.status, 'healthy');
+  const oldRoot = connection.rootState.value;
+  connection.rootState.value = new Error('native connection lost');
+  assert.equal((await adapter.health()).status, 'offline');
+  connection.rootState.value = oldRoot;
+  const rejected = adapter.send(session, { inputId: 'rejected-turn', prompt: 'rejected' });
+  for (const listener of [...connection.chatState.listeners]) listener({ channel: connection.chatUri.toString(), serverSeq: 99,
+    action: { type: ActionType.ChatTurnStarted, turnId: 'rejected-turn' }, rejectionReason: 'host admission rejected' });
+  const rejectedEvents = []; for await (const event of rejected) rejectedEvents.push(event);
+  assert.equal(rejectedEvents.at(-1).status, 'error');
+  assert.match(rejectedEvents.at(-1).error, /host admission rejected/);
   await adapter.dispose(session);
   assert.deepEqual(connection.disposedSessions, [connection.sessionUri.toString()]);
   await assert.rejects(async () => adapter.health(session), /Unknown or disposed worker session/);

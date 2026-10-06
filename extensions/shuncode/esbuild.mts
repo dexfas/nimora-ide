@@ -3,9 +3,12 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
+import { promisify } from 'node:util';
 import esbuild, { type BuildOptions, type Plugin } from 'esbuild';
 
 const extensionDir = import.meta.dirname;
@@ -14,11 +17,24 @@ const extensionSrcDir = path.join(extensionDir, 'src');
 const distDir = path.join(extensionDir, 'dist');
 const runtimeDir = path.join(extensionDir, 'runtime');
 const runtimeBinDir = path.join(runtimeDir, 'bin');
+const processMetadataNativeDir = path.join(extensionDir, 'native', 'process-metadata');
+const processMetadataNativeSource = path.join(processMetadataNativeDir, 'src', 'process_metadata.cc');
+const processMetadataBinding = path.join(processMetadataNativeDir, 'binding.gyp');
+const processMetadataBuiltAddon = path.join(processMetadataNativeDir, 'build', 'Release', 'shuncode_process_metadata.node');
+const processMetadataPackagedAddon = path.join(runtimeBinDir, 'shuncode_process_metadata.node');
 
 const require = createRequire(import.meta.url);
 const { rgPath: sourceRipgrepPath } = require('@vscode/ripgrep') as { rgPath: string };
 const ripgrepFileName = path.basename(sourceRipgrepPath);
 const watch = process.argv.includes('--watch');
+const extensionOnly = process.argv.includes('--extension-only');
+// Desktop development can hold packaged native helpers open. Incremental
+// builds preserve output directories and copy binaries only when changed.
+// The upstream built-in extension packager invokes this file without custom
+// arguments. Its caller may request the same safe incremental mode while a
+// development host holds an identical native helper open.
+const incremental = process.argv.includes('--incremental') || process.env.SHUNCODE_BUILD_INCREMENTAL === '1';
+const execFileAsync = promisify(execFile);
 
 function packagedRipgrepPlugin(relativePath: readonly string[]): Plugin {
 	const namespace = `shuncode-packaged-ripgrep-${relativePath.slice(0, -1).join('-') || 'bin'}`;
@@ -73,10 +89,54 @@ const runtimeOptions: BuildOptions = {
 async function copyRipgrep(): Promise<void> {
 	await fs.mkdir(runtimeBinDir, { recursive: true });
 	const target = path.join(runtimeBinDir, ripgrepFileName);
-	await fs.copyFile(sourceRipgrepPath, target);
+	await copyBinaryIfChanged(sourceRipgrepPath, target);
 	if (process.platform !== 'win32') {
 		await fs.chmod(target, 0o755);
 	}
+}
+
+async function copyBinaryIfChanged(source: string, target: string): Promise<void> {
+	const sourceBytes = await fs.readFile(source);
+	let targetBytes: Buffer | undefined;
+	try { targetBytes = await fs.readFile(target); } catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+	}
+	if (targetBytes && createHash('sha256').update(sourceBytes).digest('hex') === createHash('sha256').update(targetBytes).digest('hex')) return;
+	// A changed locked binary must fail, never silently claim the new version.
+	await fs.copyFile(source, target);
+}
+
+async function ensureProcessMetadataAddon(): Promise<string | undefined> {
+	if (process.platform !== 'win32') return undefined;
+	let rebuild = false;
+	try {
+		const [output, source, binding] = await Promise.all([
+			fs.stat(processMetadataBuiltAddon),
+			fs.stat(processMetadataNativeSource),
+			fs.stat(processMetadataBinding),
+		]);
+		rebuild = output.mtimeMs < Math.max(source.mtimeMs, binding.mtimeMs);
+	} catch {
+		rebuild = true;
+	}
+	if (rebuild) {
+		console.log('[shuncode] Building trusted Windows process-metadata helper...');
+		const npmCli = process.env.npm_execpath;
+		if (!npmCli) throw new Error('npm_execpath is unavailable; cannot build trusted Windows process-metadata helper.');
+		await execFileAsync(process.execPath, [npmCli, 'rebuild', '--prefix', processMetadataNativeDir], {
+			cwd: repoRoot,
+			env: process.env,
+			windowsHide: true,
+			maxBuffer: 4 * 1024 * 1024,
+		});
+	}
+	return processMetadataBuiltAddon;
+}
+
+async function copyProcessMetadataAddon(source: string | undefined): Promise<void> {
+	if (!source) return;
+	await fs.mkdir(runtimeBinDir, { recursive: true });
+	await copyBinaryIfChanged(source, processMetadataPackagedAddon);
 }
 
 async function cleanOutputs(): Promise<void> {
@@ -87,10 +147,17 @@ async function cleanOutputs(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-	if (!watch) {
+  if (extensionOnly) {
+    if (watch) throw new Error('--extension-only cannot be combined with --watch.');
+    await fs.mkdir(distDir, { recursive: true });
+    await esbuild.build(extensionOptions);
+    return;
+  }
+	if (!watch && !incremental) {
 		await cleanOutputs();
 	}
-	await copyRipgrep();
+	const processMetadataAddon = await ensureProcessMetadataAddon();
+	await Promise.all([copyRipgrep(), copyProcessMetadataAddon(processMetadataAddon)]);
 
 	if (watch) {
 		const [extensionContext, runtimeContext] = await Promise.all([

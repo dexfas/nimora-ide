@@ -32,7 +32,7 @@ export interface IAgentHostNetworkServices {
  * itself, and through it `ClaudeAgentSdkService` / `CodexAgent`) must be
  * constructed AFTER this call.
  *
- * Reads the default profile's `settings.json` from `<userRoamingDataHome>` —
+ * Reads the default profile's `settings.json` from `<appSettingsHome>` —
  * the same file the workbench writes user settings to. Initialization is
  * async because the settings file is read off disk.
  *
@@ -50,7 +50,10 @@ export async function registerAgentHostNetworkServices(
 ): Promise<IAgentHostNetworkServices> {
 	const policyService = new NullPolicyService();
 	diServices.set(IPolicyService, policyService);
-	const settingsResource = joinPath(environmentService.userRoamingDataHome, 'settings.json');
+	// The Node host registers a disk provider, not the workbench's
+	// vscode-userdata provider. appSettingsHome is the same physical default
+	// profile directory, exposed as a file URI by NativeEnvironmentService.
+	const settingsResource = joinPath(environmentService.appSettingsHome, 'settings.json');
 	const configurationService = disposables.add(new ConfigurationService(settingsResource, fileService, policyService, logService));
 	await configurationService.initialize();
 	diServices.set(IConfigurationService, configurationService);

@@ -10,7 +10,10 @@
     "test:web-mcp": "node web-mcp-smoke.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "^2.3.0",
+    "@modelcontextprotocol/node": "^2.1.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/server": "^2.3.0",
     "express": "^5.2.1",
     "playwright-core": "^1.63.0",
     "zod": "^4.6.1"

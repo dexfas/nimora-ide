@@ -246,7 +246,16 @@ function main() {
 			});
 
 			// fire up mocha
-			runner.run(failures => process.exit(failures ? 1 : 0));
+			runner.run(failures => {
+				// Let pending filesystem/WASM cleanup drain before Node exits. A
+				// forced exit can close an already-closing libuv handle on Windows.
+				process.exitCode = failures ? 1 : 0;
+				// Do not keep a completed run alive, but fail if a leaked handle does.
+				setTimeout(() => {
+					console.error('Unit tests finished, but live handles prevented shutdown for 30 seconds.');
+					process.exit(1);
+				}, 30_000).unref();
+			});
 		});
 	});
 }

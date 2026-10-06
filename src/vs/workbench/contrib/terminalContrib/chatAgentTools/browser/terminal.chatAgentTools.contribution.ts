@@ -5,8 +5,10 @@
 
 import { Codicon } from '../../../../../base/common/codicons.js';
 import { Disposable, DisposableStore, MutableDisposable } from '../../../../../base/common/lifecycle.js';
+import { URI } from '../../../../../base/common/uri.js';
 import { localize } from '../../../../../nls.js';
 import { MenuId } from '../../../../../platform/actions/common/actions.js';
+import { CommandsRegistry } from '../../../../../platform/commands/common/commands.js';
 import { ConfigurationTarget, IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { ContextKeyExpr } from '../../../../../platform/contextkey/common/contextkey.js';
 import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';
@@ -96,6 +98,28 @@ export class ChatAgentToolsContribution extends Disposable implements IWorkbench
 		@IToolResultCompressor toolResultCompressor: IToolResultCompressor,
 	) {
 		super();
+
+		this._register(CommandsRegistry.registerCommand('_workbench.prepareStrictTerminalSandboxCommand', async (accessor, rawRequest: unknown) => {
+			const request = rawRequest && typeof rawRequest === 'object' && !Array.isArray(rawRequest) ? rawRequest as Record<string, unknown> : {};
+			const command = typeof request.command === 'string' ? request.command : '';
+			const cwd = typeof request.cwd === 'string' ? request.cwd : '';
+			const writeRoots = Array.isArray(request.writeRoots)
+				? request.writeRoots.filter((value): value is string => typeof value === 'string' && !!value)
+				: [];
+			const shell = typeof request.shell === 'string' && request.shell ? request.shell : undefined;
+			if (!command.trim() || !cwd || writeRoots.length === 0) {
+				throw new Error('Invalid strict terminal sandbox request');
+			}
+			const sandboxService = accessor.get(ITerminalSandboxService);
+			if (!sandboxService.wrapStrictCommand) {
+				throw new Error('Strict terminal sandbox is unavailable in this workbench');
+			}
+			return sandboxService.wrapStrictCommand(command, {
+				cwd: URI.file(cwd),
+				writeRoots: writeRoots.map(root => URI.file(root)),
+				shell,
+			});
+		}));
 
 		registerTerminalCompressors(toolResultCompressor);
 

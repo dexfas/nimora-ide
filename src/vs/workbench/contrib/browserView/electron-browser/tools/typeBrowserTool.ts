@@ -39,6 +39,10 @@ export const TypeBrowserToolData: IToolData = {
 				type: 'boolean',
 				description: 'Whether to press Enter after typing text. Ignored when "key" is provided. Default is false.'
 			},
+			literalText: {
+				type: 'boolean',
+				description: 'When true, inserts text literally without generating per-character keyboard events. With ref/selector, focuses the exact target without a click before inserting. Default is false.'
+			},
 			key: {
 				type: 'string',
 				description: 'A key or key combination to press (e.g., "Enter", "Tab", "Control+c"). One of "text" or "key" must be provided.'
@@ -64,6 +68,7 @@ interface ITypeBrowserToolParams {
 	pageId: string;
 	text?: string;
 	submit?: boolean;
+	literalText?: boolean;
 	key?: string;
 	ref?: string;
 	selector?: string;
@@ -143,19 +148,31 @@ export class TypeBrowserTool implements IToolImpl {
 
 		// Type text
 		if (selector) {
-			return playwrightInvoke(this.playwrightService, sessionId, params.pageId, async (page, sel, text, submit) => {
+			return playwrightInvoke(this.playwrightService, sessionId, params.pageId, async (page, sel, text, submit, literalText) => {
 				const locator = page.locator(sel);
+				if (literalText) {
+					await locator.focus();
+					await page.keyboard.insertText(text);
+					if (submit) {
+						await page.keyboard.press('Enter');
+					}
+					return;
+				}
 				await locator.fill(text);
 				if (submit) {
 					await locator.press('Enter');
 				}
-			}, selector, params.text!, params.submit ?? false);
+			}, selector, params.text!, params.submit ?? false, params.literalText === true);
 		}
-		return playwrightInvoke(this.playwrightService, sessionId, params.pageId, async (page, text, submit) => {
-			await page.keyboard.type(text);
+		return playwrightInvoke(this.playwrightService, sessionId, params.pageId, async (page, text, submit, literalText) => {
+			if (literalText) {
+				await page.keyboard.insertText(text);
+			} else {
+				await page.keyboard.type(text);
+			}
 			if (submit) {
 				await page.keyboard.press('Enter');
 			}
-		}, params.text!, params.submit ?? false);
+		}, params.text!, params.submit ?? false, params.literalText === true);
 	}
 }

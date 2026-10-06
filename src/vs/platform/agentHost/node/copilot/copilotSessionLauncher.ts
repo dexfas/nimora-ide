@@ -30,6 +30,7 @@ import { agentHostPromptRegistry, type IAgentHostPromptContext } from './prompts
 import { describeSystemMessageConfig } from './prompts/systemMessage.js';
 import './prompts/allPrompts.js';
 import { StopWatch } from '../../../../base/common/stopwatch.js';
+import { assertClientToolScopeTools, CLIENT_TOOL_SCOPE_CONFIG_KEY, readClientToolScope } from '../../common/clientToolScope.js';
 
 export const ThinkingLevelConfigKey = 'thinkingLevel';
 /**
@@ -214,9 +215,8 @@ function getErrorMessage(err: unknown): string {
  * failures: those should surface so the user sees the real error and the
  * original session contents are not masked by a fresh empty session.
  *
- * Heuristic: any `-32603` Internal Error is treated as the empty-session
- * case UNLESS the message clearly indicates corruption, schema
- * validation, parse failure, or malformed input.
+ * Only known absent-history errors qualify; an unrelated network or
+ * internal error must preserve the original session history.
  */
 function shouldCreateEmptySessionAfterResumeError(err: unknown): boolean {
 	if (getCopilotSdkErrorCode(err) !== -32603) {
@@ -224,7 +224,7 @@ function shouldCreateEmptySessionAfterResumeError(err: unknown): boolean {
 	}
 
 	const message = getErrorMessage(err);
-	return !/\b(corrupt|corrupted|invalid|validation|schema|must be|parse|malformed|unexpected token)\b/i.test(message);
+	return [/\bSession not found\b/i, /\bno events\b/i, /\bempty session\b/i].some(pattern => pattern.test(message));
 }
 
 function isCustomAgentNotFoundError(err: unknown): boolean {
@@ -296,7 +296,7 @@ export function getCopilotContextTier(model: ModelSelection | undefined, longCon
  * no BYOK models, or when enumeration fails; `startProxy` is invoked only once
  * at least one model is present.
  *
- * Each vendor maps to one `type: 'openai'` / `wireApi: 'completions'` provider
+ * Each vendor maps to one `type: 'openai'` / `wireApi: 'responses'` provider
  * whose `baseUrl` points at the proxy and authenticates with the session-scoped
  * `Bearer <nonce>.<sessionId>`; each model is surfaced under the
  * provider-qualified selection id `vendor/id`, matching what the renderer's
@@ -352,7 +352,7 @@ export async function resolveByokSessionConfig(
 	const providers: NamedProviderConfig[] = [...new Set(byokModels.map(m => m.vendor))].map(vendor => ({
 		name: vendor,
 		type: 'openai',
-		wireApi: 'completions',
+		wireApi: 'responses',
 		baseUrl: handle.providerBaseUrl(vendor),
 		bearerToken: `${handle.nonce}.${sessionId}`,
 	}));
@@ -537,6 +537,27 @@ export class CopilotSessionLauncher implements ICopilotSessionLauncher {
 	}
 
 	private async _buildSessionConfig(plan: CopilotSessionLaunchPlan, runtime: ICopilotSessionRuntime): Promise<CopilotSessionLaunchConfig> {
+		const scope = readClientToolScope(this._configurationService.getSessionConfigValues(`copilotcli:/${plan.sessionId}`)?.[CLIENT_TOOL_SCOPE_CONFIG_KEY]);
+		if (scope) {
+			if (plan.kind !== 'create' || plan.resolvedAgentName || plan.activeClientToolSet.size !== 1
+				|| !plan.activeClientToolSet.has(scope.clientId)) {
+				throw new Error('Frozen client tool sessions cannot resume, change client, or select agents');
+			}
+			assertClientToolScopeTools(scope, plan.snapshot.tools);
+			const tools = runtime.createClientSdkTools();
+			if (tools.length !== scope.tools.length || tools.some((tool, i) => tool.name !== scope.tools[i].name)) {
+				throw new Error('SDK client tool projection differs from frozen execution scope');
+			}
+			const byok = await this._resolveByokSessionConfig(plan.sessionId);
+			return {
+				...byok, clientName: AGENT_HOST_COPILOT_CLIENT_NAME, workingDirectory: plan.workingDirectory?.fsPath,
+				gitHubToken: plan.githubToken, tools, availableTools: scope.tools.map(tool => `custom:${tool.name}`),
+				excludedTools: ['builtin:*', 'mcp:*'], enableConfigDiscovery: false, enableFileHooks: false,
+				enableMcpApps: false, requestExtensions: false, toolSearch: { enabled: false },
+				mcpServers: {}, customAgents: [], pluginDirectories: [], skillDirectories: [], instructionDirectories: [],
+				onPermissionRequest: () => Promise.resolve({ kind: 'reject' }),
+			};
+		}
 		const plugins = plan.snapshot.plugins;
 		// Synthesize BYOK provider/model config (empty when BYOK is gated off or the
 		// renderer reports no BYOK models), merged into the returned config so both

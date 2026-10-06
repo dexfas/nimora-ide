@@ -41,6 +41,7 @@ import { type ICopilotApiService, type ICopilotApiServiceRequestOptions, type IC
 import { WorktreeIsolation, WORKTREE_META_REPOSITORY_ROOT } from '../../node/shared/worktreeIsolation.js';
 import { AhpErrorCodes, JSON_RPC_INTERNAL_ERROR, ProtocolError } from '../../common/state/sessionProtocol.js';
 import type { INetworkDiagnosticsService } from '../../node/networkDiagnosticsService.js';
+import { CLIENT_TOOL_SCOPE_CONFIG_KEY, supportsClientToolScope } from '../../common/clientToolScope.js';
 
 /**
  * Loads a JSONL fixture of raw Copilot SDK events, runs them through
@@ -131,6 +132,38 @@ suite('AgentService (node dispatcher)', () => {
 
 	teardown(() => disposables.clear());
 	ensureNoDisposablesAreLeakedInTestSuite();
+
+	suite('frozen client tool execution', () => {
+		const tools = [{ name: 'mission_read', inputSchema: { type: 'object' as const, properties: {} } }];
+		const scope = { version: 1, scopeId: 'service-scope-test-0001', clientId: 'owned-client', tools };
+		const config = { provider: 'copilotcli', config: { [CLIENT_TOOL_SCOPE_CONFIG_KEY]: JSON.stringify(scope) }, activeClient: { clientId: scope.clientId, tools } };
+		test('requires fresh exact owned sessions and frozen schemas', async () => {
+			await assert.rejects(() => service.createSession({ ...config, provider: 'copilot' }), /fresh owned/);
+			await assert.rejects(() => service.createSession({ ...config, session: URI.parse('copilotcli:/existing') }), /fresh owned/);
+			await assert.rejects(() => service.createSession({ ...config, activeClient: { clientId: 'other', tools } }), /fresh owned/);
+			await assert.rejects(() => service.createSession({ ...config, activeClient: { clientId: scope.clientId, tools: [] } }), /frozen/);
+		});
+		test('persists the create-time scope and rejects changes, other clients and forks', async () => {
+			assert.strictEqual(supportsClientToolScope(service.stateManager.rootState), true);
+			const agent = new MockAgent('copilotcli'); disposables.add(agent); service.registerProvider(agent);
+			const session = await service.createSession(config);
+			assert.strictEqual(service.configurationService.getSessionConfigValues(session.toString())?.[CLIENT_TOOL_SCOPE_CONFIG_KEY], config.config[CLIENT_TOOL_SCOPE_CONFIG_KEY]);
+			const envelopes: ActionEnvelope[] = []; disposables.add(service.onDidAction(e => envelopes.push(e)));
+			service.dispatchAction(session.toString(), { type: ActionType.SessionConfigChanged, config: { [CLIENT_TOOL_SCOPE_CONFIG_KEY]: 'changed' } }, scope.clientId, 1);
+			service.dispatchAction(buildDefaultChatUri(session.toString()), { type: ActionType.ChatTurnStarted, turnId: 'wrong-client', startedAt: new Date().toISOString(), message: { text: 'read', origin: { kind: MessageKind.User } } }, 'other-client', 1);
+			assert.strictEqual(envelopes.filter(e => e.rejectionReason).length, 2); assert.strictEqual(agent.sendMessageCalls.length, 0);
+			assert.strictEqual(service.configurationService.getSessionConfigValues(session.toString())?.[CLIENT_TOOL_SCOPE_CONFIG_KEY], config.config[CLIENT_TOOL_SCOPE_CONFIG_KEY]);
+			await assert.rejects(() => service.createSession({ provider: 'copilotcli', fork: { session, turnId: 'any', turnIndex: 0 } }), /cannot be forked/);
+			await assert.rejects(() => service.createChat(session, URI.parse(buildChatUri(session.toString(), 'peer'))), /cannot create peer/);
+		});
+		test('scoped bang commands reach the agent as text instead of local shell execution', async () => {
+			const agent = new MockAgent('copilotcli'); disposables.add(agent); service.registerProvider(agent);
+			const session = await service.createSession(config);
+			const sent = Event.toPromise(agent.onDidSendMessage);
+			service.dispatchAction(buildDefaultChatUri(session.toString()), { type: ActionType.ChatTurnStarted, turnId: 'owned-turn', startedAt: new Date().toISOString(), message: { text: '!echo blocked', origin: { kind: MessageKind.User } } }, scope.clientId, 1);
+			assert.strictEqual((await sent).prompt, '!echo blocked');
+		});
+	});
 
 	// ---- Provider registration ------------------------------------------
 

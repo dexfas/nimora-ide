@@ -512,6 +512,7 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 
 		if (platform === 'win32') {
 			result = es.merge(result, gulp.src('resources/win32/bin/code.js', { base: 'resources/win32', allowEmpty: true }));
+			result = es.merge(result, gulp.src('resources/nimora/*', { base: 'resources/nimora' }));
 
 			if (versionedResourcesFolder) {
 				result = es.merge(result, gulp.src('resources/win32/versioned/bin/code.cmd', { base: 'resources/win32/versioned' })
@@ -671,11 +672,36 @@ function prepareCopilotRipgrepShimTask(platform: string, arch: string, destinati
 		const appNodeModulesDir = path.join(appBase, 'node_modules.asar.unpacked');
 
 		const builtInCopilotExtensionDir = path.join(appBase, 'extensions', 'copilot');
+		// OSS distributions may omit the optional Copilot extension entirely;
+		// packageCopilotExtensionStream already treats that as an empty input.
+		// A present extension still requires the complete, version-matched SDK.
+		if (!fs.existsSync(path.join(builtInCopilotExtensionDir, 'package.json'))) {
+			console.log('[prepareBuiltInCopilotRipgrepShim] No built-in Copilot extension in this distribution; no shim required.');
+			return;
+		}
 		prepareBuiltInCopilotRipgrepShim(platform, arch, builtInCopilotExtensionDir, appNodeModulesDir);
 	};
 }
 
 const buildRoot = path.dirname(root);
+
+// Build beside a running portable desktop instead of deleting its loaded files.
+// A suffix is one bounded directory-name segment, never a path or build-root override.
+const packageOutputSuffix = process.env['VSCODE_PACKAGE_OUTPUT_SUFFIX'] ?? '';
+if (packageOutputSuffix && !/^[a-z0-9][a-z0-9-]{0,47}$/.test(packageOutputSuffix)) {
+	throw new Error('VSCODE_PACKAGE_OUTPUT_SUFFIX must be a lowercase alphanumeric directory-name suffix (at most 48 characters).');
+}
+
+// The manifest alone is insufficient: npm may have installed this gyp-based
+// dependency without its native build. Fail before cleaning a release directory
+// rather than shipping a desktop that cannot read Windows system certificates.
+const verifyWin32NativeDependencies = task.define('verify-win32-native-dependencies', async () => {
+	const binary = path.join(root, 'node_modules', '@vscode', 'windows-ca-certs', 'build', 'Release', 'crypt32.node');
+	if (!fs.existsSync(binary)) {
+		throw new Error('Windows certificate native dependency is missing. Run npm rebuild @vscode/windows-ca-certs before packaging.');
+	}
+});
+task.task(verifyWin32NativeDependencies);
 
 const BUILD_TARGETS = [
 	{ platform: 'win32', arch: 'x64' },
@@ -694,9 +720,10 @@ BUILD_TARGETS.forEach(buildTarget => {
 
 	const [vscode, vscodeMin] = ['', 'min'].map(minified => {
 		const sourceFolderName = `out-vscode${dashed(minified)}`;
-		const destinationFolderName = `VSCode${dashed(platform)}${dashed(arch)}`;
+		const destinationFolderName = `VSCode${dashed(platform)}${dashed(arch)}${dashed(packageOutputSuffix)}`;
 
 		const packageTasks: task.Task[] = [
+			...(platform === 'win32' ? [verifyWin32NativeDependencies] : []),
 			compileNativeExtensionsBuildTask,
 			util.rimraf(path.join(buildRoot, destinationFolderName)),
 			packageTask(platform, arch, sourceFolderName, destinationFolderName, opts),

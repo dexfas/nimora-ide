@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import express from 'express';
 import { createIntegratedBrowserProvider } from './integrated-browser-provider.mjs';
 import { createManagedBrowserProvider } from './managed-browser-provider.mjs';
@@ -7,18 +8,19 @@ import { createPersonalEdgeProvider, PersonalEdgeControlError, PersonalEdgePollA
 import { GatewayProviderRegistry } from './provider-registry.mjs';
 import { createUpstreamMcpProvider } from './upstream-mcp-provider.mjs';
 import { createWebMcpPageHost } from './webmcp-page-host.mjs';
+import { canonicalPageAssets } from './canonical-page-assets.mjs';
 
 const PORT = Number(process.env.PORT || 48321);
 const UPSTREAM_URL = process.env.SHUNCODE_MCP_URL || '';
 const INTEGRATED_BROWSER_BRIDGE = process.env.SHUNCODE_INTEGRATED_BROWSER_BRIDGE || 'http://127.0.0.1:48322';
 const EDGE_PATH = process.env.EDGE_PATH || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const PROFILE_DIR = path.resolve(process.env.BROWSER_PROFILE || './browser-profile');
-const SCREENSHOT_DIR = path.resolve('./screenshots');
+const SCREENSHOT_DIR = path.resolve(process.env.SHUNCODE_WEBMCP_SCREENSHOT_DIR || './screenshots');
 const CHAT_AGENT_PATH = path.resolve('./generic-chat-agent.js');
-const SHARED_PAGE_CORE_PATH = process.env.SHUNCODE_WEBMCP_PAGE_CORE_PATH || '';
-const SHARED_SITE_ADAPTERS_PATH = process.env.SHUNCODE_WEBMCP_SITE_ADAPTERS_PATH || '';
-const SHARED_PAGE_AGENT_PATH = process.env.SHUNCODE_WEBMCP_PAGE_AGENT_PATH || '';
-const PERSONAL_EDGE_BRIDGE_TOKEN = process.env.SHUNCODE_PERSONAL_EDGE_TOKEN || 'shuncode-local-development';
+const canonicalAssets = canonicalPageAssets();
+// Standalone deployments may supply a private token; absent configuration is
+// an unpaired random instance, never a public development credential.
+const PERSONAL_EDGE_BRIDGE_TOKEN = process.env.SHUNCODE_PERSONAL_EDGE_TOKEN || randomBytes(32).toString('base64url');
 const integratedBrowserProvider = createIntegratedBrowserProvider({ bridgeUrl: INTEGRATED_BROWSER_BRIDGE });
 const upstreamMcpProvider = createUpstreamMcpProvider({ url: UPSTREAM_URL });
 const managedBrowserProvider = createManagedBrowserProvider({ edgePath: EDGE_PATH, profileDir: PROFILE_DIR, screenshotDir: SCREENSHOT_DIR });
@@ -70,9 +72,7 @@ const webMcpPageHost = createWebMcpPageHost({
   listTools: listAllTools,
   callTool: callAnyTool,
   fallbackAgentPath: CHAT_AGENT_PATH,
-  sharedPageCorePath: SHARED_PAGE_CORE_PATH,
-  sharedSiteAdaptersPath: SHARED_SITE_ADAPTERS_PATH,
-  sharedPageAgentPath: SHARED_PAGE_AGENT_PATH,
+  ...canonicalAssets,
 });
 const mcpExposure = createGatewayMcpExposureAdapter({ listTools: listAllTools, callTool: callAnyTool });
 
@@ -80,7 +80,7 @@ const app = express();
 app.use(express.json({ limit: '8mb' }));
 
 app.get('/control/healthz', (_req, res) => {
-  res.json({ ok: true, integratedWebMcp: true, controlVersion: 2, browserRunning: managedBrowserProvider.isRunning(), profile: managedBrowserProvider.profileDir, personalEdge: personalEdgeProvider.status() });
+  res.json({ ok: true, integratedWebMcp: true, controlVersion: 3, personalEdgePairing: 'private-token', browserRunning: managedBrowserProvider.isRunning(), profile: managedBrowserProvider.profileDir, personalEdge: personalEdgeProvider.status() });
 });
 
 app.post('/control/personal-edge/register', (req, res) => {

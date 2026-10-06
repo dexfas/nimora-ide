@@ -56,6 +56,7 @@ tools/webmcp-gateway/browser-profile/
 tools/webmcp-gateway/screenshots/
 tools/webmcp-gateway/.env
 tools/webmcp-gateway/*.local.*
+extensions/shuncode-webmcp/gateway/
 extensions/shuncode-personal-edge-bridge/config.local.js
 *.route-token
 *.tunnel-token

@@ -179,7 +179,8 @@
 			"chatReferenceBinaryData",
 			"chatPromptFiles",
 			"chatProvider",
-			"languageModelThinkingPart"
+			"languageModelThinkingPart",
+			"chatSessionsProvider"
 		]
 	}
 }

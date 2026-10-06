@@ -10,7 +10,7 @@ import { win32 } from '../../../base/common/path.js';
 import { isLinux, isWindows } from '../../../base/common/platform.js';
 import { getOSReleaseInfo } from '../../../base/node/osReleaseInfo.js';
 import { findExecutable } from '../../../base/node/processes.js';
-import { ISandboxDependencyStatus, ISandboxHelperService, type IWindowsMxcConfig, IWindowsMxcFilesystemPolicy, type IWindowsMxcPolicyContainment, type IWindowsMxcSandboxPolicy } from '../common/sandboxHelperService.js';
+import { ISandboxDependencyStatus, ISandboxHelperService, type IWindowsMxcConfig, IWindowsMxcFilesystemPolicy, type IWindowsMxcPlatformSupport, type IWindowsMxcPolicyContainment, type IWindowsMxcSandboxPolicy } from '../common/sandboxHelperService.js';
 
 type FindCommand = (command: string) => Promise<string | undefined>;
 type BubblewrapProbe = (command: string) => Promise<{ usable: boolean; error?: string }>;
@@ -88,6 +88,20 @@ export class SandboxHelperService implements ISandboxHelperService {
 
 	checkSandboxDependencies(): Promise<ISandboxDependencyStatus | undefined> {
 		return SandboxHelperService.checkSandboxDependenciesWith(findExecutable);
+	}
+
+	async getWindowsMxcPlatformSupport(): Promise<IWindowsMxcPlatformSupport | undefined> {
+		if (!isWindows) {
+			return undefined;
+		}
+		const { getPlatformSupport } = await import('@microsoft/mxc-sdk');
+		const support = getPlatformSupport();
+		return {
+			isSupported: support.isSupported,
+			availableMethods: [...support.availableMethods],
+			isolationTier: support.isolationTier,
+			isolationWarnings: support.isolationWarnings ? [...support.isolationWarnings] : undefined,
+		};
 	}
 
 	private static _probeBubblewrap(command: string): Promise<{ usable: boolean; error?: string }> {

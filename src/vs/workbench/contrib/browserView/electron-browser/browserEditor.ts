@@ -614,6 +614,7 @@ export class BrowserEditor extends EditorPane {
 	}
 
 	protected override setEditorVisible(visible: boolean): void {
+		super.setEditorVisible(visible);
 		for (const c of this._contributionInstances.values()) {
 			c.onPaneVisibilityChanged(visible);
 		}

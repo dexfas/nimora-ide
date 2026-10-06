@@ -23,6 +23,7 @@ import { ByokLmBridgeRegistry, IByokLmBridgeRegistry } from '../../node/byokLmBr
 import { ByokLmProxyService, IByokLmProxyService, type IByokLmProxyHandle } from '../../node/copilot/byokLmProxyService.js';
 import { CopilotSessionLauncher, getCopilotReasoningEffort, resolveByokSessionConfig, type CopilotSessionLaunchPlan, type ICopilotSessionRuntime } from '../../node/copilot/copilotSessionLauncher.js';
 import type { ICopilotPluginInfo } from '../../node/copilot/copilotAgent.js';
+import { CLIENT_TOOL_SCOPE_CONFIG_KEY, readClientToolScope } from '../../common/clientToolScope.js';
 
 const testRuntime: ICopilotSessionRuntime = {
 	handlePermissionRequest: async () => { throw new Error('Unexpected permission request'); },
@@ -42,6 +43,7 @@ const testWorkingDirectory = URI.file(process.cwd());
 function createTestLauncher(): CopilotSessionLauncher {
 	const configurationService = {
 		getRootValue: () => undefined,
+		getSessionConfigValues: () => undefined,
 	} as Partial<IAgentConfigurationService> as IAgentConfigurationService;
 	return new CopilotSessionLauncher(
 		configurationService,
@@ -385,6 +387,64 @@ suite('CopilotSessionLauncher client identity', () => {
 			sessions.dispose();
 			await launcher.disposeByokProxyHandle();
 		}
+	});
+});
+
+suite('CopilotSessionLauncher frozen client tools', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+	const tools = [{ name: 'mission_read', description: 'Read within a Mission', inputSchema: { type: 'object' as const, properties: {} } }];
+	const scope = { version: 1, scopeId: 'scoped-session-0001', clientId: 'owner', tools };
+	function fixture() {
+		let calls = 0;
+		let captured: Parameters<CopilotClient['createSession']>[0] | undefined;
+		const session = { sessionId: 'scoped-1', on: () => () => { }, disconnect: async () => { } } as unknown as CopilotSession;
+		const client = {
+			createSession: async (config: Parameters<CopilotClient['createSession']>[0]) => { calls++; captured = config; return session; },
+			resumeSession: async () => { throw new Error('Unexpected resume'); },
+		};
+		const configuration = { getRootValue: () => undefined, getSessionConfigValues: () => ({ [CLIENT_TOOL_SCOPE_CONFIG_KEY]: JSON.stringify(scope) }) } as unknown as IAgentConfigurationService;
+		const launcher = new CopilotSessionLauncher(configuration, {} as IAgentHostTerminalManager, new NullLogService(), {} as IFileService,
+			{ _serviceBrand: undefined, start: async () => { throw new Error('Unexpected proxy'); }, dispose: () => { } }, new ByokLmBridgeRegistry());
+		const activeClientToolSet = new ActiveClientToolSet(); activeClientToolSet.set(scope.clientId, tools);
+		const plan: CopilotSessionLaunchPlan = { kind: 'create', client, sessionId: 'scoped-1', workingDirectory: testWorkingDirectory,
+			model: undefined, resolvedAgentName: undefined, snapshot: { tools, plugins: [], mcpServers: {} }, activeClientToolSet, shellManager: undefined, githubToken: undefined };
+		const runtime: ICopilotSessionRuntime = { ...testRuntime,
+			createClientSdkTools: () => tools.map(tool => ({ ...tool, handler: async () => 'ok' })),
+			createServerSdkTools: () => { throw new Error('Native server tools must not be projected'); } };
+		return { launcher, plan, runtime, get calls() { return calls; }, get config() { return captured!; } };
+	}
+	test('projects exact custom tools and disables native discovery, side channels and permissions', async () => {
+		const f = fixture(); const session = await f.launcher.launch(f.plan, f.runtime);
+		try {
+			assert.deepStrictEqual(f.config.availableTools, ['custom:mission_read']);
+			assert.deepStrictEqual(f.config.excludedTools, ['builtin:*', 'mcp:*']);
+			assert.strictEqual(f.config.enableConfigDiscovery, false); assert.strictEqual(f.config.enableFileHooks, false);
+			assert.strictEqual(f.config.enableMcpApps, false); assert.strictEqual(f.config.requestExtensions, false);
+			assert.deepStrictEqual(f.config.toolSearch, { enabled: false }); assert.deepStrictEqual(f.config.mcpServers, {});
+			assert.deepStrictEqual(f.config.customAgents, []); assert.deepStrictEqual(f.config.pluginDirectories, []);
+			assert.deepStrictEqual(f.config.skillDirectories, []); assert.deepStrictEqual(f.config.instructionDirectories, []);
+			assert.deepStrictEqual(await f.config.onPermissionRequest!({ kind: 'shell', toolCallId: 'unexpected' } as never, { sessionId: 'scoped-1' }), { kind: 'reject' });
+		} finally { session.dispose(); await f.launcher.disposeByokProxyHandle(); }
+	});
+	test('rejects resume before invoking any SDK operation', async () => {
+		const f = fixture(); const { model, ...base } = f.plan;
+		await assert.rejects(() => f.launcher.launch({ ...base, workingDirectory: testWorkingDirectory, kind: 'resume', fallback: { model } }, f.runtime), /cannot resume/);
+		assert.strictEqual(f.calls, 0);
+	});
+	test('rejects changed client ownership or a second contributing client', async () => {
+		const f = fixture(); f.plan.activeClientToolSet.set('other', tools);
+		await assert.rejects(() => f.launcher.launch(f.plan, f.runtime), /change client/); assert.strictEqual(f.calls, 0);
+	});
+	test('rejects schema drift and extra SDK tools before launch', async () => {
+		const f = fixture();
+		await assert.rejects(() => f.launcher.launch({ ...f.plan, snapshot: { ...f.plan.snapshot, tools: [] } }, f.runtime), /frozen/i);
+		await assert.rejects(() => f.launcher.launch(f.plan, { ...f.runtime, createClientSdkTools: () => [] }), /differs/);
+		assert.strictEqual(f.calls, 0);
+	});
+	test('rejects malformed, duplicate and discovery tool declarations', () => {
+		assert.throws(() => readClientToolScope('{}'));
+		assert.throws(() => readClientToolScope(JSON.stringify({ ...scope, tools: [tools[0], tools[0]] })));
+		assert.throws(() => readClientToolScope(JSON.stringify({ ...scope, tools: [{ ...tools[0], name: 'tool_search' }] })));
 	});
 });
 

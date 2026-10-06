@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { deepStrictEqual, strictEqual, ok } from 'assert';
+import { deepStrictEqual, strictEqual, ok, rejects } from 'assert';
 import { CancellationToken } from '../../../../../../base/common/cancellation.js';
 import { IChannel } from '../../../../../../base/parts/ipc/common/ipc.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
@@ -171,6 +171,11 @@ suite('TerminalSandboxService - network domains', () => {
 			readonlyPaths: ['c:\\tools\\node'],
 			readwritePaths: [],
 		};
+		platformSupport = {
+			isSupported: true,
+			availableMethods: ['processcontainer'],
+			isolationTier: 'base-container' as const,
+		};
 		environment = [
 			'SystemRoot=c:\\windows',
 			'PATH=c:\\tools\\node;c:\\windows\\system32',
@@ -185,6 +190,10 @@ suite('TerminalSandboxService - network domains', () => {
 		checkSandboxDependencies(): Promise<ISandboxDependencyStatus> {
 			this.callCount++;
 			return Promise.resolve(this.status);
+		}
+
+		getWindowsMxcPlatformSupport() {
+			return Promise.resolve(this.platformSupport);
 		}
 
 		getWindowsMxcFilesystemPolicy(): Promise<IWindowsMxcFilesystemPolicy> {
@@ -1591,6 +1600,91 @@ suite('TerminalSandboxService - network domains', () => {
 		ok(config.filesystem.readonlyPaths.includes('c:\\tools\\node'), 'MXC available tools policy should add tool paths to readonly paths');
 		ok(config.filesystem.readonlyPaths.includes('c:\\program files\\powershell\\7'), 'Resolved PowerShell executable directory should be readable in the MXC config');
 		ok(!config.filesystem.deniedPaths.includes('c:\\Users\\test'), 'User home should not be denied by default in the MXC config on Windows');
+	});
+
+	test('strict Windows sandbox should use exact write roots and ignore broad workspace/network fallback settings', async () => {
+		configurationService.setUserConfiguration(AgentSandboxSettingId.AgentSandboxEnabled, AgentSandboxEnabledValue.Off);
+		configurationService.setUserConfiguration(AgentSandboxSettingId.AgentSandboxWindowsEnabled, AgentSandboxEnabledValue.Off);
+		configurationService.setUserConfiguration(AgentSandboxSettingId.AgentSandboxAllowNetwork, true);
+		configurationService.setUserConfiguration(AgentSandboxSettingId.AgentSandboxAllowUnsandboxedCommands, true);
+		configurationService.setUserConfiguration(AgentSandboxSettingId.AgentSandboxRetryWithAllowNetworkRequests, true);
+		remoteAgentService.remoteEnvironment = {
+			...remoteAgentService.remoteEnvironment!,
+			os: OperatingSystem.Windows,
+			appRoot: URI.file('/c:/app'),
+			execPath: 'c:\\app\\Code.exe',
+			tmpDir: URI.file('/c:/tmp'),
+			userHome: URI.file('/c:/Users/test'),
+			workspaceStorageHome: URI.file('/c:/Users/test/AppData/Roaming/Code/User/workspaceStorage'),
+			arch: 'x64'
+		};
+		workspaceContextService.setWorkspaceFolders([URI.file('/c:/workspace-one'), URI.file('/c:/workspace-two')]);
+		sandboxHelperService.filesystemPolicy = {
+			readonlyPaths: ['c:\\', 'c:\\tools\\node'],
+			readwritePaths: [
+				'c:\\users\\test\\appdata\\local\\temp',
+				'c:\\users\\test\\appdata\\roaming\\microsoft\\windows\\powershell\\psreadline'
+			],
+		};
+		const sandboxService = store.add(instantiationService.createInstance(TerminalSandboxService));
+		const exactRoot = URI.file('/c:/workspace-one/allowed');
+		const wrapped = await sandboxService.wrapStrictCommand('echo strict', {
+			cwd: exactRoot,
+			writeRoots: [exactRoot],
+			shell: 'c:\\program files\\powershell\\7\\pwsh.exe',
+		});
+
+		strictEqual(wrapped.isSandboxWrapped, true);
+		strictEqual(wrapped.cleanupPaths.length, 1);
+		const configPath = [...createdFiles.keys()].find(candidate => wrapped.command.includes(candidate));
+		ok(configPath, 'Strict wrapper should reference its isolated MXC config');
+		const configContent = createdFiles.get(configPath);
+		ok(configContent, 'Strict MXC config should be persisted before execution');
+		const config = JSON.parse(configContent);
+
+		deepStrictEqual(
+			config.filesystem.readwritePaths.filter((value: string) => !value.includes('\\strict\\')),
+			['c:\\workspace-one\\allowed'],
+			'Strict sandbox must not inherit whole-workspace or helper TEMP/PSReadLine write roots'
+		);
+		ok(config.filesystem.readwritePaths.some((value: string) => value.includes('\\strict\\')), 'Only the isolated strict sandbox temp dir may be added as an implementation write root');
+		ok(!config.filesystem.readwritePaths.includes('c:\\workspace-one'), 'Parent workspace must not become writable');
+		ok(!config.filesystem.readwritePaths.includes('c:\\workspace-two'), 'Unrelated workspace must not become writable');
+		ok(!config.filesystem.readwritePaths.includes('c:\\users\\test\\appdata\\local\\temp'), 'Generic user TEMP must not become writable');
+		ok(!config.filesystem.readwritePaths.some((value: string) => value.includes('psreadline')), 'PSReadLine history must not become writable');
+		ok(config.filesystem.readonlyPaths.includes('c:\\tools\\node'), 'Concrete developer tool directories may remain read-only');
+		ok(!config.filesystem.readonlyPaths.includes('c:\\'), 'Drive-root read access must be stripped');
+		strictEqual(config.network.defaultPolicy, 'block', 'Strict sandbox must ignore global allow-network settings');
+		deepStrictEqual(config.processContainer.capabilities, [], 'Strict sandbox must not grant internetClient');
+	});
+
+	test('strict Windows sandbox should reject the AppContainer DACL fallback before creating a sandbox config', async () => {
+		remoteAgentService.remoteEnvironment = {
+			...remoteAgentService.remoteEnvironment!,
+			os: OperatingSystem.Windows,
+			appRoot: URI.file('/c:/app'),
+			execPath: 'c:\\app\\Code.exe',
+			tmpDir: URI.file('/c:/tmp'),
+			userHome: URI.file('/c:/Users/test'),
+			workspaceStorageHome: URI.file('/c:/Users/test/AppData/Roaming/Code/User/workspaceStorage'),
+			arch: 'x64'
+		};
+		sandboxHelperService.platformSupport = {
+			isSupported: true,
+			availableMethods: ['processcontainer'],
+			isolationTier: 'appcontainer-dacl',
+		// Simulate an unqualified legacy host payload; production types accept only Base Container.
+		} as unknown as typeof sandboxHelperService.platformSupport;
+		const sandboxService = store.add(instantiationService.createInstance(TerminalSandboxService));
+		const exactRoot = URI.file('/c:/workspace-one/allowed');
+		const beforeFiles = createdFiles.size;
+
+		await rejects(() => sandboxService.wrapStrictCommand('echo strict', {
+			cwd: exactRoot,
+			writeRoots: [exactRoot],
+			shell: 'c:\\program files\\powershell\\7\\pwsh.exe',
+		}), /rejects the AppContainer\+DACL fallback/);
+		strictEqual(createdFiles.size, beforeFiles, 'Rejected DACL fallback must not persist a sandbox config');
 	});
 
 	test('should keep remote Windows sandbox disabled unless Windows sandbox setting is enabled', async () => {

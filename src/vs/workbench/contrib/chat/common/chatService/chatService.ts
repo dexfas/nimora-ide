@@ -166,6 +166,8 @@ export interface IChatUsage {
 	outputBuffer?: number;
 	promptTokenDetails?: readonly IChatUsagePromptTokenDetail[];
 	copilotCredits?: number;
+	/** Authoritative session total; includes work billed outside individual turns. */
+	sessionCopilotCredits?: number;
 	/**
 	 * The language-model ID that actually served the request. Set when a
 	 * meta-model (e.g. "auto") routes to a concrete model so consumers
@@ -254,6 +256,7 @@ export class ChatMultiDiffData implements IChatMultiDiffData {
 }
 
 export interface IChatProgressMessage {
+	id?: string;
 	content: IMarkdownString;
 	kind: 'progressMessage';
 	shimmer?: boolean;
@@ -475,6 +478,8 @@ export type IChatQuestionAnswers = Record<string, IChatQuestionAnswerValue>;
  * Users can navigate between questions and submit their answers.
  */
 export interface IChatQuestionCarousel {
+	autoReply?: boolean;
+	answerPresentation?: 'conversation';
 	questions: IChatQuestion[];
 	allowSkip: boolean;
 	/** Unique identifier for resolving the carousel answers back to the extension */
@@ -578,8 +583,18 @@ export interface IChatHookPart {
 	subAgentInvocationId?: string;
 }
 
+export type ChatVoiceProgressStage = 'investigating' | 'planning' | 'editing' | 'validating' | 'recovering';
+
+export interface IChatVoiceProgressPart {
+	readonly kind: 'voiceProgress';
+	readonly id: ChatVoiceProgressStage;
+	readonly value: string;
+}
+
 export interface IChatTerminalToolInvocationData {
 	kind: 'terminal';
+	/** Whether a persistent terminal rule can resolve future prompts. */
+	autoApproveRuleResolvable?: boolean;
 	commandLine: {
 		original: string;
 		userEdited?: string;
@@ -1475,6 +1490,7 @@ export type IChatProgress =
 	| IChatPullRequestContent
 	| IChatUndoStop
 	| IChatThinkingPart
+	| IChatVoiceProgressPart
 	| IChatTaskSerialized
 	| IChatElicitationRequest
 	| IChatElicitationRequestSerialized
@@ -1813,6 +1829,7 @@ export interface IRemotePendingRequest {
 }
 
 export interface IChatSendRequestOptions {
+	isVoiceModeInput?: boolean;
 	modeInfo?: IChatRequestModeInfo;
 	userSelectedModelId?: string;
 	/**

@@ -1,5 +1,6 @@
 import type { CapabilityMetadata } from "./capability-registry.js";
 import type {
+  HostCapabilityExecutionAdmission,
   HostCapabilityExecutionRequest,
   HostCapabilityExecutor,
   HostCapabilityExecutorResult,
@@ -13,7 +14,7 @@ export interface RoutableHostCapabilityExecutor extends HostCapabilityExecutor {
 export class HostCapabilityExecutorRouter implements HostCapabilityExecutor {
   constructor(private readonly executors: readonly RoutableHostCapabilityExecutor[]) {}
 
-  async execute(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata): Promise<HostCapabilityExecutorResult> {
+  async execute(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata, admission?: HostCapabilityExecutionAdmission): Promise<HostCapabilityExecutorResult> {
     const matches = this.executors.filter(executor => executor.supports(request, capability));
     if (matches.length === 0) {
       throw new Error(`No host capability executor owns ${request.name} (${capability.id}, environment=${capability.environment}).`);
@@ -21,6 +22,6 @@ export class HostCapabilityExecutorRouter implements HostCapabilityExecutor {
     if (matches.length > 1) {
       throw new Error(`Multiple host capability executors claim ${request.name}; routing must be unambiguous.`);
     }
-    return matches[0].execute(request, capability);
+    return matches[0].execute(request, capability, admission);
   }
 }

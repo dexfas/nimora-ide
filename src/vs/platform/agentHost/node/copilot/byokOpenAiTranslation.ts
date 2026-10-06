@@ -9,7 +9,7 @@ import {
 	IByokLmChatResult,
 	IByokLmTool,
 	IByokLmToolCall,
-} from '../../common/agentHostByokLm.js';
+} from '../../common/legacyByokCompletions.js';
 
 /**
  * Minimal subset of the OpenAI Chat Completions wire format the Copilot SDK

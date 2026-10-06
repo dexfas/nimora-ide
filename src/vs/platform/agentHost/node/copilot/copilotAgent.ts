@@ -2109,7 +2109,7 @@ export class CopilotAgent extends Disposable implements IAgent {
 		// invisible to the FileEditTracker pipeline. Best-effort: a
 		// non-git folder or capture failure leaves the session running
 		// with the legacy `file_edits`-based per-turn diff path.
-		this._checkpointService.captureBaseline(sessionUri, workingDirectory).catch(err => {
+		this._checkpointService.captureBaselineCheckpoint(sessionUri, resolvedWorkingDirectories ?? (workingDirectory ? [workingDirectory] : undefined)).catch(err => {
 			this._logService.warn(`[Copilot:${sessionId}] Baseline checkpoint capture failed: ${err instanceof Error ? err.message : String(err)}`);
 		});
 

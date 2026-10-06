@@ -16,6 +16,8 @@ export const ipcBrowserViewGroupChannelName = 'browserViewGroup';
 export interface IBrowserViewGroupViewEvent {
 	/** The ID of the browser view that was added or removed. */
 	readonly viewId: string;
+	/** Exact CDP page target identity. Present on add events. */
+	readonly targetId?: string;
 }
 
 /**

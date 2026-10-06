@@ -251,6 +251,8 @@ export interface IChatListItemRendererOptions {
 export interface IChatWidgetViewOptions {
 	autoScroll?: boolean | ((mode: ChatModeKind) => boolean);
 	renderInputOnTop?: boolean;
+	/** Show the read-only status banner above the transcript instead of beside the composer. */
+	readOnlyBannerAtTop?: boolean;
 	renderFollowups?: boolean;
 	renderStyle?: 'compact' | 'minimal';
 	renderInputToolbarBelowInput?: boolean;
@@ -337,6 +339,7 @@ export function isIChatResourceViewContext(context: IChatWidgetViewContext): con
 export type IChatWidgetViewContext = IChatViewViewContext | IChatResourceViewContext | {};
 
 export interface IChatAcceptInputOptions {
+	isVoiceModeInput?: boolean;
 	noCommandDetection?: boolean;
 	isVoiceInput?: boolean;
 	enableImplicitContext?: boolean; // defaults to true
@@ -363,6 +366,13 @@ export interface IChatAcceptInputOptions {
 	preserveFocus?: boolean;
 	/** Keeps the input box contents and attachments after submitting a programmatic query, and omits them from it. The query itself is sent as-is: prompt slash commands in it are not resolved. */
 	preserveInput?: boolean;
+	/**
+	 * Called once the request has been handed over to the chat service, i.e. it was either sent
+	 * right away or queued because another request is in progress. Callers that must not wait for
+	 * a queued request to actually run should use this instead of awaiting `acceptInput`, which
+	 * only resolves once the request has been sent.
+	 */
+	onRequestAccepted?: () => void;
 }
 
 export interface IChatWidgetViewModelChangeEvent {
@@ -372,6 +382,8 @@ export interface IChatWidgetViewModelChangeEvent {
 
 export interface IChatWidget {
 	readonly domNode: HTMLElement;
+	/** DOM node of the scrollable transcript area, excluding the input part. */
+	readonly transcriptDomNode: HTMLElement;
 	readonly visible: boolean;
 	readonly onDidChangeViewModel: Event<IChatWidgetViewModelChangeEvent>;
 	readonly onDidAcceptInput: Event<void>;
@@ -382,6 +394,7 @@ export interface IChatWidget {
 	readonly onDidChangeParsedInput: Event<void>;
 	readonly onDidChangeActiveInputEditor: Event<void>;
 	readonly onDidFocus: Event<void>;
+	readonly onDidScroll: Event<void>;
 	readonly location: ChatAgentLocation;
 	readonly viewContext: IChatWidgetViewContext;
 	readonly viewModel: IChatViewModel | undefined;
@@ -476,6 +489,12 @@ export interface IChatWidget {
 	 * Returns the currently rendered chat item containing the node, if any.
 	 */
 	getElementFromNode(node: HTMLElement): ChatTreeItem | undefined;
+	/**
+	 * Suppresses auto-scrolling the transcript to the bottom until the returned
+	 * disposable is disposed. Holds compose, so concurrent callers do not
+	 * clobber each other.
+	 */
+	holdAutoScroll(): IDisposable;
 	clear(targetSessionType?: string): Promise<void>;
 	getViewState(): IChatModelInputState | undefined;
 	lockToCodingAgent(name: string, displayName: string, agentId?: string, agentHostProviderId?: string): void;

@@ -5,6 +5,7 @@ import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import * as vscode from "vscode";
 import type { TerminalCapabilityBackend } from "./terminal-capability-provider.js";
+import { STRICT_TERMINAL_SANDBOX_INPUT, type StrictTerminalSandboxInput } from "./strict-terminal-sandbox-contract.js";
 
 const MAX_CAPTURED_OUTPUT_BYTES = 2 * 1024 * 1024;
 const DEFAULT_OUTPUT_BYTES = 32 * 1024;
@@ -16,6 +17,7 @@ const MAX_ECHO_HUNT_BYTES = 1024 * 1024;
 const MANAGED_TERMINAL_NAME = /^ShunCode · \d+$/;
 const CHAT_CAPTURE_COLUMNS = 1000;
 export const CHAT_CAPTURE_INPUT_KEY = "__shuncodeChatCapture";
+const STRICT_TERMINAL_SANDBOX_COMMAND_ID = "_workbench.prepareStrictTerminalSandboxCommand";
 
 interface TerminalSlot {
   id: string;
@@ -50,8 +52,21 @@ interface CommandState {
   suspectedParserError?: boolean;
   recoveredByAbort?: boolean;
   child?: child_process.ChildProcess;
+  sandboxed: boolean;
+  sandboxCleanupPaths?: string[];
   done: Promise<void>;
   resolveDone(): void;
+}
+
+interface StrictSandboxPreparation {
+  command: string;
+  cleanupPaths: string[];
+}
+
+interface StrictSandboxCommandResult {
+  command: string;
+  isSandboxWrapped: boolean;
+  cleanupPaths: string[];
 }
 
 interface ManagedShellSpec {
@@ -1040,6 +1055,7 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
           state.status = "killed";
           state.exitCode = null;
           state.endedAt = Date.now();
+          this.cleanupSandboxPaths(state);
           state.resolveDone();
         }
       }),
@@ -1058,13 +1074,61 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
       state.status = "killed";
       state.exitCode = null;
       state.endedAt = Date.now();
+      this.cleanupSandboxPaths(state);
       state.resolveDone();
     }
     for (const slot of this.slots.values()) {
       if (!slot.closed) slot.terminal.dispose();
     }
+    for (const state of this.states.values()) this.cleanupSandboxPaths(state);
     this.slots.clear();
     this.states.clear();
+  }
+
+  private cleanupSandboxPaths(state: CommandState): void {
+    const cleanupPaths = state.sandboxCleanupPaths;
+    if (!cleanupPaths?.length) return;
+    state.sandboxCleanupPaths = undefined;
+    for (const cleanupPath of cleanupPaths) {
+      fs.rm(cleanupPath, { recursive: true, force: true }, () => {});
+    }
+  }
+
+  private strictSandboxShell(): string | undefined {
+    if (process.platform === "win32") {
+      return path.join(process.env.SystemRoot || process.env.WINDIR || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    }
+    if (fs.existsSync("/bin/bash")) return "/bin/bash";
+    if (fs.existsSync("/bin/sh")) return "/bin/sh";
+    return undefined;
+  }
+
+  private async prepareStrictSandboxCommand(
+    command: string,
+    cwd: string,
+    input: Record<string, unknown>,
+  ): Promise<StrictSandboxPreparation | undefined> {
+    const strict = (input as Record<PropertyKey, unknown>)[STRICT_TERMINAL_SANDBOX_INPUT] as StrictTerminalSandboxInput | undefined;
+    if (!strict) return undefined;
+    if (!Array.isArray(strict.writeRoots) || strict.writeRoots.length === 0 || strict.writeRoots.some(root => typeof root !== "string" || !path.isAbsolute(root))) {
+      throw new Error("Host-managed run_command strict sandbox roots are invalid.");
+    }
+    const prepared = await vscode.commands.executeCommand<StrictSandboxCommandResult>(
+      STRICT_TERMINAL_SANDBOX_COMMAND_ID,
+      {
+        command,
+        cwd,
+        writeRoots: [...strict.writeRoots],
+        shell: this.strictSandboxShell(),
+      },
+    );
+    if (!prepared?.isSandboxWrapped || typeof prepared.command !== "string" || !prepared.command.trim()) {
+      throw new Error("Host-managed run_command requires a verified strict OS sandbox wrapper.");
+    }
+    if (!Array.isArray(prepared.cleanupPaths) || prepared.cleanupPaths.some(value => typeof value !== "string" || !value)) {
+      throw new Error("Strict OS sandbox returned invalid cleanup ownership.");
+    }
+    return { command: prepared.command, cleanupPaths: [...prepared.cleanupPaths] };
   }
 
   private sameFileSystemPath(a: string, b: string): boolean {
@@ -1232,6 +1296,7 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
       state.tempScriptPath = undefined;
       fs.unlink(tempScript, () => {});
     }
+    this.cleanupSandboxPaths(state);
     state.resolveDone();
     this.pruneIdleTerminals();
   }
@@ -1270,18 +1335,24 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
     const background = asBoolean(input.background, false);
     if (typeof input.background !== "boolean") throw new Error("background must be explicitly true or false");
     const timeoutMs = asInteger(input.timeout_ms, 120_000, 1_000, 120_000);
-    const cwdInfo = typeof input.cwd === "string" && input.cwd.trim()
-      ? resolveWorkspacePath(input.cwd)
-      : undefined;
+    // Every capability invocation gets an explicit, workspace-bounded cwd.
+    // Persistent terminals may preserve environment variables, but a prior shell
+    // command is never allowed to make a later AI invocation silently inherit an
+    // out-of-workspace current directory.
+    const cwdInfo = resolveWorkspacePath(
+      typeof input.cwd === "string" && input.cwd.trim() ? input.cwd : ".",
+    );
     const execution = asString(input.execution, "pty");
     if (execution !== "pty" && execution !== "direct") {
       throw new Error(`execution must be "pty" or "direct".`);
     }
+    const strictSandbox = await this.prepareStrictSandboxCommand(command, cwdInfo.absolute, input);
+    const executionCommand = strictSandbox?.command ?? command;
     if (execution === "direct") {
       if (background) {
         throw new Error(`execution="direct" does not support background=true; use the default PTY mode for long-running or user-visible commands.`);
       }
-      return this.runDirect(command, cwdInfo, timeoutMs);
+      return this.runDirect(command, executionCommand, cwdInfo, timeoutMs, strictSandbox?.cleanupPaths);
     }
     const id = `cmd_${Date.now()}_${this.nextCommandId++}`;
     // Never type risky commands into the readline layer: multi-line input hits
@@ -1290,13 +1361,20 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
     // ConPTY paste (whole payloads silently vanish), and non-ASCII input (CJK, emoji) can
     // be mangled by the console code page. Bridge all of them through a temp script that a
     // single ASCII one-line command executes instead.
-    let execCommand = command;
+    let execCommand = executionCommand;
     let tempScriptPath: string | undefined;
-    if (/\r|\n/.test(command) || /[^\x00-\x7F]/.test(command) || command.length > 1024) {
-      tempScriptPath = writeTempScript(id, command);
+    if (/\r|\n/.test(execCommand) || /[^\x00-\x7F]/.test(execCommand) || execCommand.length > 1024) {
+      tempScriptPath = writeTempScript(id, execCommand);
       execCommand = tempScriptCommand(tempScriptPath);
     }
-    const { slot, reused, effectiveCwd } = await this.acquireTerminal(id, cwdInfo);
+    let acquired: Awaited<ReturnType<TerminalCommandManager["acquireTerminal"]>>;
+    try {
+      acquired = await this.acquireTerminal(id, cwdInfo);
+    } catch (error) {
+      for (const cleanupPath of strictSandbox?.cleanupPaths ?? []) fs.rm(cleanupPath, { recursive: true, force: true }, () => {});
+      throw error;
+    }
+    const { slot, reused, effectiveCwd } = acquired;
     const displayCwd = cwdInfo?.relative ?? this.displayCwd(effectiveCwd);
     const terminal = slot.terminal;
     let resolveDone!: () => void;
@@ -1320,6 +1398,8 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
       totalOutputBytes: 0,
       ansiPending: "",
       tempScriptPath,
+      sandboxed: !!strictSandbox,
+      sandboxCleanupPaths: strictSandbox?.cleanupPaths,
       done,
       resolveDone,
     };
@@ -1380,6 +1460,7 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
       `terminal_id: ${state.terminalId}`,
       `terminal_name: ${JSON.stringify(state.terminalName)}`,
       `execution: ${state.kind}`,
+      `sandbox: ${state.sandboxed ? "strict" : "none"}`,
       `terminal_reused: ${reused}`,
       `command: ${JSON.stringify(command)}`,
       `status: ${snapshot.status}`,
@@ -1413,8 +1494,10 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
    */
   private async runDirect(
     command: string,
+    executionCommand: string,
     cwdInfo: { absolute: string; relative: string; uri: vscode.Uri } | undefined,
     timeoutMs: number,
+    sandboxCleanupPaths?: string[],
   ): Promise<string> {
     const id = `cmd_${Date.now()}_${this.nextCommandId++}`;
     let file: string;
@@ -1424,12 +1507,12 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
       // Always bridge through a temp script: it carries a UTF-8 BOM (correct non-ASCII
       // decoding on PowerShell 5.1), sets UTF-8 output encoding, and removes every quoting
       // pitfall a -Command one-liner would have.
-      tempScriptPath = writeTempScript(id, command);
+      tempScriptPath = writeTempScript(id, executionCommand);
       file = path.join(process.env.SystemRoot || process.env.WINDIR || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
       args = ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tempScriptPath];
     } else {
       file = fs.existsSync("/bin/bash") ? "/bin/bash" : "/bin/sh";
-      args = ["-c", command];
+      args = ["-c", executionCommand];
     }
     const cwd = cwdInfo?.absolute ?? resolveWorkspacePath(".").absolute;
     let resolveDone!: () => void;
@@ -1452,6 +1535,8 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
       totalOutputBytes: 0,
       ansiPending: "",
       tempScriptPath,
+      sandboxed: !!sandboxCleanupPaths,
+      sandboxCleanupPaths,
       done,
       resolveDone,
     };
@@ -1497,6 +1582,7 @@ export class TerminalCommandManager implements TerminalCapabilityBackend {
       `terminal_reused: false`,
       `command: ${JSON.stringify(command)}`,
       `execution: direct`,
+      `sandbox: ${state.sandboxed ? "strict" : "none"}`,
       `status: ${snapshot.status}`,
       `exit_code: ${snapshot.exit_code ?? "null"}`,
       `cwd: ${JSON.stringify(state.cwd)}`,

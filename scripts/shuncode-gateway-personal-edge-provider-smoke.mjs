@@ -110,6 +110,12 @@ assert.equal(provider.status().connected, false, 'client must become stale after
 await assert.rejects(() => provider.callTool('personal_edge_read'), /not connected/);
 
 nowValue = 93_000;
+provider.register({ token: 'test-token', clientId: 'edge-1', shared: true, tab: { id: 7, url: 'https://example.test/original' } });
+const pendingClick = provider.callTool('personal_edge_click', { selector: '#once' });
+const pendingFailure = assert.rejects(pendingClick, /changed|unconfirmed|replay/);
+provider.register({ token: 'test-token', clientId: 'edge-1', shared: true, tab: { id: 10, url: 'https://example.test/new' } });
+await pendingFailure;
+assert.equal(await provider.poll({ token: 'test-token', clientId: 'edge-1' }), null, 'changed share discards pending side effects');
 provider.register({ token: 'test-token', clientId: 'edge-1', shared: true, tab: { id: 9, url: 'edge://settings' } });
 await assert.rejects(() => provider.callTool('personal_edge_read'), /privileged\/non-web page/);
 

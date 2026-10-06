@@ -57,6 +57,7 @@ import { ICopilotApiService, type ICopilotApiServiceRequestOptions, type ICopilo
 import { IAgentHostGitHubEndpointService } from '../../node/agentHostGitHubEndpointService.js';
 import type { IAgentHostRestrictedTelemetry, IAgentHostRestrictedTelemetryContext, IAgentHostInternalTelemetryContext, TelemetryMeasurements, TelemetryProps } from '../../node/agentHostRestrictedTelemetry.js';
 import { createTestGitHubEndpointService } from './testGitHubEndpointService.js';
+import { CLIENT_TOOL_SCOPE_CONFIG_KEY } from '../../common/clientToolScope.js';
 
 // ---- Mock CopilotSession (SDK level) ----------------------------------------
 
@@ -669,7 +670,7 @@ async function createAgentSession(disposables: DisposableStore, options?: {
 		getEffectiveWorkingDirectories: () => undefined,
 		isWorkingDirectoryPending: () => false,
 		resolveWorkingDirectoryForResume: async (_session, workingDirectory) => workingDirectory,
-		getSessionConfigValues: () => undefined,
+		getSessionConfigValues: () => configValues,
 		updateSessionConfig: (session, patch) => { sessionConfigUpdates.push({ session, patch }); },
 		getRootValue: ((_schema: unknown, key: string) => rootValues[key]) as IAgentConfigurationService['getRootValue'],
 		updateRootConfig: () => { /* no-op */ },
@@ -6409,6 +6410,42 @@ suite('CopilotAgentSession', () => {
 			toolSet.set(clientId, snapshot.tools);
 			return toolSet;
 		};
+		test('scoped SDK calls emit host requests and receipt only after SDK completion', async () => {
+			const scope = { version: 1, scopeId: 'scoped-client-test-0001', clientId: 'test-client', tools: snapshot.tools };
+			const { session, runtime, mockSession, signals, waitForSignal } = await createAgentSession(disposables, {
+				clientSnapshot: snapshot, activeClientToolSet: activeClientToolSetWith(scope.clientId),
+				configValues: { [CLIENT_TOOL_SCOPE_CONFIG_KEY]: JSON.stringify(scope) },
+			});
+			mockSession.fire('tool.execution_start', { toolCallId: 'scoped-call', toolName: 'my_tool', arguments: { path: 'a' } } as SessionEventPayload<'tool.execution_start'>['data']);
+			const tool = runtime.createClientSdkTools()[0];
+			assert.strictEqual(tool.skipPermission, true); assert.strictEqual(tool.defer, 'never');
+			const pending = invokeClientToolHandler(tool, 'scoped-call', { path: 'a' });
+			const request = signals.find(s => isAction(s, ActionType.ChatToolCallReady));
+			assert.ok(request && isAction(request, ActionType.ChatToolCallReady));
+			assert.deepStrictEqual((request.action as ChatToolCallReadyAction)._meta?.['clientToolScopeRequest'], { version: 1, scopeId: scope.scopeId, clientId: scope.clientId });
+			session.handleClientToolCallComplete('scoped-call', { success: true, pastTenseMessage: 'read', content: [{ type: ToolResultContentType.Text, text: 'bounded content' }] });
+			assert.strictEqual((await pending).textResultForLlm, 'bounded content');
+			assert.strictEqual(signals.some(s => isAction(s, ActionType.ChatToolCallComplete)), false);
+			assert.throws(() => session.handleClientToolCallComplete('scoped-call', { success: true, pastTenseMessage: 'duplicate' }), /consumed/);
+			mockSession.fire('tool.execution_complete', { toolCallId: 'scoped-call', success: true, result: { content: 'bounded content' } } as SessionEventPayload<'tool.execution_complete'>['data']);
+			const receipt = await waitForSignal(s => isAction(s, ActionType.ChatToolCallComplete));
+			assert.ok(isAction(receipt, ActionType.ChatToolCallComplete));
+			assert.deepStrictEqual((receipt.action as ChatToolCallCompleteAction)._meta?.['clientToolScopeReceipt'], { version: 1, scopeId: scope.scopeId, clientId: scope.clientId });
+		});
+		test('scoped execution rejects lost owners, schema drift, and command bypasses', async () => {
+			const owners = activeClientToolSetWith('test-client');
+			const scope = { version: 1, scopeId: 'scoped-client-test-0002', clientId: 'test-client', tools: snapshot.tools };
+			const { session, runtime, mockSession } = await createAgentSession(disposables, {
+				clientSnapshot: snapshot, activeClientToolSet: owners, configValues: { [CLIENT_TOOL_SCOPE_CONFIG_KEY]: JSON.stringify(scope) },
+			});
+			owners.delete('test-client');
+			await assert.rejects(() => invokeClientToolHandler(runtime.createClientSdkTools()[0], 'no-owner'), /disconnected/);
+			owners.set('test-client', []);
+			await assert.rejects(() => invokeClientToolHandler(runtime.createClientSdkTools()[0], 'drift'), /frozen/i);
+			await assert.rejects(() => session.send('/compact', undefined, 'command-1'), /cannot execute/);
+			await assert.rejects(() => session.send('!echo unsafe', undefined, 'command-2'), /cannot execute/);
+			assert.strictEqual(mockSession.commandInvokeCalls.length, 0); assert.strictEqual(mockSession.compactCalls.length, 0); assert.strictEqual(mockSession.sendRequests.length, 0);
+		});
 
 		test('client tool started with no connected client fails immediately', async () => {
 			// No activeClientState is provided, so the session seeds one with

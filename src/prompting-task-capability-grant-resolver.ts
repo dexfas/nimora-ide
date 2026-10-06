@@ -4,6 +4,7 @@ import type { HostCapabilityGrantResolver } from "./host-capability-policy-autho
 import { TaskCapabilityGrantResolver } from "./task-capability-grant-resolver.js";
 import type { TaskCapabilityGrantScope } from "./task-contract.js";
 import type { TaskRuntime } from "./task-runtime.js";
+import { HostCapabilityAuthorizationError } from "./host-capability-policy-authorizer.js";
 
 export interface CapabilityGrantPromptRequest {
   request: HostCapabilityExecutionRequest;
@@ -27,6 +28,7 @@ export class PromptingTaskCapabilityGrantResolver implements HostCapabilityGrant
   constructor(
     private readonly tasks: TaskRuntime,
     private readonly prompt: CapabilityGrantPrompt,
+    private readonly shouldPrompt: (request: HostCapabilityExecutionRequest) => boolean = () => true,
   ) {
     this.durable = new TaskCapabilityGrantResolver(tasks);
   }
@@ -34,6 +36,9 @@ export class PromptingTaskCapabilityGrantResolver implements HostCapabilityGrant
   async isGranted(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata): Promise<boolean> {
     if (await this.durable.isGranted(request, capability)) return true;
     if (!request.taskId) return false;
+    if (!this.shouldPrompt(request)) {
+      throw new HostCapabilityAuthorizationError(`Capability ${capability.id} is outside the current preapproval or was revoked.`, capability.id, capability.approval, true);
+    }
 
     const scope = this.scopeFor(capability);
     if (!scope) return false;
@@ -43,6 +48,7 @@ export class PromptingTaskCapabilityGrantResolver implements HostCapabilityGrant
 
     const pending = (async () => {
       if (await this.durable.isGranted(request, capability)) return true;
+      if (!this.shouldPrompt(request)) throw new HostCapabilityAuthorizationError(`Capability ${capability.id} was not preapproved.`, capability.id, capability.approval, true);
       const approved = await this.prompt.requestGrant({ request, capability, scope });
       if (!approved) return false;
       await this.tasks.grantCapabilityStrict(request.taskId!, {

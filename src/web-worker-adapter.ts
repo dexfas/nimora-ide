@@ -17,6 +17,7 @@ export interface WebWorkerTransportDescriptor {
   availability: "available" | "degraded" | "unavailable";
   models?: readonly string[];
   capabilities?: Partial<WorkerCapabilities>;
+  capabilityProjection?: WorkerDescriptor["capabilityProjection"];
   extensions?: Record<string, unknown>;
 }
 
@@ -42,6 +43,7 @@ export interface WebWorkerTransportInput {
   prompt: string;
   history?: WorkerInput["history"];
   allowedCapabilities?: string[];
+  externalCapabilities?: WorkerInput["externalCapabilities"];
   modeInstructions?: string;
   extensions?: Record<string, unknown>;
 }
@@ -113,6 +115,16 @@ export class WebWorkerAdapter implements WorkerAdapter<WebWorkerSessionOptions> 
       label: descriptor.label,
       availability: descriptor.availability,
       models: descriptor.models ? [...descriptor.models] : undefined,
+      capabilityProjection: descriptor.capabilityProjection
+        ? {
+            nativeByName: descriptor.capabilityProjection.nativeByName === true,
+            externalDefinitions: descriptor.capabilityProjection.externalDefinitions === true,
+            executionRoutes: descriptor.capabilityProjection.executionRoutes?.map(route => ({
+              ...route,
+              toolNames: [...route.toolNames],
+            })) ?? [],
+          }
+        : { nativeByName: false, externalDefinitions: false, executionRoutes: [] },
       capabilities: defaultCapabilities(descriptor.capabilities),
       extensions: {
         site: descriptor.site,
@@ -208,6 +220,7 @@ export class WebWorkerAdapter implements WorkerAdapter<WebWorkerSessionOptions> 
         prompt: input.prompt,
         history: input.history,
         allowedCapabilities: input.allowedCapabilities ? [...input.allowedCapabilities] : undefined,
+        externalCapabilities: input.externalCapabilities ? input.externalCapabilities.map(definition => structuredClone(definition)) : undefined,
         modeInstructions: input.modeInstructions,
         extensions: input.extensions ? { ...input.extensions } : undefined,
       });
@@ -254,7 +267,9 @@ export class WebWorkerAdapter implements WorkerAdapter<WebWorkerSessionOptions> 
       }
     } finally {
       record.activeInputId = undefined;
-      if (record.handle.state !== "disposed") this.touch(record, record.handle.state === "interrupted" ? "interrupted" : "idle");
+      if (record.handle.state !== "disposed") {
+        this.touch(record, terminalSeen ? "idle" : record.handle.state === "interrupted" ? "interrupted" : "idle");
+      }
     }
   }
 

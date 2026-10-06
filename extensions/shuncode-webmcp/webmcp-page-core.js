@@ -84,19 +84,21 @@
 
   function setLineArgument(target, dottedPath, value) {
     const parts = String(dottedPath || '').split('.').filter(Boolean);
-    if (!parts.length) return;
+    if (!parts.length) return false;
+    if (parts.some(part => part === '__proto__' || part === 'constructor' || part === 'prototype')) return false;
     let current = target;
     for (let index = 0; index < parts.length; index += 1) {
       const part = parts[index];
       const key = /^\d+$/.test(part) ? Number(part) : part;
       if (index === parts.length - 1) {
         current[key] = value;
-        return;
+        return true;
       }
       const nextIsArray = /^\d+$/.test(parts[index + 1]);
       if (!current[key] || typeof current[key] !== 'object') current[key] = nextIsArray ? [] : {};
       current = current[key];
     }
+    return true;
   }
 
   function parseToolLineObject(text, markerIndex, markerLength) {
@@ -123,22 +125,31 @@
           chunks.push(lines[index]);
         }
         if (!closed) return null;
-        setLineArgument(call.arguments, dottedPath, chunks.join('\n'));
+        if (!setLineArgument(call.arguments, dottedPath, chunks.join('\n'))) return null;
         continue;
       }
       const pair = line.match(/^(id|name|arg\.([A-Za-z0-9_.-]+))=(.*)$/);
       if (!pair) continue;
       if (pair[1] === 'id') call.id = pair[3].trim();
       else if (pair[1] === 'name') call.name = pair[3].trim();
-      else setLineArgument(call.arguments, pair[2], parseLineScalar(pair[3]));
+      else if (!setLineArgument(call.arguments, pair[2], parseLineScalar(pair[3]))) return null;
     }
     if (typeof call.name !== 'string' || !call.name) return null;
     return { value: call, endIndex: closeMarkerIndex + closeMarker.length, lineProtocol: true };
   }
 
   function parseToolObject(text, markerIndex, markerLength) {
-    return parseToolJsonObject(text, markerIndex, markerLength)
-      || parseToolLineObject(text, markerIndex, markerLength);
+    const closeMarkerIndex = text.indexOf('[/SHUNCODE_TOOL]', markerIndex + markerLength);
+    if (closeMarkerIndex < 0) return null;
+    const payload = text.slice(markerIndex + markerLength, closeMarkerIndex).trim();
+    if (!payload) return null;
+    // Choose the provider transport grammar from the payload prefix. DeepSeek's
+    // line protocol may legitimately contain scalar values such as arg={}.
+    // Letting the JSON parser scan forward to that later brace would steal the
+    // entire line-protocol block and erase its id/name before admission.
+    return payload.startsWith('{')
+      ? parseToolJsonObject(text, markerIndex, markerLength)
+      : parseToolLineObject(text, markerIndex, markerLength);
   }
 
   function extractCalls(text) {

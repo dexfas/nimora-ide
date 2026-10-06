@@ -1,4 +1,4 @@
-import type { TaskArtifactRef, TaskExecution, TaskSnapshot, TaskTodo } from "./task-contract.js";
+import type { MissionPlane, TaskArtifactRef, TaskExecution, TaskSnapshot, TaskTodo } from "./task-contract.js";
 
 export interface ContextHandoffOptions {
   targetWorkerId?: string;
@@ -39,6 +39,10 @@ export interface ContextHandoffWorker {
 export interface ContextHandoffPackage {
   version: 1;
   taskId: string;
+  projectId?: string;
+  missionId?: string;
+  missionPlane?: MissionPlane;
+  missionType?: string;
   generatedAt: string;
   targetWorkerId?: string;
   sourceManagedSessionId?: string;
@@ -60,6 +64,17 @@ export interface RenderedContextHandoff {
   package: ContextHandoffPackage;
   text: string;
   truncatedSections: string[];
+}
+
+export interface ContextHandoffRenderSection {
+  name: string;
+  lines: readonly string[];
+}
+
+export interface StructuredContextHandoffRenderInput {
+  title: string;
+  preambleLines?: readonly string[];
+  sections: readonly ContextHandoffRenderSection[];
 }
 
 const DEFAULT_MAX_CHARS = 12_000;
@@ -122,6 +137,10 @@ export function buildContextHandoffPackage(snapshot: TaskSnapshot, options: Cont
   return {
     version: 1,
     taskId: snapshot.taskId,
+    projectId: snapshot.mission?.projectId,
+    missionId: snapshot.mission ? snapshot.taskId : undefined,
+    missionPlane: snapshot.mission?.plane,
+    missionType: snapshot.mission?.missionType,
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     targetWorkerId: options.targetWorkerId,
     sourceManagedSessionId: options.sourceManagedSessionId,
@@ -176,27 +195,51 @@ function appendSection(parts: string[], name: string, lines: readonly string[], 
   truncatedSections.push(name);
 }
 
-export function renderContextHandoff(pkg: ContextHandoffPackage, maxChars = DEFAULT_MAX_CHARS): { text: string; truncatedSections: string[] } {
+/**
+ * Shared provider-neutral hard-containment renderer. Callers that need semantic
+ * item atomicity should pre-select whole items so this guard never becomes the
+ * first place an authoritative fact is shortened.
+ */
+export function renderStructuredContextHandoff(
+  input: StructuredContextHandoffRenderInput,
+  maxChars = DEFAULT_MAX_CHARS,
+): { text: string; truncatedSections: string[] } {
   const budget = Math.max(1, Math.floor(maxChars));
-  const parts: string[] = [
-    "# Nimora Task Handoff\n",
-    `Task: ${pkg.taskId}\nStatus: ${pkg.status}\n${pkg.targetWorkerId ? `Target worker: ${pkg.targetWorkerId}\n` : ""}\n`,
-  ];
+  const parts: string[] = [`# ${input.title}\n`];
+  if (input.preambleLines?.length) parts.push(`${input.preambleLines.join("\n")}\n\n`);
   const truncatedSections: string[] = [];
-  appendSection(parts, "Goal", pkg.goal ? [pkg.goal] : [], budget, truncatedSections);
-  appendSection(parts, "Context summary", pkg.summary ? [pkg.summary] : [], budget, truncatedSections);
-  appendSection(parts, "Constraints", bullets(pkg.constraints), budget, truncatedSections);
-  appendSection(parts, "Decisions", bullets(pkg.decisions), budget, truncatedSections);
-  appendSection(parts, "Relevant files", bullets(pkg.relevantFiles), budget, truncatedSections);
-  appendSection(parts, "Current progress", pkg.progress ? [
-    `${pkg.progress.phase ? `${pkg.progress.phase}: ` : ""}${pkg.progress.message}${typeof pkg.progress.percent === "number" ? ` (${pkg.progress.percent}%)` : ""}`,
-  ] : [], budget, truncatedSections);
-  appendSection(parts, "Todos", pkg.todos.map(todo => `- [${todo.status}] ${todo.title}`), budget, truncatedSections);
-  appendSection(parts, "Recent artifacts", pkg.artifacts.map(artifact => `- ${artifact.kind}: ${artifact.title}${artifact.uri ? ` — ${artifact.uri}` : ""}`), budget, truncatedSections);
-  appendSection(parts, "Recent executions", pkg.recentExecutions.map(formatExecution), budget, truncatedSections);
-  appendSection(parts, "Worker history", pkg.workerSessions.map(formatWorker), budget, truncatedSections);
-  appendSection(parts, "Omitted by item limits", bullets(pkg.omitted), budget, truncatedSections);
+  for (const section of input.sections) {
+    appendSection(parts, section.name, section.lines, budget, truncatedSections);
+  }
   return { text: parts.join("").slice(0, budget), truncatedSections };
+}
+
+export function renderContextHandoff(pkg: ContextHandoffPackage, maxChars = DEFAULT_MAX_CHARS): { text: string; truncatedSections: string[] } {
+  return renderStructuredContextHandoff({
+    title: "Nimora Task Handoff",
+    preambleLines: [
+      `Task: ${pkg.taskId}`,
+      ...(pkg.projectId ? [`Project: ${pkg.projectId}`] : []),
+      ...(pkg.missionId ? [`Mission: ${pkg.missionId}${pkg.missionPlane ? ` · ${pkg.missionPlane}` : ""}${pkg.missionType ? ` · ${pkg.missionType}` : ""}`] : []),
+      `Status: ${pkg.status}`,
+      ...(pkg.targetWorkerId ? [`Target worker: ${pkg.targetWorkerId}`] : []),
+    ],
+    sections: [
+      { name: "Goal", lines: pkg.goal ? [pkg.goal] : [] },
+      { name: "Context summary", lines: pkg.summary ? [pkg.summary] : [] },
+      { name: "Constraints", lines: bullets(pkg.constraints) },
+      { name: "Decisions", lines: bullets(pkg.decisions) },
+      { name: "Relevant files", lines: bullets(pkg.relevantFiles) },
+      { name: "Current progress", lines: pkg.progress ? [
+        `${pkg.progress.phase ? `${pkg.progress.phase}: ` : ""}${pkg.progress.message}${typeof pkg.progress.percent === "number" ? ` (${pkg.progress.percent}%)` : ""}`,
+      ] : [] },
+      { name: "Todos", lines: pkg.todos.map(todo => `- [${todo.status}] ${todo.title}`) },
+      { name: "Recent artifacts", lines: pkg.artifacts.map(artifact => `- ${artifact.kind}: ${artifact.title}${artifact.uri ? ` — ${artifact.uri}` : ""}`) },
+      { name: "Recent executions", lines: pkg.recentExecutions.map(formatExecution) },
+      { name: "Worker history", lines: pkg.workerSessions.map(formatWorker) },
+      { name: "Omitted by item limits", lines: bullets(pkg.omitted) },
+    ],
+  }, maxChars);
 }
 
 export function buildRenderedContextHandoff(snapshot: TaskSnapshot, options: ContextHandoffOptions = {}): RenderedContextHandoff {

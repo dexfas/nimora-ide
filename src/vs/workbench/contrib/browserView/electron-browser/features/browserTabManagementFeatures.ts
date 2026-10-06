@@ -338,6 +338,62 @@ class OpenIntegratedBrowserAction extends Action2 {
 	}
 }
 
+/**
+ * Atomically open one allowlisted provider page and request the native share
+ * consent for THAT newly-created BrowserEditorInput, never whichever tab became
+ * active while the page was loading.
+ */
+class NimoraOpenAndShareProviderPageAction extends Action2 {
+	constructor() {
+		super({
+			id: 'workbench.action.browser.nimoraOpenAndShareProviderPage',
+			title: localize2('browser.nimoraOpenAndShareProvider', 'Nimora: Open and Share Web AI Page'),
+			category: BrowserActionCategory,
+		});
+	}
+
+	async run(accessor: ServicesAccessor, provider: unknown, exactIdentity: unknown = false): Promise<boolean | undefined | { shared: true; pageId: string }> {
+		if (provider !== 'deepseek' && provider !== 'chatgpt') {
+			throw new Error('Nimora browser sharing requires a supported explicit provider.');
+		}
+		if (exactIdentity !== true && exactIdentity !== false) {
+			throw new Error('Nimora browser page identity selection requires explicit true or false.');
+		}
+		const url = provider === 'deepseek' ? 'https://chat.deepseek.com' : 'https://chatgpt.com';
+		const allowedHosts = provider === 'deepseek' ? ['chat.deepseek.com'] : ['chatgpt.com', 'chat.openai.com'];
+		const browserService = accessor.get(IBrowserViewWorkbenchService);
+		const editorService = accessor.get(IEditorService);
+		const resource = BrowserViewUri.forId(generateUuid());
+		const pane = await editorService.openEditor({ resource, options: { viewState: { url } } }, await browserService.getPreferredGroup());
+		const editor = pane?.input;
+		if (!(editor instanceof BrowserEditorInput) || editor.resource.toString() !== resource.toString()) {
+			throw new Error('Nimora could not prove the newly opened browser page identity. No page was shared.');
+		}
+		// A slow navigation or a login redirect is not authority to auto-share an
+		// unrelated URL. Leave the tab visible for explicit manual consent instead.
+		for (let attempt = 0; attempt < 12; attempt++) {
+			const loaded = editor.url;
+			if (loaded) {
+				let parsed: URL;
+				try { parsed = new URL(loaded); } catch { return undefined; }
+				if (parsed.protocol !== 'https:' || !allowedHosts.includes(parsed.hostname.toLowerCase())) return undefined;
+				const model = await editor.resolve();
+				const shared = await model.setSharedWithAgent(true);
+				if (exactIdentity === true && shared === true) {
+					const pageId = BrowserViewUri.getId(resource);
+					if (!pageId || pageId !== editor.id) {
+						throw new Error('Nimora new shared page identity could not be matched to its exact browser editor.');
+					}
+					return { shared: true, pageId };
+				}
+				return shared;
+			}
+			await new Promise(resolve => setTimeout(resolve, 250));
+		}
+		return undefined;
+	}
+}
+
 class OpenFileInIntegratedBrowserAction extends Action2 {
 	constructor() {
 		const IS_LOCAL_HTML_FILE = ContextKeyExpr.and(
@@ -544,6 +600,7 @@ MenuRegistry.appendMenuItem(MenuId.EditorTitle, {
 
 registerAction2(QuickOpenBrowserAction);
 registerAction2(OpenIntegratedBrowserAction);
+registerAction2(NimoraOpenAndShareProviderPageAction);
 registerAction2(OpenFileInIntegratedBrowserAction);
 registerAction2(OpenOrListBrowsersAction);
 registerAction2(NewTabAction);

@@ -1,11 +1,56 @@
 {
-	"version": "2.0.0",
-	"command": "npm",
-	"type": "shell",
-	"presentation": {
-		"reveal": "silent",
-	},
-	"args": ["run", "compile"],
-	"isBackground": true,
-	"problemMatcher": "$tsc-watch"
+    "version":  "2.0.0",
+    "tasks":  [
+                  {
+                      "label":  "Phase11 Final Proof 025",
+                      "type":  "shell",
+                      "command":  "echo ${input:phase11Proof025}",
+                      "problemMatcher":  [
+
+                                         ]
+                  }
+              ],
+    "inputs":  [
+                   {
+                       "id":  "phase11Proof025",
+                       "type":  "command",
+                       "command":  "_shuncode.projectFormation.executeCoordinatorCommandTurn",
+                       "args":  {
+                                    "projectId":  "e99a2c78-5c0c-4960-902e-1db309f10068",
+                                    "managedRootMissionId":  "ba166044-c0b9-4017-8c02-508769d41396",
+                                    "coordinationMissionId":  "41d5107e-b03c-406e-9cfa-50e2bd9f5175",
+                                    "managedSessionId":  "d890d974-dc63-4390-acf5-0f6b0921331f",
+                                    "inputId":  "phase11-chatgpt-coordinator-final-liveness-025",
+                                    "command":  {
+                                                    "kind":  "deliverExplicitMissionInput",
+                                                    "arguments":  {
+                                                                      "projectId":  "e99a2c78-5c0c-4960-902e-1db309f10068",
+                                                                      "managedRootMissionId":  "ba166044-c0b9-4017-8c02-508769d41396",
+                                                                      "coordinationMissionId":  "41d5107e-b03c-406e-9cfa-50e2bd9f5175",
+                                                                      "targetMissionId":  "ba166044-c0b9-4017-8c02-508769d41396",
+                                                                      "managedSessionId":  "6a8b1c86-ede8-46a8-aaef-c06e563a3998",
+                                                                      "inputId":  "phase11-chatgpt-production-rwv-027",
+                                                                      "instructionKind":  "final-live-proof",
+                                                                      "instruction":  "Use only the connected ChatGPT plugin/app named Nimora Phase 11 MCP 025027 and its Mission-native MCP tools in this same active turn. Do not use any other plugin/app/connector or fallback route. First call read_files for exactly .build/phase11-live-chatgpt.txt and require its exact content to be PHASE11_CHATGPT_BEFORE. If and only if that exact value is observed, call apply_patch exactly once to replace only PHASE11_CHATGPT_BEFORE with PHASE11_CHATGPT_AFTER in that file and modify no other file. Then call read_files again for exactly the same file and require its exact content to be PHASE11_CHATGPT_AFTER. Do not call apply_patch more than once. Do not use any other workspace write path. Return a concise terminal result only after all three operations succeed. If the exact Nimora Phase 11 MCP 025027 plugin is unavailable or any required tool call fails, stop and report failure without using another route.",
+                                                                      "phase8Materialization":  {
+                                                                                                    "profile":  "practice",
+                                                                                                    "budget":  {
+                                                                                                                   "maxInstructionChars":  20000,
+                                                                                                                   "maxContextChars":  50000,
+                                                                                                                   "maxSkillChars":  10000,
+                                                                                                                   "maxSchemaChars":  50000,
+                                                                                                                   "maxCombinedChars":  120000
+                                                                                                               },
+                                                                                                    "capability":  {
+                                                                                                                       "requiredCapabilityIds":  [
+                                                                                                                                                     "workspace.read-files",
+                                                                                                                                                     "workspace.apply-patch"
+                                                                                                                                                 ]
+                                                                                                                   }
+                                                                                                }
+                                                                  }
+                                                }
+                                }
+                   }
+               ]
 }

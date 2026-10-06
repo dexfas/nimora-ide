@@ -50,6 +50,7 @@ export interface RuntimeHello {
     streamingModelResponses?: boolean;
     recoverableCheckpoints?: boolean;
     extensionHostFetchProxy?: boolean;
+    missionToolBroker?: boolean;
   };
 }
 
@@ -96,6 +97,8 @@ export class RuntimeClient implements vscode.Disposable {
     toolInvocationToken?: vscode.ChatParticipantToolToken;
     cancellationToken: vscode.CancellationToken;
     registeredToolNames: Set<string>;
+    invokeMissionTool?: (requestId: string | number, name: string, args: unknown) => Promise<{ text?: string; isError?: boolean }>;
+    missionToolSubmitted?: (requestId: string | number, error?: Error) => void;
   }>();
   private networkFetchControllers = new Map<string, AbortController>();
   private nextId = 1;
@@ -160,12 +163,17 @@ export class RuntimeClient implements vscode.Disposable {
       externalTools?: RuntimeToolDefinition[];
       modeInstructions?: string;
       checkpoint?: RuntimeAgentCheckpoint;
+      hostManagedTools?: boolean;
+      terminalAfterExternalToolResult?: boolean;
     },
     onTrace?: (item: RuntimeTraceItem) => void,
     onCheckpoint?: (checkpoint: RuntimeAgentCheckpoint) => void,
-    invocationContext?: { toolInvocationToken?: vscode.ChatParticipantToolToken; cancellationToken: vscode.CancellationToken },
+    invocationContext?: { toolInvocationToken?: vscode.ChatParticipantToolToken; cancellationToken: vscode.CancellationToken;
+      invokeMissionTool?: (requestId: string | number, name: string, args: unknown) => Promise<{ text?: string; isError?: boolean }>;
+      missionToolSubmitted?: (requestId: string | number, error?: Error) => void },
   ): Promise<any> {
     await this.start();
+    if (params.hostManagedTools && !invocationContext?.invokeMissionTool) throw new Error("Mission Runtime requires an exact host capability invoker.");
     const runId = `run-${Date.now()}-${this.nextRunId++}`;
     if (onTrace) this.traceListeners.set(runId, onTrace);
     if (onCheckpoint) this.checkpointListeners.set(runId, onCheckpoint);
@@ -363,11 +371,23 @@ export class RuntimeClient implements vscode.Disposable {
     try {
       if (!context) throw new Error(`Unknown or inactive runId: ${runId}`);
       if (!name) throw new Error("IDE tool request is missing a tool name.");
+      if (context.invokeMissionTool) {
+        if (!params.arguments || typeof params.arguments !== "object" || Array.isArray(params.arguments)) throw new Error("Mission tool RPC arguments must be an object; no invocation.");
+        const requestId = request.id;
+        const result = await context.invokeMissionTool(requestId, name, args);
+        await new Promise<void>((resolve, reject) => child.stdin.write(
+          `${JSON.stringify({ jsonrpc: "2.0", id: requestId, result })}\n`, error => {
+            context.missionToolSubmitted?.(requestId, error ?? undefined);
+            if (error) reject(error); else resolve();
+          }));
+        return;
+      }
       const result = await this.ideToolBroker.invoke(name, args, context, context.registeredToolNames.has(name));
       child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, result })}\n`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, error: { code: -32010, message } })}\n`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        context?.missionToolSubmitted?.(request.id, error instanceof Error ? error : new Error(message));
+        child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, error: { code: -32010, message } })}\n`);
     }
   }
 

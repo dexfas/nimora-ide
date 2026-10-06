@@ -1,4 +1,5 @@
 import type {
+  MissionPlane,
   TaskArtifactRef,
   TaskDeliveryStatus,
   TaskExecutionStatus,
@@ -29,6 +30,12 @@ export interface TaskCenterExecutionCounts {
 export interface TaskCenterTaskSummary {
   version: 1;
   taskId: string;
+  projectId?: string;
+  missionId?: string;
+  rootMissionId?: string;
+  parentMissionId?: string;
+  plane?: MissionPlane;
+  missionType?: string;
   status: TaskStatus;
   sourceKind: TaskSnapshot["source"]["kind"];
   workspace?: string;
@@ -137,6 +144,12 @@ function projectSummary(task: TaskSnapshot): TaskCenterTaskSummary {
   return {
     version: 1,
     taskId: task.taskId,
+    projectId: task.mission?.projectId,
+    missionId: task.mission ? task.taskId : undefined,
+    rootMissionId: task.mission?.rootMissionId,
+    parentMissionId: task.mission?.parentMissionId,
+    plane: task.mission?.plane,
+    missionType: task.mission?.missionType,
     status: task.status,
     sourceKind: task.source.kind,
     workspace: task.source.workspace,

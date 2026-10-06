@@ -75,6 +75,7 @@ suite('ChatCollapsibleInputOutputContentPart', () => {
 			false,
 			false,
 			false,
+			undefined,
 		));
 
 		const button = part.domNode.querySelector<HTMLElement>('.chat-confirmation-widget-title');

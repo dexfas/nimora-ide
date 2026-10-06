@@ -4,16 +4,14 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { tmpdir } from 'os';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
+import sinon from 'sinon';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { SessionDatabase, runMigrations, sessionDatabaseMigrations, type ISessionDatabaseMigration } from '../../node/sessionDatabase.js';
 import { FileEditKind, MessageKind } from '../../common/state/sessionState.js';
 import type { IReviewedFileRecord } from '../../common/sessionDataService.js';
 import type { Database } from '@vscode/sqlite3';
-import { generateUuid } from '../../../../base/common/uuid.js';
-import { join } from '../../../../base/common/path.js';
 import { URI } from '../../../../base/common/uri.js';
 
 suite('SessionDatabase', () => {
@@ -31,24 +29,16 @@ suite('SessionDatabase', () => {
 	suite('initialization', () => {
 
 		test('retries after a transient initialization failure', async () => {
-			const tempRoot = await fs.mkdtemp(join(tmpdir(), 'session-db-retry-' + generateUuid()));
+			const mkdir = sinon.stub(fs.promises, 'mkdir').resolves(undefined);
+			mkdir.onFirstCall().rejects(Object.assign(new Error('Transient directory initialization failure'), { code: 'EEXIST' }));
+			const database = new SessionDatabase(':memory:');
 			try {
-				const databaseDir = join(tempRoot, 'blocked');
-				const databasePath = join(databaseDir, 'session.db');
-				await fs.writeFile(databaseDir, '');
-				const database = new SessionDatabase(databasePath);
-				try {
-					await assert.rejects(() => database.setMetadata('key', 'first'), { code: 'EEXIST' });
-					await fs.rm(databaseDir);
-
-					await database.setMetadata('key', 'second');
-
-					assert.strictEqual(await database.getMetadata('key'), 'second');
-				} finally {
-					await database.close();
-				}
+				await assert.rejects(() => database.setMetadata('key', 'first'), { code: 'EEXIST' });
+				await database.setMetadata('key', 'second');
+				assert.strictEqual(await database.getMetadata('key'), 'second');
 			} finally {
-				await fs.rm(tempRoot, { recursive: true, force: true });
+				await database.close();
+				mkdir.restore();
 			}
 		});
 	});
@@ -58,6 +48,9 @@ suite('SessionDatabase', () => {
 	 * Database instance, enabling reopen tests with :memory: databases.
 	 */
 	class TestableSessionDatabase extends SessionDatabase {
+		getRawDb(): Promise<Database> {
+			return this._ensureDb();
+		}
 		static override async open(path: string, migrations: readonly ISessionDatabaseMigration[] = sessionDatabaseMigrations): Promise<TestableSessionDatabase> {
 			const inst = new TestableSessionDatabase(path, migrations);
 			await inst._ensureDb();
@@ -840,31 +833,29 @@ suite('SessionDatabase', () => {
 	// ---- vacuumInto -----------------------------------------------------
 
 	suite('vacuumInto', () => {
-
-		let tmpDir: string;
-
-		setup(async () => {
-			tmpDir = await fs.mkdtemp(join(tmpdir(), 'session-db-test-' + generateUuid()));
-		});
-
-		teardown(async () => {
-			await Promise.all([db?.close(), db2?.close()]);
-			db = db2 = undefined;
-			await fs.rm(tmpDir, { recursive: true, force: true });
-		});
-
-		test('produces a copy with the same data', async () => {
-			db = disposables.add(await SessionDatabase.open(':memory:'));
-			await db.createTurn('turn-1');
-			await db.setTurnEventId('turn-1', 'evt-1');
-			await db.setMetadata('key', 'value');
-
-			const targetPath = join(tmpDir, 'copy.db');
-			await db.vacuumInto(targetPath);
-
-			db2 = disposables.add(await SessionDatabase.open(targetPath));
-			assert.strictEqual(await db2.getTurnEventId('turn-1'), 'evt-1');
-			assert.strictEqual(await db2.getMetadata('key'), 'value');
+		test('binds the destination as data and propagates SQLite errors', async () => {
+			const database = disposables.add(await TestableSessionDatabase.open(':memory:'));
+			db = database;
+			await database.setMetadata('key', 'value');
+			const raw = await database.getRawDb();
+			const failure = new Error('SQLite export failure');
+			const target = "copy's destination.db";
+			// The directory's test contract requires in-memory databases. Intercept
+			// only the export statement; all setup and subsequent reads use SQLite.
+			const run = sinon.stub(raw, 'run').callsFake(function (sql: string, ...args: unknown[]) {
+				assert.strictEqual(sql, 'VACUUM INTO ?');
+				assert.deepStrictEqual(args[0], [target]);
+				const callback = args[1];
+				assert.strictEqual(typeof callback, 'function');
+				(callback as (err: Error) => void)(failure);
+				return raw;
+			});
+			try {
+				await assert.rejects(() => database.vacuumInto(target), err => err === failure);
+			} finally {
+				run.restore();
+			}
+			assert.strictEqual(await database.getMetadata('key'), 'value');
 		});
 	});
 });

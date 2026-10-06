@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { Server as ModernServer, createMcpHandler, isLegacyRequest } from '@modelcontextprotocol/server';
+import { toNodeHandler, toWebRequest } from '@modelcontextprotocol/node';
 
 export function createGatewayMcpExposureAdapter({
   listTools,
@@ -15,6 +17,13 @@ export function createGatewayMcpExposureAdapter({
   if (typeof callTool !== 'function') throw new Error('Gateway MCP exposure requires callTool().');
 
   const sessions = new Map();
+  const modern = createMcpHandler(() => {
+    const server = new ModernServer({ name: serverName, version: serverVersion }, { capabilities: { tools: {}, logging: {} }, instructions });
+    server.setRequestHandler('tools/list', async () => ({ tools: await listTools() }));
+    server.setRequestHandler('tools/call', async request => callTool(request.params.name, request.params.arguments ?? {}));
+    return server;
+  }, { legacy: 'reject' });
+  const modernNode = toNodeHandler(modern);
 
   function createProtocolServer() {
     const server = new Server(
@@ -30,6 +39,12 @@ export function createGatewayMcpExposureAdapter({
   }
 
   async function handlePost(request, response, body = request.body) {
+    // The official era classifier validates protocol metadata. Transport
+    // sessions remain legacy compatibility state, never application authority.
+    if (!(await isLegacyRequest(await toWebRequest(request, body)))) {
+      await modernNode(request, response, body);
+      return;
+    }
     const sid = request.headers['mcp-session-id'];
     let transport = typeof sid === 'string' ? sessions.get(sid) : undefined;
     if (!transport && !sid && isInitializeRequest(body)) {

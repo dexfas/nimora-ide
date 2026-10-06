@@ -257,6 +257,7 @@ async function main(): Promise<void> {
 	const agentService = new AgentService(logService, fileService, sessionDataService, productService, gitService, rootConfigResource, telemetryService, fileMonitorService, undefined, fetchFn, [createCodexProviderConfiguration(environmentService.userHome)]);
 	disposables.add(agentService);
 	diServices.set(IAgentService, agentService);
+	diServices.set(IAgentHostCheckpointService, agentService.checkpointService);
 	diServices.set(IAgentHostStateManager, agentService.stateManager);
 	const networkDiagnosticsService = instantiationService.createInstance(NetworkDiagnosticsService);
 	diServices.set(INetworkDiagnosticsService, networkDiagnosticsService);
@@ -279,7 +280,6 @@ async function main(): Promise<void> {
 		diServices.set(IEditArcReporterService, editArcReporterService);
 		diServices.set(IAgentHostGitHubEndpointService, agentService.gitHubEndpointService);
 		diServices.set(IAgentHostCompletions, agentService.completionsService);
-		diServices.set(IAgentHostCheckpointService, agentService.checkpointService);
 		diServices.set(IAgentHostGitService, gitService);
 		// Register `ICopilotApiService` BEFORE `IClaudeProxyService` —
 		// the proxy service constructor requires it.

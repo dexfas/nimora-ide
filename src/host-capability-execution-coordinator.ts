@@ -11,6 +11,7 @@ export interface HostCapabilityExecutionRequest {
   callId: string;
   name: string;
   arguments?: unknown;
+  occurrenceId?: string;
 }
 
 export interface HostCapabilityExecutorResult {
@@ -20,7 +21,18 @@ export interface HostCapabilityExecutorResult {
 }
 
 export interface HostCapabilityExecutor {
-  execute(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata): Promise<HostCapabilityExecutorResult>;
+  execute(request: HostCapabilityExecutionRequest, capability: CapabilityMetadata, admission?: HostCapabilityExecutionAdmission): Promise<HostCapabilityExecutorResult>;
+}
+
+/** Live admission only; never part of execution identity or durable journal data. */
+export interface HostCapabilityExecutionAdmission {
+  signal?: AbortSignal;
+  assertCurrent?: () => void;
+}
+
+export function assertHostCapabilityExecutionAdmission(admission?: HostCapabilityExecutionAdmission): void {
+  if (admission?.signal?.aborted) throw new Error("Host capability admission revoked: request cancelled or Mission turn ended.");
+  admission?.assertCurrent?.();
 }
 
 export interface HostCapabilityAuthorizer {
@@ -85,7 +97,8 @@ export class HostCapabilityExecutionCoordinator {
     this.now = options.now ?? Date.now;
   }
 
-  async executeOnce(request: HostCapabilityExecutionRequest): Promise<WorkerCapabilityResultInput> {
+  async executeOnce(request: HostCapabilityExecutionRequest, admission?: HostCapabilityExecutionAdmission): Promise<WorkerCapabilityResultInput> {
+    assertHostCapabilityExecutionAdmission(admission);
     this.validateRequest(request);
     const capability = getCapabilityMetadata(request.name);
     if (!capability) throw new Error(`Host-managed execution requires registered capability metadata: ${request.name}`);
@@ -105,7 +118,7 @@ export class HostCapabilityExecutionCoordinator {
       deliveryAttempts: 0,
     };
     this.records.set(request.executionId, record);
-    record.executionPromise = this.recoverAuthorizeAndExecute(request, capability, record);
+    record.executionPromise = this.recoverAuthorizeAndExecute(request, capability, record, admission);
     try {
       const result = await record.executionPromise;
       record.result = result;
@@ -169,6 +182,7 @@ export class HostCapabilityExecutionCoordinator {
     request: HostCapabilityExecutionRequest,
     capability: CapabilityMetadata,
     record: ExecutionRecord,
+    admission?: HostCapabilityExecutionAdmission,
   ): Promise<WorkerCapabilityResultInput> {
     if (this.options.durableStore) {
       const recovery = await this.options.durableStore.recover(request, capability);
@@ -176,7 +190,9 @@ export class HostCapabilityExecutionCoordinator {
       if (recovered) return recovered;
     }
 
+    assertHostCapabilityExecutionAdmission(admission);
     await this.options.authorizer.authorize(request, capability);
+    assertHostCapabilityExecutionAdmission(admission);
     if (this.options.durableStore) {
       const claim = await this.options.durableStore.claim(request, capability);
       const recovered = this.consumeRecovery(request, record, claim);
@@ -187,7 +203,10 @@ export class HostCapabilityExecutionCoordinator {
     const startedAt = this.now();
     let result: WorkerCapabilityResultInput;
     try {
-      const executed = await this.options.executor.execute(request, capability);
+      // claim() may await durable I/O. If authority ended during that await,
+      // persist a failed result for the claim without entering the executor.
+      assertHostCapabilityExecutionAdmission(admission);
+      const executed = await this.options.executor.execute(request, capability, admission);
       result = {
         inputId: request.inputId,
         callId: request.callId,
@@ -196,6 +215,7 @@ export class HostCapabilityExecutionCoordinator {
         isError: executed.isError === true,
         durationMs: Math.max(0, this.now() - startedAt),
         data: executed.data,
+        extensions: request.occurrenceId ? { occurrenceId: request.occurrenceId } : undefined,
       };
     } catch (error) {
       result = {
@@ -205,6 +225,7 @@ export class HostCapabilityExecutionCoordinator {
         text: `Host capability executor failed: ${error instanceof Error ? error.message : String(error)}`,
         isError: true,
         durationMs: Math.max(0, this.now() - startedAt),
+        extensions: request.occurrenceId ? { occurrenceId: request.occurrenceId } : undefined,
       };
     }
     record.result = result;
@@ -230,8 +251,11 @@ export class HostCapabilityExecutionCoordinator {
       throw new Error(`Durable execution ${request.executionId} is ambiguous and will not be automatically re-executed: ${recovery.reason}`);
     }
     record.result = structuredClone(recovery.result);
+    if (request.occurrenceId) {
+      record.result.extensions = { ...(record.result.extensions ?? {}), occurrenceId: request.occurrenceId };
+    }
     record.phase = recovery.state === "delivered" ? "delivered" : "executed";
-    return structuredClone(recovery.result);
+    return structuredClone(record.result);
   }
 
   private validateRequest(request: HostCapabilityExecutionRequest): void {
@@ -252,6 +276,7 @@ export class HostCapabilityExecutionCoordinator {
       callId: request.callId,
       name: request.name,
       arguments: request.arguments,
+      occurrenceId: request.occurrenceId,
     });
   }
 

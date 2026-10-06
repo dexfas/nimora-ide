@@ -254,6 +254,40 @@ try {
   assert.match(hostRemaining.find(event => event.type === 'capability_result')?.text ?? '', /README/);
   assert.equal(tasks.getTask(task.taskId).executions[hostCall.extensions.executionId].duplicateObservations, 0, 'Manager must not shadow-project host-owned execution after strict owner claim');
 
+  // Exercise the actual production router: advertised Task tools must have a
+  // strict executor, isolated to the exact attached Task Worker. A duplicate
+  // delivery cannot append another todo/progress mutation.
+  const taskRequest = {
+    executionId: `worker:${hostSession.managedSessionId}:task-state:1`,
+    managedSessionId: hostSession.managedSessionId, workerId: hostSession.workerId,
+    taskId: task.taskId, inputId: 'task-state', callId: 'todos-state', name: 'set_todos',
+    arguments: { todos: [{ id: 'build', title: 'Build deliverables', status: 'in_progress' }] },
+  };
+  const taskSink = { async submitCapabilityResult() {} };
+  const todoResult = await hostExecution.executeAndDeliver(taskRequest, taskSink);
+  assert.equal(todoResult.isError, false);
+  assert.equal(tasks.getTask(task.taskId).todos[0].id, 'build');
+  const progressRequest = { ...taskRequest, executionId: `worker:${hostSession.managedSessionId}:task-state:2`,
+    callId: 'progress-state', name: 'report_progress', arguments: { message: 'Implementation started', percent: 20 } };
+  const progressResult = await hostExecution.executeAndDeliver(progressRequest, taskSink);
+  assert.equal(progressResult.isError, false);
+  assert.equal(tasks.getTask(task.taskId).progress.todoId, 'build');
+  assert.equal(tasks.getTask(task.taskId).progress.percent, 20);
+  await hostExecution.executeAndDeliver(taskRequest, taskSink);
+  await hostExecution.executeAndDeliver(progressRequest, taskSink);
+  assert.deepEqual(brokerCalls, [], 'Task tools must never run IDE commands or write workspace files');
+  const wrongBinding = await hostExecution.executeOnce({ ...taskRequest, executionId: 'task-state-wrong-worker',
+    managedSessionId: 'unbound-worker', callId: 'wrong-binding' });
+  assert.equal(wrongBinding.isError, true);
+  assert.match(wrongBinding.text, /exact current Mission Worker binding/);
+  const invalidTodo = await hostExecution.executeOnce({ ...taskRequest, executionId: 'task-state-invalid-todos',
+    callId: 'invalid-todos', arguments: { todos: [{ id: 'bad', title: '', status: 'in_progress' }] } });
+  assert.equal(invalidTodo.isError, true);
+  assert.equal(tasks.getTask(task.taskId).todos[0].id, 'build');
+  const journal = (await fs.readFile(path.join(taskDirectory, `${task.taskId}.jsonl`), 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
+  assert.equal(journal.filter(event => event.type === 'TaskTodosUpdated').length, 1);
+  assert.equal(journal.filter(event => event.type === 'TaskProgressUpdated').length, 1);
+
   const runCommand = getCapabilityMetadata('run_command');
   const terminalRequest = {
     executionId: `worker:${hostSession.managedSessionId}:stack-turn-host:terminal-grant`,

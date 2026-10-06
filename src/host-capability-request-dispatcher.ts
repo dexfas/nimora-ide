@@ -37,6 +37,10 @@ export async function dispatchHostCapabilityRequest(
       name: request.name,
       text: `Permission was not granted for ${request.name}.`,
       isError: true,
+      extensions: request.occurrenceId || error.stopTurn ? {
+        ...(request.occurrenceId ? { occurrenceId: request.occurrenceId } : {}),
+        ...(error.stopTurn ? { hostAuthorizationStoppedTurn: true } : {}),
+      } : undefined,
     };
     await sink.submitCapabilityResult(request.managedSessionId, result);
     return { status: "denied", result };

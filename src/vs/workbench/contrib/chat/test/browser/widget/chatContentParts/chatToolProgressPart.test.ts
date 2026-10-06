@@ -195,6 +195,7 @@ suite('ChatToolProgressSubPart', () => {
 				setTodos() { },
 				migrateTodos() { },
 			} satisfies IChatTodoListService,
+			mockConfigurationService,
 		));
 	}
 
@@ -378,6 +379,7 @@ suite('ChatToolProgressSubPart', () => {
 				setTodos() { },
 				migrateTodos() { },
 			} satisfies IChatTodoListService,
+			mockConfigurationService,
 		));
 		const sessionIdBeforeUpdate = part.domNode.firstElementChild?.getAttribute('data-terminal-tool-session-id');
 

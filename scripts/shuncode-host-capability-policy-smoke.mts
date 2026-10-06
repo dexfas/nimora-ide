@@ -19,6 +19,7 @@ await esbuild.build({
       export { HostCapabilityExecutorRouter } from './src/host-capability-executor-router.ts';
       export { FileToolHostCapabilityExecutor } from './src/file-host-capability-executor.ts';
       export { IdeToolBrokerHostCapabilityExecutor } from './extensions/shuncode/src/ide-host-capability-executor.ts';
+      export { STRICT_TERMINAL_SANDBOX_INPUT } from './extensions/shuncode/src/strict-terminal-sandbox-contract.ts';
     `,
     resolveDir: root,
     sourcefile: 'host-capability-policy-entry.ts',
@@ -38,6 +39,7 @@ const {
   HostCapabilityExecutorRouter,
   FileToolHostCapabilityExecutor,
   IdeToolBrokerHostCapabilityExecutor,
+  STRICT_TERMINAL_SANDBOX_INPUT,
 } = require(bundlePath);
 const request = (name) => ({ executionId: `exec-${name}`, managedSessionId: 'managed-1', workerId: 'nimora.web-worker', taskId: 'task-1', inputId: 'turn-1', callId: `call-${name}`, name, arguments: {} });
 
@@ -61,6 +63,27 @@ try {
   const denied = new CapabilityMetadataHostAuthorizer({ async isGranted() { return false; } });
   await assert.rejects(() => denied.authorize(request('run_command'), getCapabilityMetadata('run_command')), /was not granted/);
 
+  const taskSnapshot = {
+    inputAccessPolicies: {
+      'turn-1': {
+        inputId: 'turn-1',
+        managedSessionId: 'managed-1',
+        allowedWorkspacePathPrefixes: ['.'],
+      },
+    },
+    workerSessions: {
+      'managed-1': {
+        managedSessionId: 'managed-1',
+        workerId: 'nimora.web-worker',
+      },
+    },
+  };
+  const tasks = {
+    getTask(taskId) {
+      return taskId === 'task-1' ? taskSnapshot : undefined;
+    },
+  };
+
   const calls = [];
   const executor = new IdeToolBrokerHostCapabilityExecutor({
     async invokeDirect(name, args) {
@@ -72,6 +95,41 @@ try {
   assert.equal(listResult.text, 'BROKER:list_directory');
   assert.deepEqual(calls, [{ name: 'list_directory', args: { path: '.' } }]);
   await assert.rejects(() => executor.execute(request('read_files'), getCapabilityMetadata('read_files')), /not owned by IdeToolBroker/);
+  await assert.rejects(
+    () => executor.execute(request('run_command'), getCapabilityMetadata('run_command')),
+    /requires exact durable Work Order path policy/,
+  );
+
+  let strictInvocationArgs;
+  const strictExecutor = new IdeToolBrokerHostCapabilityExecutor({
+    async invokeDirect(name, args) {
+      strictInvocationArgs = args;
+      return { text: 'BROKER:strict-run', isError: false };
+    },
+  }, { tasks, workspaceRoots: () => [workspaceDirectory] });
+  const strictResult = await strictExecutor.execute(request('run_command'), getCapabilityMetadata('run_command'));
+  assert.equal(strictResult.text, 'BROKER:strict-run');
+  const strictMarker = strictInvocationArgs[STRICT_TERMINAL_SANDBOX_INPUT];
+  assert.deepEqual(strictMarker.writeRoots, [await fs.realpath(workspaceDirectory)]);
+  assert.equal(Object.prototype.propertyIsEnumerable.call(strictInvocationArgs, STRICT_TERMINAL_SANDBOX_INPUT), false);
+  assert.deepEqual(Object.keys(strictInvocationArgs), [], 'sandbox roots must not become model-visible string arguments');
+
+  for (const [status, exit, stdout, expected] of [
+    ['completed', '0', 'status: failed\nexit_code: 42', false],
+    ['failed', '1', 'status: completed\nexit_code: 0', true],
+    ['completed', '2', '', true],
+    ['killed', 'null', '', true],
+    ['running', 'null', '', false],
+  ]) {
+    for (const [tool, envelope] of [['run_command', 'RUN_COMMAND'], ['get_command_output', 'COMMAND_OUTPUT']]) {
+      const terminalExecutor = new IdeToolBrokerHostCapabilityExecutor({ invokeDirect: async () => ({
+        text: `=== ${envelope} BEGIN ===\nstatus: ${status}\nexit_code: ${exit}\n--- OUTPUT BEGIN ---\n${stdout}\n--- OUTPUT END ---\n=== ${envelope} END ===`, isError: false,
+      }) }, { tasks, workspaceRoots: () => [workspaceDirectory] });
+      const terminalResult = await terminalExecutor.execute(request(tool), getCapabilityMetadata(tool));
+      assert.equal(terminalResult.isError, expected, 'only the host header decides command failure, never stdout');
+      assert.equal(terminalResult.data.commandStatus, status);
+    }
+  }
 
   const fileExecutor = new FileToolHostCapabilityExecutor({ workspaceRoots: () => [workspaceDirectory] });
   const router = new HostCapabilityExecutorRouter([executor, fileExecutor]);
@@ -80,6 +138,13 @@ try {
     arguments: { files: [{ path: 'note.txt' }] },
   }, getCapabilityMetadata('read_files'));
   assert.match(fileResult.text, /ROUTER_FILE_OK/);
+  const partialRead = await router.execute({ ...request('read_files'), arguments: { files: [{ path: 'note.txt' }, { path: 'missing.txt' }] } }, getCapabilityMetadata('read_files'));
+  assert.equal(partialRead.isError, true, 'partial read failure must stop a web turn');
+  assert.match(partialRead.text, /ROUTER_FILE_OK/);
+  assert.match(partialRead.text, /FILE_NOT_FOUND/);
+  const outsideRead = await router.execute({ ...request('read_files'), arguments: { files: [{ path: bundlePath }] } }, getCapabilityMetadata('read_files'));
+  assert.equal(outsideRead.isError, true);
+  assert.match(outsideRead.text, /PATH_OUTSIDE_WORKSPACE/);
   assert.deepEqual(calls, [{ name: 'list_directory', args: { path: '.' } }], 'runtime/file capability must not fall through to IdeToolBroker');
   const routedList = await router.execute({ ...request('list_directory'), arguments: { path: '.' } }, getCapabilityMetadata('list_directory'));
   assert.equal(routedList.text, 'BROKER:list_directory');

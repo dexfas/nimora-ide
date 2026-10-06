@@ -3,6 +3,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const vscode = require('vscode');
+const workerPageResources = require('./worker-page-resources.js');
+const { createChatGptWorkerController } = require('./chatgpt-worker-controller.js');
+const { collectObservedResources, invokeWithDeadline } = require('./bounded-browser-tool.js');
+const { findExtensionGatewayDirectory } = require('./gateway-location.js');
+const { createDeepSeekProviderWriteGate, isDeepSeekRateLimitError } = require('./deepseek-provider-write-gate.js');
+const { runProviderConversationCleanup } = require('./conversation-lifecycle.js');
 
 function envPort(name, fallback) {
   const value = Number(process.env[name]);
@@ -12,7 +18,7 @@ function envPort(name, fallback) {
 const HOST = '127.0.0.1';
 const PORT = envPort('SHUNCODE_WEBMCP_CONTROL_PORT', 48322);
 const BUILTIN_BROWSER_TOOLS = [
-  'open_browser_page', 'list_browser_pages', 'read_page', 'click_element',
+  'open_browser_page', 'list_browser_pages', 'activate_browser_page', 'read_page', 'click_element',
   'type_in_page', 'navigate_page', 'hover_element', 'drag_element',
   'handle_dialog', 'run_playwright_code', 'screenshot_page',
 ];
@@ -34,19 +40,37 @@ const WEB_MCP_HIGH_IMPACT = new Set([
 const WEB_MCP_NATIVE_BYPASS_HOSTS = new Set(['chatgpt.com', 'chat.openai.com']);
 const WEB_MCP_PAGE_TOKEN = require('node:crypto').randomUUID();
 const WEB_MCP_APPROVAL_MODE_KEY = 'shuncode.webMcp.approvalMode';
+const WEB_MCP_DEEPSEEK_LAST_WRITE_AT_KEY = 'shuncode.webMcp.deepSeekLastProviderWriteAt';
+const WEB_MCP_DEEPSEEK_COOLDOWN_UNTIL_KEY = 'shuncode.webMcp.deepSeekProviderCooldownUntil';
+const WEB_MCP_LIST_BROWSER_TIMEOUT_MS = 5000;
+const WEB_MCP_EXACT_PAGE_VISIBILITY_TOTAL_MS = 2500;
+const WEB_MCP_EXACT_PAGE_VISIBILITY_POLL_MS = 100;
+const WEB_MCP_OBSERVATION_ATTEMPT_MS = 4000;
+const WEB_MCP_OBSERVATION_TOTAL_MS = 12000;
+const WEB_MCP_DISCOVERY_TOTAL_MS = 20000;
+const WEB_MCP_CONTROL_ATTEMPT_MS = 4000;
+const WEB_MCP_CONTROL_TOTAL_MS = 12000;
+const WEB_MCP_SEND_TOTAL_MS = 20000;
+const CHATGPT_EXACT_OBSERVATION_ATTEMPT_MS = 4000;
+const CHATGPT_EXACT_OBSERVATION_TOTAL_MS = 12000;
+const WEB_MCP_INTERNAL_BROWSER_COMMAND = '_workbench.browser.webMcpInternalOperation';
 const webMcpSessionApprovals = new Set();
 let webMcpApprovalMode = 'session';
 let arenaInjectBusy = false;
 let arenaInjectTimer = null;
 let arenaAgentSource = null;
+let webMcpSiteAdapterSource = null;
 let lastArenaStatus = { cdp: false, targets: 0, arenaTargets: 0, injected: 0, error: null };
 let lastArenaError = '';
 let sharePromptCooldownUntil = 0;
 const injectionAttemptedPages = new Set();
 let webMcpProcess = null;
 let webMcpStartPromise = null;
+let webMcpStorageDirectory = null;
+let personalEdgeToken;
 let webMcpStatusItem = null;
 let webMcpApprovalItem = null;
+let deepSeekProviderWriteGate = null;
 
 function webMcpHost(url) {
   try { return new URL(String(url || '')).hostname.toLowerCase(); }
@@ -179,6 +203,13 @@ function getArenaAgentSource() {
       + `})`;
   }
   return arenaAgentSource;
+}
+
+function getWebMcpSiteAdapterSource() {
+  if (webMcpSiteAdapterSource === null) {
+    webMcpSiteAdapterSource = fs.readFileSync(WEB_MCP_SITE_ADAPTERS_SCRIPT_PATH, 'utf8').trim();
+  }
+  return webMcpSiteAdapterSource;
 }
 
 function cdpEvaluate(webSocketDebuggerUrl, expression, timeoutMs = 3500) {
@@ -409,28 +440,6 @@ function webMcpRequest(method, requestPath, body, timeoutMs = 5000) {
   });
 }
 
-async function findGatewayDirectory() {
-  const folders = vscode.workspace.workspaceFolders || [];
-  const candidates = [];
-  for (const folder of folders) {
-    const root = folder.uri.fsPath;
-    candidates.push(
-      path.join(root, 'ShunCode-Browser-MCP', 'ShunCode-Browser-MCP'),
-      path.join(root, 'ShunCode-Browser-MCP'),
-      root,
-    );
-  }
-  for (const candidate of candidates) {
-    if (fs.existsSync(path.join(candidate, 'server.mjs'))) return candidate;
-  }
-  const found = await vscode.workspace.findFiles(
-    '**/ShunCode-Browser-MCP/ShunCode-Browser-MCP/server.mjs',
-    '**/{node_modules,browser-profile}/**',
-    1,
-  );
-  return found[0] ? path.dirname(found[0].fsPath) : null;
-}
-
 function updateWebMcpStatus(text, tooltip) {
   if (!webMcpStatusItem) return;
   webMcpStatusItem.text = text;
@@ -458,18 +467,26 @@ async function ensureWebMcpGateway(output) {
     if (recheck?.integratedWebMcp) return recheck;
     if (recheck) throw new Error('端口 48321 正在运行旧版 Web MCP 网关。请先停止旧网关，再重新点击 MCP。');
 
-    const gatewayDir = await findGatewayDirectory();
-    if (!gatewayDir) throw new Error('找不到 ShunCode-Browser-MCP/server.mjs。请先打开包含该项目的 ShunCode 工作区。');
+    const gatewayDir = findExtensionGatewayDirectory(__dirname);
+    if (!gatewayDir) throw new Error('Nimora 随附的 WebMCP 网关缺失。请修复 ShunCode 的扩展安装；无需更换用户项目工作区。');
+    if (!webMcpStorageDirectory) throw new Error('Nimora WebMCP 的扩展数据目录尚未初始化。');
 
     if (!webMcpProcess || webMcpProcess.exitCode !== null) {
       const env = { ...process.env };
-      delete env.ELECTRON_RUN_AS_NODE;
+      // Reuse the owning desktop's embedded Node runtime. A portable release
+      // must not require a separately installed or PATH-selected node.exe.
+      env.ELECTRON_RUN_AS_NODE = '1';
       env.PORT = String(WEB_MCP_PORT);
       env.SHUNCODE_INTEGRATED_BROWSER_BRIDGE = `http://${HOST}:${PORT}`;
       env.SHUNCODE_WEBMCP_PAGE_CORE_PATH = WEB_MCP_PAGE_CORE_SCRIPT_PATH;
       env.SHUNCODE_WEBMCP_SITE_ADAPTERS_PATH = WEB_MCP_SITE_ADAPTERS_SCRIPT_PATH;
       env.SHUNCODE_WEBMCP_PAGE_AGENT_PATH = ARENA_AGENT_SCRIPT_PATH;
-      webMcpProcess = spawn('node', ['server.mjs'], {
+      env.SHUNCODE_PERSONAL_EDGE_TOKEN = await personalEdgeToken();
+      // The extension tree may be read-only in a packaged application. Keep
+      // browser profile and screenshots in the owning extension data folder.
+      env.BROWSER_PROFILE = path.join(webMcpStorageDirectory, 'browser-profile');
+      env.SHUNCODE_WEBMCP_SCREENSHOT_DIR = path.join(webMcpStorageDirectory, 'screenshots');
+      webMcpProcess = spawn(process.execPath, ['server.mjs'], {
         cwd: gatewayDir,
         env,
         windowsHide: true,
@@ -620,25 +637,220 @@ async function safeClipboardWebMcpStep(output) {
   }
 }
 
-async function invokeBuiltinBrowserTool(name, input = {}) {
+async function invokeBuiltinBrowserTool(name, input = {}, deadlineMs) {
   const found = vscode.lm.tools.find(tool => tool.name === name);
   if (!found) throw new Error(`ShunCode built-in browser tool is not registered: ${name}`);
   const cts = new vscode.CancellationTokenSource();
   try {
-    return await vscode.lm.invokeTool(name, { toolInvocationToken: undefined, input }, cts.token);
+    if (!(Number.isFinite(deadlineMs) && deadlineMs > 0)) {
+      return await vscode.lm.invokeTool(name, { toolInvocationToken: undefined, input }, cts.token);
+    }
+    return await invokeWithDeadline(
+      () => vscode.lm.invokeTool(name, { toolInvocationToken: undefined, input }, cts.token),
+      deadlineMs,
+      () => cts.cancel(),
+      `Built-in browser tool ${name}`,
+    );
   } finally {
     cts.dispose();
   }
 }
 
-function parseSharedBrowserPages(text) {
-  const pages = [];
-  for (const line of String(text || '').split(/\r?\n/)) {
-    const match = line.match(/- \[([0-9a-f-]{36})\]\s+(.+?)\s+\((https?:\/\/[^)]+)\)(.*)$/i);
-    if (!match) continue;
-    pages.push({ pageId: match[1], title: match[2], url: match[3], visible: !/not visible/i.test(match[4] || '') });
+async function invokeInternalBrowserOperation(input, deadlineMs, label = 'WebMCP internal browser operation') {
+  const invoke = () => vscode.commands.executeCommand(WEB_MCP_INTERNAL_BROWSER_COMMAND, input);
+  if (!(Number.isFinite(deadlineMs) && deadlineMs > 0)) return await invoke();
+  return await invokeWithDeadline(invoke, deadlineMs, undefined, label);
+}
+
+async function listSharedBrowserPagesInternal() {
+  const pages = await invokeInternalBrowserOperation(
+    { operationId: 'listSharedPages' },
+    WEB_MCP_LIST_BROWSER_TIMEOUT_MS,
+    'WebMCP shared-page list',
+  );
+  if (!Array.isArray(pages)) throw new Error('WebMCP shared-page list did not return an array.');
+  return pages.map(page => ({
+    pageId: String(page?.pageId || ''),
+    title: String(page?.title || ''),
+    url: String(page?.url || ''),
+    visible: page?.visible === true,
+  })).filter(page => page.pageId && page.url);
+}
+
+function browserPageOrigin(url) {
+  try { return new URL(String(url || '')).origin; } catch { return ''; }
+}
+
+async function ensureExactSharedBrowserPageVisible({ pageId, expectedUrl = '', expectedOrigin = '', label = 'browser provider page' } = {}) {
+  const exactPageId = String(pageId || '').trim();
+  const exactExpectedUrl = String(expectedUrl || '').trim();
+  const exactExpectedOrigin = String(expectedOrigin || '').trim();
+  if (!exactPageId) throw new Error(`${label} visibility requires exact pageId.`);
+
+  const before = (await listSharedBrowserPagesInternal()).find(page => page.pageId === exactPageId);
+  if (!before) throw new Error(`${label} disappeared before provider mutation: ${exactPageId}`);
+  if (exactExpectedUrl && before.url !== exactExpectedUrl) {
+    throw new Error(`${label} URL changed before provider mutation: ${before.url}`);
   }
-  return pages;
+  if (exactExpectedOrigin && browserPageOrigin(before.url) !== exactExpectedOrigin) {
+    throw new Error(`${label} origin changed before provider mutation: ${before.url}`);
+  }
+  if (before.visible) return before;
+
+  await invokeBuiltinBrowserTool('activate_browser_page', { pageId: exactPageId });
+  const startedAt = Date.now();
+  let observationCount = 0;
+  let notificationToastsDismissed = false;
+  while (true) {
+    const after = (await listSharedBrowserPagesInternal()).find(page => page.pageId === exactPageId);
+    observationCount += 1;
+    if (!after) throw new Error(`${label} disappeared during exact-page activation: ${exactPageId}`);
+    if (after.url !== before.url) throw new Error(`${label} URL changed during exact-page activation: ${after.url}`);
+    if (exactExpectedUrl && after.url !== exactExpectedUrl) {
+      throw new Error(`${label} URL changed after exact-page activation: ${after.url}`);
+    }
+    if (exactExpectedOrigin && browserPageOrigin(after.url) !== exactExpectedOrigin) {
+      throw new Error(`${label} origin changed after exact-page activation: ${after.url}`);
+    }
+    if (after.visible) return after;
+    if (!notificationToastsDismissed) {
+      // Native BrowserViews pause under notification overlays. Activation alone
+      // cannot reveal such a page. Hide only transient toasts once; notifications
+      // remain in their center and modal Human consent is never dismissed. This
+      // is presentation recovery before the first provider mutation, not a send
+      // retry. Exact shared identity and real visibility must still converge.
+      notificationToastsDismissed = true;
+      await vscode.commands.executeCommand('notifications.hideToasts');
+    }
+    if (Date.now() - startedAt >= WEB_MCP_EXACT_PAGE_VISIBILITY_TOTAL_MS) {
+      throw new Error(`${label} did not become visible after exact-page activation: ${exactPageId}; observations=${observationCount}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, WEB_MCP_EXACT_PAGE_VISIBILITY_POLL_MS));
+  }
+}
+
+async function runDeferredInternalBrowserOperation({ operationId, pageId, input = {}, deferredInput = {}, totalMs, perAttemptMs }) {
+  const startedAt = Date.now();
+  let deferredResultId = '';
+  let executionCount = 0;
+  while (Date.now() - startedAt < totalMs) {
+    const remainingMs = Math.max(1, totalMs - (Date.now() - startedAt));
+    const attemptMs = Math.max(1, Math.min(perAttemptMs, remainingMs));
+    const request = deferredResultId
+      ? { operationId, pageId, ...deferredInput, deferredResultId, timeoutMs: attemptMs }
+      : { operationId, pageId, ...input, timeoutMs: attemptMs };
+    const result = await invokeInternalBrowserOperation(request, Math.min(remainingMs, attemptMs + 1000), `WebMCP fixed ${operationId}`);
+    if (!deferredResultId) executionCount += 1;
+    if (result?.error) throw new Error(String(result.error));
+    if (!result?.deferredResultId) return { result: result?.result, executionCount, deferredResultId: deferredResultId || undefined };
+    const nextDeferredResultId = String(result.deferredResultId || '').trim();
+    if (!nextDeferredResultId) throw new Error(`WebMCP fixed ${operationId} returned an empty deferred identity.`);
+    if (deferredResultId && nextDeferredResultId !== deferredResultId) {
+      throw new Error(`WebMCP fixed ${operationId} deferred identity changed from ${deferredResultId} to ${nextDeferredResultId}.`);
+    }
+    deferredResultId = nextDeferredResultId;
+  }
+  throw new Error(`WebMCP fixed ${operationId} exceeded total deadline (${totalMs}ms)${deferredResultId ? `; deferredResultId=${deferredResultId}` : ''}`);
+}
+
+async function observeExactChatGptComposer(page) {
+  const pageId = String(page?.pageId || '').trim();
+  const expectedHref = String(page?.url || '').trim();
+  if (!pageId || !expectedHref) throw new Error('ChatGPT exact composer observation requires pageId and current URL.');
+  const observed = await runDeferredInternalBrowserOperation({
+    operationId: 'chatgptObserveComposer',
+    pageId,
+    input: { expectedHref },
+    deferredInput: { expectedHref },
+    totalMs: CHATGPT_EXACT_OBSERVATION_TOTAL_MS,
+    perAttemptMs: CHATGPT_EXACT_OBSERVATION_ATTEMPT_MS,
+  });
+  if (!observed.result || typeof observed.result !== 'object') throw new Error('ChatGPT exact composer observation returned no structured result.');
+  return observed.result;
+}
+
+async function observeExactChatGptProviderUsers(page) {
+  const pageId = String(page?.pageId || '').trim();
+  const expectedHref = String(page?.url || '').trim();
+  if (!pageId || !expectedHref) throw new Error('ChatGPT exact provider-user observation requires pageId and current URL.');
+  const observed = await runDeferredInternalBrowserOperation({
+    operationId: 'chatgptObserveProviderUsers',
+    pageId,
+    input: { expectedHref },
+    deferredInput: { expectedHref },
+    totalMs: CHATGPT_EXACT_OBSERVATION_TOTAL_MS,
+    perAttemptMs: CHATGPT_EXACT_OBSERVATION_ATTEMPT_MS,
+  });
+  if (!observed.result || typeof observed.result !== 'object') throw new Error('ChatGPT exact provider-user observation returned no structured result.');
+  return observed.result;
+}
+
+function parseSharedBrowserPages(text) {
+  return workerPageResources.parseSharedBrowserPages(text);
+}
+
+async function observeSharedWebMcpWorkerPage(page, totalMs = WEB_MCP_OBSERVATION_TOTAL_MS) {
+  if (shouldBypassWebMcp(page?.url)) return workerPageResources.normalizeBypassResource(page);
+  const observed = await runDeferredInternalBrowserOperation({
+    operationId: 'observe',
+    pageId: page.pageId,
+    input: { expectedHref: page.url },
+    totalMs,
+    perAttemptMs: WEB_MCP_OBSERVATION_ATTEMPT_MS,
+  });
+  return workerPageResources.normalizeObservedResource(
+    page,
+    observed.result,
+    false,
+  );
+}
+
+async function listSharedWebMcpWorkerResources(output) {
+  const deadline = Date.now() + WEB_MCP_DISCOVERY_TOTAL_MS;
+  const pages = await listSharedBrowserPagesInternal();
+  output?.appendLine?.(`[web-mcp:worker-discovery] start shared=${pages.length} budgetMs=${WEB_MCP_DISCOVERY_TOTAL_MS}`);
+  return collectObservedResources({
+    pages,
+    totalMs: Math.max(1, deadline - Date.now()),
+    perPageMs: WEB_MCP_OBSERVATION_TOTAL_MS,
+    // Independent, read-only page observations should share the 20s wall-clock
+    // budget rather than spending up to 12s serially on each of three tabs.
+    concurrency: 3,
+    observe: async (page, budget) => {
+      const resource = await observeSharedWebMcpWorkerPage(page, budget);
+      // Diagnostic facts only: never record page content, conversation URL,
+      // credentials, or complete browser/session identities.
+      output?.appendLine?.(`[web-mcp:worker-discovery] page=${String(page.pageId).slice(0, 8)} provider=${resource.site || 'unknown'} ready=${resource.ready} composer=${resource.composerFound} auth=${resource.isDeepSeekAuthPage} compatible=${resource.sessionIdentityCompatible}`);
+      return resource;
+    },
+    onFailure: (page, error) => output?.appendLine?.(`[web-mcp:worker-discovery] failed page=${page.pageId}: ${error instanceof Error ? error.message : String(error)}`),
+    shouldSkipFailure: (page, error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      return message.includes(`Page "${page?.pageId || ''}" not found`)
+        || message.includes(`Browser page is not open: ${page?.pageId || ''}`);
+    },
+    onSkipped: (page, error) => output?.appendLine?.(`[web-mcp:worker-discovery] skipped stale page=${page.pageId}: ${error instanceof Error ? error.message : String(error)}`),
+  });
+}
+
+async function probeSharedWebMcpWorkerResource(pageId) {
+  const exactPageId = String(pageId || '').trim();
+  if (!exactPageId) throw new Error('WebMCP worker resource probe requires pageId.');
+  const deadline = Date.now() + WEB_MCP_DISCOVERY_TOTAL_MS;
+  const page = (await listSharedBrowserPagesInternal()).find(item => item.pageId === exactPageId);
+  if (!page) return undefined;
+  return await observeSharedWebMcpWorkerPage(page, Math.min(WEB_MCP_OBSERVATION_TOTAL_MS, Math.max(1, deadline - Date.now())));
+}
+
+async function resolveExactWebMcpWorkerPage(target) {
+  const pageId = String(target?.pageId || '').trim();
+  if (!pageId) throw new Error('WebMCP exact worker target requires pageId.');
+  const deadline = Date.now() + WEB_MCP_DISCOVERY_TOTAL_MS;
+  const page = (await listSharedBrowserPagesInternal()).find(item => item.pageId === pageId);
+  if (!page) throw new Error(`Selected WebMCP page disappeared: ${pageId}`);
+  const observation = await observeSharedWebMcpWorkerPage(page, Math.min(WEB_MCP_OBSERVATION_TOTAL_MS, Math.max(1, deadline - Date.now())));
+  workerPageResources.assertExactTargetCompatible(target, observation);
+  return { page, observation };
 }
 
 async function getOrShareCurrentBrowserPage(output) {
@@ -670,7 +882,8 @@ async function connectCurrentWebMcpPage(output) {
   updateWebMcpStatus('$(sync~spin) Web MCP', '正在连接当前内置浏览器聊天页…');
   try {
     await ensureWebMcpGateway(output);
-    const page = await getOrShareCurrentBrowserPage(output);
+    const sharedPages = await listSharedBrowserPagesInternal();
+    const page = sharedPages.find(item => item.visible) || sharedPages.at(-1) || await getOrShareCurrentBrowserPage(output);
     if (shouldBypassWebMcp(page.url)) {
       try {
         await invokeBuiltinBrowserTool('run_playwright_code', {
@@ -685,23 +898,21 @@ async function connectCurrentWebMcpPage(output) {
       vscode.window.showInformationMessage(`Web MCP 已跳过 ${host}。按你的设置，此页面使用原生 MCP/工具能力，不注入 WebMCP。`);
       return;
     }
-    const source = getArenaAgentSource();
-    const expression = `(${source})(${JSON.stringify({ bridge: `http://${HOST}:${PORT}`, token: WEB_MCP_PAGE_TOKEN })})`;
-    const code = `
-      const expression = ${JSON.stringify(expression)};
-      const status = await page.evaluate(source => (0, eval)(source), expression);
-      const prime = await page.evaluate(async () => await window.__shuncodeWebMcp.prime());
-      return { status, prime, url: page.url() };
-    `;
-    const injected = await invokeBuiltinBrowserTool('run_playwright_code', { pageId: page.pageId, code, timeoutMs: 20000 });
-    const text = resultText(injected);
-    if (!/toolCount|alreadyPrimed|version[^\d]*25/i.test(text)) {
-      throw new Error(`网页 Web MCP 注入未确认成功：${text.slice(0, 1200) || '无返回结果'}`);
-    }
+    const observation = await observeSharedWebMcpWorkerPage(page);
+    const target = {
+      pageId: observation.pageId,
+      resourceIdentity: observation.resourceIdentity,
+      origin: observation.origin,
+      href: observation.href,
+      site: observation.site,
+      ...(observation.pageSessionId ? { pageSessionId: observation.pageSessionId } : {}),
+    };
+    workerPageResources.assertExactTargetCompatible(target, observation);
+    await connectWebMcpWorkerPage(output, { target, prime: true });
     const tools = await webMcpRequest('GET', '/control/shuncode-tools?protocol=2', undefined, 10000);
     const toolCount = Array.isArray(tools.tools) ? tools.tools.length : 0;
-    updateWebMcpStatus('$(check) Web MCP', `已连接：${page.url || page.title || page.pageId}`);
-    output.appendLine(`[web-mcp] connected page=${page.pageId} url=${page.url || ''} tools=${toolCount}`);
+    updateWebMcpStatus('$(check) Web MCP', `已连接：${observation.href || page.title || page.pageId}`);
+    output.appendLine(`[web-mcp] connected page=${page.pageId} url=${observation.href || page.url || ''} tools=${toolCount}`);
     vscode.window.showInformationMessage(`Web MCP 已连接当前网页，${toolCount} 个真实 ShunCode 工具可用。后续工具请求会自动往返。`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -713,22 +924,41 @@ async function connectCurrentWebMcpPage(output) {
 
 async function connectWebMcpWorkerPage(output, options = {}) {
   await ensureWebMcpGateway(output);
-  const page = await getOrShareCurrentBrowserPage(output);
+  const exactTarget = options?.target || options?.extensions?.webMcpTarget;
+  const exact = exactTarget ? await resolveExactWebMcpWorkerPage(exactTarget) : undefined;
+  const page = exact?.page || await getOrShareCurrentBrowserPage(output);
   if (shouldBypassWebMcp(page.url)) {
     throw new Error(`Web worker transport cannot attach to a native-MCP bypass page: ${page.url || page.title || page.pageId}`);
   }
-  const source = getArenaAgentSource();
-  const expression = `(${source})(${JSON.stringify({ bridge: `http://${HOST}:${PORT}`, token: WEB_MCP_PAGE_TOKEN })})`;
   const shouldPrime = options?.prime !== false;
-  const code = `
-    const expression = ${JSON.stringify(expression)};
-    const status = await page.evaluate(source => (0, eval)(source), expression);
-    const prime = ${shouldPrime ? 'await page.evaluate(async () => await window.__shuncodeWebMcp.prime())' : 'null'};
-    const workerSession = await page.evaluate(() => window.__shuncodeWebMcp.workerSession());
-    return { status, prime, workerSession, url: page.url() };
-  `;
-  const result = await invokeBuiltinBrowserTool('run_playwright_code', { pageId: page.pageId, code, timeoutMs: 20000 });
-  const connected = playwrightResultValue(result, 'WebMCP worker connect');
+  let connected;
+  if (exactTarget) {
+    const internal = await runDeferredInternalBrowserOperation({
+      operationId: 'connect',
+      pageId: page.pageId,
+      input: {
+        target: exactTarget,
+        prime: shouldPrime,
+        bridgePort: PORT,
+        token: WEB_MCP_PAGE_TOKEN,
+      },
+      totalMs: 20000,
+      perAttemptMs: 5000,
+    });
+    connected = internal.result;
+  } else {
+    const source = getArenaAgentSource();
+    const expression = `(${source})(${JSON.stringify({ bridge: `http://${HOST}:${PORT}`, token: WEB_MCP_PAGE_TOKEN })})`;
+    const code = `
+        const expression = ${JSON.stringify(expression)};
+        const status = await page.evaluate(source => (0, eval)(source), expression);
+        const prime = ${shouldPrime ? 'await page.evaluate(async () => await window.__shuncodeWebMcp.prime())' : 'null'};
+        const workerSession = await page.evaluate(() => window.__shuncodeWebMcp.workerSession());
+        return { status, prime, workerSession, url: page.url() };
+      `;
+    const result = await invokeBuiltinBrowserTool('run_playwright_code', { pageId: page.pageId, code, timeoutMs: 20000 });
+    connected = playwrightResultValue(result, 'WebMCP worker connect');
+  }
   if (connected?.status?.version !== 25 || !connected?.workerSession?.sessionId) {
     throw new Error(`WebMCP worker connection did not expose the v25 worker contract: ${JSON.stringify(connected).slice(0, 1200)}`);
   }
@@ -745,40 +975,56 @@ async function controlWebMcpWorkerPage(request) {
   const pageId = String(request?.pageId || '').trim();
   const sessionId = String(request?.sessionId || '').trim();
   const action = String(request?.action || '').trim();
-  if (!pageId || !sessionId || !action) throw new Error('WebMCP worker control requires pageId, sessionId and action.');
-  const payload = {
+  const expectedOrigin = String(request?.expectedOrigin || '').trim();
+  const expectedHref = String(request?.expectedHref || '').trim();
+  const expectedSite = String(request?.expectedSite || '').trim();
+  const allowedActions = new Set(['send', 'poll', 'interrupt', 'resolve', 'health', 'disconnect']);
+  if (!pageId || !sessionId || !action || !expectedOrigin || !expectedHref || !expectedSite) throw new Error('WebMCP worker control requires pageId, sessionId, expectedOrigin, expectedHref, expectedSite and action.');
+  if (expectedHref.length > 2048) throw new Error('WebMCP worker control expectedHref is too large.');
+  if (!allowedActions.has(action)) throw new Error(`Unsupported WebMCP worker control action: ${action}`);
+  const control = {
     sessionId,
     action,
-    input: request?.input,
-    inputId: request?.inputId,
-    result: request?.result,
+    expectedOrigin,
+    expectedHref,
+    expectedSite,
+    ...(action === 'send' ? { input: request?.input } : {}),
+    ...(action === 'poll' || action === 'interrupt' ? { inputId: request?.inputId } : {}),
+    ...(action === 'resolve' ? { result: request?.result } : {}),
   };
-  const code = `
-    const request = ${JSON.stringify(payload)};
-    return await page.evaluate(async request => {
-      const api = window.__shuncodeWebMcp;
-      if (!api || api.version !== 25 || typeof api.workerSession !== 'function') throw new Error('WebMCP v25 worker contract is unavailable on this page');
-      const session = api.workerSession();
-      if (session.sessionId !== request.sessionId) throw new Error('WebMCP worker page session changed; reconnect the worker session');
-      if (request.action === 'send') return await api.workerSend(request.input);
-      if (request.action === 'poll') return api.workerPoll(request.inputId);
-      if (request.action === 'interrupt') return { interrupted: await api.workerInterrupt(request.inputId), turn: api.workerPoll(request.inputId) };
-      if (request.action === 'resolve') return await api.workerResolveCapability(request.result);
-      if (request.action === 'health') return { session, status: api.status() };
-      if (request.action === 'disconnect') {
-        const status = api.status();
-        if (status.workerTurn?.state === 'running') await api.workerInterrupt(status.workerTurn.inputId);
-        return { disconnected: true, session };
-      }
-      throw new Error('Unsupported WebMCP worker action: ' + request.action);
-    }, request);
-  `;
-  const result = await invokeBuiltinBrowserTool('run_playwright_code', {
-    pageId,
-    code,
-    timeoutMs: action === 'send' ? 20000 : 10000,
-  });
-  return playwrightResultValue(result, `WebMCP worker ${action}`);
+  const invokeFixedControl = async () => {
+    // Visibility is checked after provider-write pacing so another queued page
+    // cannot steal focus between this guard and the exact fixed control.
+    if (action === 'send') {
+      await ensureExactSharedBrowserPageVisible({
+        pageId,
+        expectedUrl: expectedHref,
+        expectedOrigin,
+        label: 'WebMCP worker send page',
+      });
+    }
+    return await runDeferredInternalBrowserOperation({
+      operationId: 'control',
+      pageId,
+      input: { control },
+      deferredInput: { control },
+      totalMs: action === 'send' ? WEB_MCP_SEND_TOTAL_MS : WEB_MCP_CONTROL_TOTAL_MS,
+      perAttemptMs: WEB_MCP_CONTROL_ATTEMPT_MS,
+    });
+  };
+  const isDeepSeekProviderWrite = expectedSite === 'deepseek'
+    && expectedOrigin === 'https://chat.deepseek.com'
+    && (action === 'send' || action === 'resolve');
+  if (isDeepSeekProviderWrite && !deepSeekProviderWriteGate) {
+    throw new Error('DeepSeek provider write gate is not initialized.');
+  }
+  const provenPreAdmissionRateLimit = error => action === 'resolve'
+    && isDeepSeekRateLimitError(error)
+    && /before exact user-message admission/i.test(String(error?.message || error || ''));
+  const fixed = isDeepSeekProviderWrite
+    ? await deepSeekProviderWriteGate.execute(invokeFixedControl, { retryIf: provenPreAdmissionRateLimit })
+    : await invokeFixedControl();
+  return fixed.result;
 }
 
 async function stopCurrentWebMcpPage(output) {
@@ -968,8 +1214,39 @@ async function invoke(name, input) {
 function activate(context) {
   const output = vscode.window.createOutputChannel('Integrated Browser Bridge');
   context.subscriptions.push(output);
+  webMcpStorageDirectory = context.globalStorageUri.fsPath;
+  fs.mkdirSync(webMcpStorageDirectory, { recursive: true });
+  let pairingSecretPromise;
+  personalEdgeToken = () => pairingSecretPromise ??= (async () => {
+    if (!context.secrets) throw new Error('Personal Edge 配对需要宿主 SecretStorage。');
+    const key = 'nimora.personalEdge.pairingToken.v1';
+    const saved = await context.secrets.get(key);
+    if (typeof saved === 'string' && /^[A-Za-z0-9_-]{43}$/.test(saved)) return saved;
+    const token = require('node:crypto').randomBytes(32).toString('base64url');
+    await context.secrets.store(key, token);
+    return token;
+  })();
+  const chatGptWorkerController = createChatGptWorkerController({
+    invokeBrowserTool: invokeBuiltinBrowserTool,
+    ensureExactPageVisible: ensureExactSharedBrowserPageVisible,
+    observeExactComposer: observeExactChatGptComposer,
+    observeExactProviderUsers: observeExactChatGptProviderUsers,
+    getSiteAdapterSource: getWebMcpSiteAdapterSource,
+    resultText,
+    structuredValue: playwrightResultValue,
+  });
 
   webMcpApprovalMode = normalizeWebMcpApprovalMode(context.globalState.get(WEB_MCP_APPROVAL_MODE_KEY, 'session'));
+  const now = Date.now();
+  const storedLastWriteAt = Number(context.globalState.get(WEB_MCP_DEEPSEEK_LAST_WRITE_AT_KEY, 0));
+  const storedCooldownUntil = Number(context.globalState.get(WEB_MCP_DEEPSEEK_COOLDOWN_UNTIL_KEY, 0));
+  deepSeekProviderWriteGate = createDeepSeekProviderWriteGate({
+    initialLastWriteStartedAt: Number.isFinite(storedLastWriteAt) && storedLastWriteAt <= now ? storedLastWriteAt : 0,
+    initialCooldownUntil: Number.isFinite(storedCooldownUntil) && storedCooldownUntil > now && storedCooldownUntil <= now + 5 * 60_000
+      ? storedCooldownUntil : 0,
+    onWriteStarted: startedAt => context.globalState.update(WEB_MCP_DEEPSEEK_LAST_WRITE_AT_KEY, startedAt),
+    onCooldown: cooldownUntil => context.globalState.update(WEB_MCP_DEEPSEEK_COOLDOWN_UNTIL_KEY, cooldownUntil),
+  });
 
   webMcpStatusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   webMcpStatusItem.command = 'shuncode.webMcp.connect';
@@ -988,9 +1265,35 @@ function activate(context) {
     vscode.commands.registerCommand('shuncode.webMcp.clipboard', () => safeClipboardWebMcpStep(output)),
     vscode.commands.registerCommand('shuncode.webMcp.stop', () => stopCurrentWebMcpPage(output)),
     vscode.commands.registerCommand('shuncode.webMcp.status', () => showWebMcpStatus()),
+    vscode.commands.registerCommand('shuncode.webMcp.pairPersonalEdge', async () => {
+      const ready = await ensureWebMcpGateway(output);
+      if (ready.controlVersion < 3 || ready.personalEdgePairing !== 'private-token') throw new Error('当前 Gateway 尚未加载私人口令配对版本。请在无活动工作时重启源码宿主。');
+      const endpoint = `http://${WEB_MCP_HOST}:${WEB_MCP_PORT}`;
+      await vscode.window.showInputBox({ title: 'Personal Edge 私人口令',
+        prompt: `打开 Personal Edge 扩展设置，地址填写 ${endpoint}；将下方口令复制到设置并验证。`,
+        value: await personalEdgeToken(), password: true, ignoreFocusOut: true });
+      return { state: 'pairing-instructions-shown', endpoint };
+    }),
     vscode.commands.registerCommand('shuncode.webMcp.approvalMode', () => chooseWebMcpApprovalMode(context)),
     vscode.commands.registerCommand('_shuncode.webMcp.getPrompt', options => getIntegratedWebMcpPrompt(output, options)),
     vscode.commands.registerCommand('_shuncode.webMcp.invoke', request => invokeIntegratedWebMcpTool(output, request)),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerListResources', () => listSharedWebMcpWorkerResources(output)),
+    vscode.commands.registerCommand('_shuncode.webMcp.archiveRetiredConversation', async request => {
+      if (!request || !['deepseek', 'chatgpt'].includes(request.provider) || !request.pageId || !request.adapterSessionId) throw new Error('Archive requires the exact retired page identity.');
+      const observe = () => request.provider === 'deepseek' ? probeSharedWebMcpWorkerResource(request.pageId) : chatGptWorkerController.probeResource(request.pageId);
+      const assertSettled = async () => {
+        const row = await observe();
+        if (!row || row.href !== request.expectedHref || row.ready !== true
+          || (request.provider === 'deepseek' ? row.pageSessionId !== request.adapterSessionId || (row.workerTurnState !== 'idle' && row.workerTurnState !== 'completed')
+            : row.lifecycleIdentity !== request.adapterSessionId || typeof row.stopButtonRef !== 'string' || row.stopButtonRef !== '')) throw new Error('Retired cleanup page identity or settled state changed. Do not replay.');
+      };
+      await assertSettled();
+      await ensureExactSharedBrowserPageVisible({ pageId: request.pageId, expectedUrl: request.expectedHref, label: 'retired provider cleanup page' });
+      return runProviderConversationCleanup({ readPage: async pageId => resultText(await invokeBuiltinBrowserTool('read_page', { pageId })),
+        clickElement: async (pageId, ref, element) => { await assertSettled(); return invokeBuiltinBrowserTool('click_element', { pageId, ref, element }); } },
+        { ...request, mode: 'archive-only' });
+    }),
+    vscode.commands.registerCommand('_shuncode.webMcp.workerProbeResource', request => probeSharedWebMcpWorkerResource(request?.pageId)),
     vscode.commands.registerCommand('_shuncode.webMcp.workerConnect', options => connectWebMcpWorkerPage(output, options)),
     vscode.commands.registerCommand('_shuncode.webMcp.workerSend', request => controlWebMcpWorkerPage({ ...request, action: 'send' })),
     vscode.commands.registerCommand('_shuncode.webMcp.workerPoll', request => controlWebMcpWorkerPage({ ...request, action: 'poll' })),
@@ -998,6 +1301,14 @@ function activate(context) {
     vscode.commands.registerCommand('_shuncode.webMcp.workerResolve', request => controlWebMcpWorkerPage({ ...request, action: 'resolve' })),
     vscode.commands.registerCommand('_shuncode.webMcp.workerHealth', request => controlWebMcpWorkerPage({ ...request, action: 'health' })),
     vscode.commands.registerCommand('_shuncode.webMcp.workerDisconnect', request => controlWebMcpWorkerPage({ ...request, action: 'disconnect' })),
+    vscode.commands.registerCommand('_shuncode.chatgptWorker.listResources', () => chatGptWorkerController.listResources()),
+    vscode.commands.registerCommand('_shuncode.chatgptWorker.probeResource', request => chatGptWorkerController.probeResource(request?.pageId)),
+    vscode.commands.registerCommand('_shuncode.chatgptWorker.connect', options => chatGptWorkerController.connect(options)),
+    vscode.commands.registerCommand('_shuncode.chatgptWorker.send', request => chatGptWorkerController.control({ ...request, action: 'send' })),
+    vscode.commands.registerCommand('_shuncode.chatgptWorker.poll', request => chatGptWorkerController.control({ ...request, action: 'poll' })),
+    vscode.commands.registerCommand('_shuncode.chatgptWorker.interrupt', request => chatGptWorkerController.control({ ...request, action: 'interrupt' })),
+    vscode.commands.registerCommand('_shuncode.chatgptWorker.health', request => chatGptWorkerController.control({ ...request, action: 'health' })),
+    vscode.commands.registerCommand('_shuncode.chatgptWorker.disconnect', request => chatGptWorkerController.control({ ...request, action: 'disconnect' })),
   );
   updateWebMcpStatus('$(plug) Web MCP', '连接当前内置浏览器聊天页');
 

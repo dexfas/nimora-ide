@@ -745,14 +745,17 @@ async function commitPlans(plans: MutationPlan[], signal?: AbortSignal): Promise
       if (signal?.aborted) throw new DOMException("Patch application was cancelled.", "AbortError");
       if (plan.action === "update") {
         await assertSourceUnchanged(plan);
+        if (signal?.aborted) throw new DOMException("Patch application was cancelled.", "AbortError");
         await replaceExistingFromStage(stagedFor(plan, staged));
       } else if (plan.action === "add") {
         await installNewFromStage(stagedFor(plan, staged));
       } else if (plan.action === "delete") {
         await assertSourceUnchanged(plan);
+        if (signal?.aborted) throw new DOMException("Patch application was cancelled.", "AbortError");
         await unlink(plan.sourcePath!);
       } else {
         await assertSourceUnchanged(plan);
+        if (signal?.aborted) throw new DOMException("Patch application was cancelled.", "AbortError");
         const entry = stagedFor(plan, staged);
         await installNewFromStage(entry);
         try {

@@ -186,6 +186,21 @@ Manager 不拥有 transcript、Task goal、capability policy 或 context packing
 
 运行中的 WorkerSession 不允许 rebind/unbind。这个限制不是 UI 偏好，而是 ownership invariant：一次 turn 尚未结束时，不能把同一执行 session 从 Task A 静默改挂到 Task B。
 
+Mission Work Phase 2 在 Manager 上增加了显式 retirement，并把 detach 与 retirement 分开：
+
+- `dispose()` 仍代表普通资源失败/释放：若绑定 Task，则当下只 durable detach；Mission 本身继续存在，可以创建 replacement Worker。若 Mission 以后完成，该历史 detached ref 仍会被 finalization service 补成 durable retirement；
+- `retire()` 代表显式 Worker-ref retirement：正常路径先通过 Task binding strict 写 `TaskWorkerRetired`，再从 active routing 移除 session，最后 best-effort 调 provider `dispose()`；Mission finalization 本身也会让其历史 provider-native identities 在 durable authority 中立即死亡；
+- provider cleanup 失败只记录 `disposeError`，retired tombstone 仍然生效且可重试 cleanup；所有 `send/bind/resume/...` active routing 都拒绝 retired managed id；
+- provider-native lifecycle identity 是 `workerId + adapterSessionId`。Manager 对该 identity 串行化 create publication、bind/unbind、dispose 与 retirement；`retireAdapterSession()` 会按 native identity 找到 live wrapper，即使它已经换了 fresh `managedSessionId` 或当前绑定到另一个尚未完成的 Mission；
+- Mission finalization 对其完整 durable Worker history 建立 provider-native death authority；`TaskRuntime.isWorkerAdapterSessionRetired()` 从 `TaskMissionFinalized` 或 `TaskWorkerRetired` 派生该事实，因此不依赖 Manager-local tombstone、managed id 或仍存活的 wrapper；
+- `MissionFinalizationService` 先在 Task authority 中安装 Mission-level admission fence，再从该稳定快照收集 Mission-owned native identities；task-exclusive lock 随即释放，之后才取得排序后的 Manager lifecycle barriers。这个短 fence 阻止 snapshot 之后的新 create/attach/rebind/send continuation，因此“未知于初始 identity snapshot 的 late identity”也不能逃逸，同时 lock ordering 不会形成 task-lock → provider-lock 环；
+- `send()` 返回的 stream 本身不构成不可撤销 provider capability。第一次实际消费、`bind/unbind`、`resume` 都在 provider-native barrier 内重新检查 durable death 和普通 Mission admission；只有通过检查的 send 才取得 active-send lease 并调用 adapter。send-start 若先线性化，lease 使 session 暴露为 `running`；finalizer 检测到 lease 后先释放 barriers，等待 terminal/cancellation/error cleanup，再重新取得 barriers并继续，而不是持锁等待。若该已经 admission 的 turn 在等待期发出 host-requested capability，pending result 会绑定 exact `inputId + callId + capability + send-lease token`；结果回送仍重验 durable death，但可穿过临时 finalization fence以完成同一 turn。该 authority 随 terminal/cancel/error/consumer-close 清理，且不能授权新 send/create/attach/rebind/resume。finalization fence 若先线性化，则 late attach/create/send fail closed，provider send 不会开始；
+- Manager tombstone 只是 active routing cache，不是死亡 Source of Truth。若 A-owned identity 当前包装在 Mission B，A finalization 建立的 durable death 仍可移除该旧 wrapper；即使 B 的附属 `TaskWorkerRetired` bookkeeping 因 journal 故障失败，也只记录 `ownershipPersistenceError`，不能让旧 identity fail-open，也不能杀死/完成 B。B 可绑定真正新的 provider identity继续；
+- exact rebind 不转移旧 Mission 对该 provider-native conversation 的 death authority：A 历史上拥有的 exact identity 即使当前绑定 B，A finalization 仍会退休该 Worker ref；B 本身保持未 finalization，可用真正新的 provider identity 创建 replacement Worker；
+- 这些规则不读取 provider transcript，也不把 transcript 变成 Task Source of Truth。
+
+Coordinator Worker 没有特殊生命周期豁免；如果它所属 Mission finalizes，它与普通 cognition/practice Worker 一样退休。
+
 ## 6.2 Context Handoff
 
 Phase 4.4 已新增 `src/context-handoff.ts`。Worker 切换不复制完整旧 transcript，而是从 durable Task Snapshot 构造 bounded、provider-neutral 的 handoff package：

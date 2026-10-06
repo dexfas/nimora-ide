@@ -10,6 +10,12 @@ import { autorun } from '../../../../../../base/common/observable.js';
 import { mark } from '../../../../../../base/common/performance.js';
 import { ThemeIcon } from '../../../../../../base/common/themables.js';
 import { localize } from '../../../../../../nls.js';
+import { CommandsRegistry } from '../../../../../../platform/commands/common/commands.js';
+import { agentHostWorkerDiscovery } from '../../../../../../../agent-host-worker-discovery.js';
+import { AgentHostClientToolBridge } from '../../../../../../../agent-host-client-tool-bridge.js';
+import type { ClientToolWorkerOptions } from '../../../../../../../agent-host-client-tool-worker.js';
+import { supportsClientToolScope } from '../../../../../../platform/agentHost/common/clientToolScope.js';
+import type { WorkerCapabilityResultInput, WorkerInput, WorkerSessionHandle } from '../../../../../../../worker-contract.js';
 import { affectsAgentHostProviderPreference, IAgentHostService, shouldSurfaceLocalAgentHostProvider, type AgentProvider } from '../../../../../../platform/agentHost/common/agentService.js';
 import { IAgentHostEnablementService } from '../../../../../../platform/agentHost/common/agentHostEnablementService.js';
 import { type ProtectedResourceMetadata } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
@@ -36,6 +42,26 @@ import { AgentHostSessionHandler } from './agentHostSessionHandler.js';
 import { AgentHostPromptCacheNotification } from './agentHostPromptCacheNotification.js';
 import { IAgentHostActiveClientService } from './agentHostActiveClientService.js';
 import { AICustomizationManagementSection } from '../../../common/aiCustomizationWorkspaceService.js';
+
+const clientToolBridges = new WeakMap<IAgentHostService, AgentHostClientToolBridge>();
+CommandsRegistry.registerCommand('_agentHost.workerSnapshot', accessor => ({
+	...agentHostWorkerDiscovery(accessor.get(IAgentHostService).rootState.value),
+	clientToolWorkerVersion: supportsClientToolScope(accessor.get(IAgentHostService).rootState.value) ? 1 : 0,
+}));
+CommandsRegistry.registerCommand('_agentHost.clientToolWorker', (accessor, request: { operation: string; options: ClientToolWorkerOptions; handle: WorkerSessionHandle; input: WorkerInput; result: WorkerCapabilityResultInput }) => {
+	const service = accessor.get(IAgentHostService);
+	let bridge = clientToolBridges.get(service);
+	if (!bridge) { bridge = new AgentHostClientToolBridge(service); clientToolBridges.set(service, bridge); }
+	switch (request.operation) {
+		case 'create': return bridge.create(request.options);
+		case 'start': return bridge.start(request.handle, request.input);
+		case 'poll': return bridge.poll(request.handle);
+		case 'complete': return bridge.complete(request.handle, request.result);
+		case 'interrupt': return bridge.interrupt(request.handle);
+		case 'dispose': return bridge.dispose(request.handle);
+		default: throw new Error('Unsupported client tool worker operation');
+	}
+});
 
 const LOCAL_AGENT_HOST_SESSION_TYPE_PREFIX = 'agent-host-';
 

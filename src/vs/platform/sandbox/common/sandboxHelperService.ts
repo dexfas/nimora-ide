@@ -21,6 +21,28 @@ export interface IWindowsMxcFilesystemPolicy {
 	readonly readwritePaths: string[];
 }
 
+export interface IWindowsMxcPlatformSupport {
+	readonly isSupported: boolean;
+	readonly availableMethods: string[];
+	readonly isolationTier?: 'base-container' | 'appcontainer-bfs' | 'appcontainer-dacl';
+	readonly isolationWarnings?: string[];
+}
+
+/**
+ * Stable unattended execution refuses MXC's DACL-mutation fallback. The caller
+ * must have a process-container backend whose isolation is provided by
+ * BaseContainer or AppContainer+BFS instead of host ACL rewriting.
+ */
+export function assertWindowsMxcStableIsolationSupport(support: IWindowsMxcPlatformSupport | undefined): void {
+	if (!support?.isSupported || !support.availableMethods.includes('processcontainer') || !support.isolationTier) {
+		throw new Error('Strict terminal sandbox requires a verified Windows MXC process-container isolation tier');
+	}
+	if (support.isolationTier === 'appcontainer-dacl') {
+		const detail = support.isolationWarnings?.length ? ` ${support.isolationWarnings.join(' | ')}` : '';
+		throw new Error(`Strict terminal sandbox rejects the AppContainer+DACL fallback; BaseContainer or AppContainer+BFS is required for Stable execution.${detail}`);
+	}
+}
+
 /** Sandbox policy passed to the Windows MXC helper process. */
 export interface IWindowsMxcSandboxPolicy {
 	version: string;
@@ -97,6 +119,7 @@ export type IWindowsMxcPolicyContainment = 'process' | 'vm' | 'microvm' | 'proce
 export interface ISandboxHelperService {
 	readonly _serviceBrand: undefined;
 	checkSandboxDependencies(): Promise<ISandboxDependencyStatus | undefined>;
+	getWindowsMxcPlatformSupport?(): Promise<IWindowsMxcPlatformSupport | undefined>;
 	getWindowsMxcFilesystemPolicy(): Promise<IWindowsMxcFilesystemPolicy | undefined>;
 	getWindowsMxcEnvironment(): Promise<string[] | undefined>;
 	buildWindowsMxcSandboxPayload(commandLine: string, policy: IWindowsMxcSandboxPolicy, workingDirectory?: string, containerName?: string, containment?: IWindowsMxcPolicyContainment): Promise<IWindowsMxcConfig | undefined>;

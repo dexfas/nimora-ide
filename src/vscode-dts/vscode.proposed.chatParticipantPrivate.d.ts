@@ -49,6 +49,9 @@ declare module 'vscode' {
 	}
 
 	export interface ChatRequest {
+		/** Existing ShunCode round intent; restricted to the private participant API. */
+		readonly shunCodeBranchIntent?: { kind: 'branch' | 'merge'; groupId?: string };
+		/** Whether this request was submitted through Agents Voice Mode. */
 		/**
 		 * The id of the chat request. Used to identity an interaction with any of the chat surfaces.
 		 */

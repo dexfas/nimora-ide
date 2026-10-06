@@ -151,6 +151,8 @@ declare module 'vscode' {
 	 * Represents a skill resource.
 	 */
 	export interface ChatSkill {
+		/** Current platform enablement. Missing metadata from an older host is not permission to load it. */
+		readonly enabled?: boolean;
 		/**
 		 * Uri to the chat resource. This is typically a `.agent.md`, `.instructions.md`, `.prompt.md`, or `SKILL.md` file.
 		 */

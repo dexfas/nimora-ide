@@ -4,6 +4,7 @@ import net from 'node:net';
 import express from 'express';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client as ModernClient, StreamableHTTPClientTransport as ModernTransport } from '@modelcontextprotocol/client';
 import { createGatewayMcpExposureAdapter } from '../tools/webmcp-gateway/mcp-exposure-adapter.mjs';
 
 async function freePort() {
@@ -74,7 +75,15 @@ try {
   assert.match(result.content.map(part => part.type === 'text' ? part.text : '').join('\n'), /ECHO:nimora/);
   assert.deepEqual(calls, [{ name: 'echo', args: { text: 'nimora' } }]);
 
-  console.log('[smoke] Gateway MCP exposure initialize/session/list/call/invalid-session contract ok');
+  const modernClient = new ModernClient({ name: 'modern-gateway-smoke', version: '1' }, { versionNegotiation: { mode: { pin: '2026-07-28' } } });
+  try {
+    await modernClient.connect(new ModernTransport(new URL(endpoint)));
+    assert.equal(exposure.sessionCount(), 1, 'modern client must not allocate legacy session');
+    assert.deepEqual((await modernClient.listTools()).tools.map(tool => tool.name), ['echo']);
+    assert.match(JSON.stringify(await modernClient.callTool({ name: 'echo', arguments: { text: 'modern' } })), /ECHO:modern/);
+  } finally { await modernClient.close(); }
+
+  console.log('[smoke] Gateway MCP exposure legacy session + modern discover/list/call, invalid-session contract ok');
 } finally {
   try { await client.close(); } catch {}
   await new Promise(resolve => server.close(resolve));
